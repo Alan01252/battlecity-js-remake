@@ -13,19 +13,17 @@ import {play} from './src/play';
 import * as mapBuilder from "./src/mapBuilder";
 
 
-var type = "WebGL"
+var type = "WebGL";
 
 if (!utils.isWebGLSupported()) {
     type = "canvas"
 }
 
 
-var renderer = PIXI.autoDetectRenderer(800, 800);
-document.body.appendChild(renderer.view);
 
 
-var stage = new PIXI.Container();
-renderer.render(stage);
+var app = new PIXI.Application();
+document.body.appendChild(app.view);
 
 const game = {
     map: [],
@@ -34,10 +32,20 @@ const game = {
     lastTick: 0,
     timePassed: 0,
     textures: [],
+    maxMapX: 800,
+    maxMapY: 800,
     player: {
         isTurning: 0,
         timeTurn: 0,
         direction: 0,
+        defaultOffset: {
+            x: (800/2) -24,
+            y: (800/2) -24
+        },
+        groundOffset: {
+            x: 48,
+            y: 48
+        },
         offset: {
             x: 0,
             y: 0,
@@ -45,8 +53,9 @@ const game = {
             vy: 0
         }
     },
-    stage: stage
+    stage: app.stage
 };
+
 
 
 PIXI.loader
@@ -84,8 +93,8 @@ function setup() {
     var tankRectangle = new Rectangle(0, 0, 48, 48);
     game.textures['tankTexture'].frame = tankRectangle;
     var playersTank = new Sprite(game.textures['tankTexture']);
-    playersTank.x = 400;
-    playersTank.y = 400;
+    playersTank.x = game.player.groundOffset.x;
+    playersTank.y = game.player.groundOffset.y;
     playersTank.vx = 0;
     playersTank.vy = 0;
 
@@ -100,12 +109,10 @@ function gameLoop() {
 
     game.lastTick = game.tick;
     game.tick = new Date().getTime();
-    game.timePassed = (game.tick - game.lastTick) / 10;
+    game.timePassed = (game.tick - game.lastTick);
 
     play(game);
     draw(game);
-
-    renderer.render(stage);
 
 }
 
