@@ -11,6 +11,7 @@ import {
 import {draw} from './src/draw'
 import {play} from './src/play';
 import * as mapBuilder from "./src/mapBuilder";
+import BulletFactory from "./src/factories/BulletFactory"
 
 
 var type = "WebGL";
@@ -55,8 +56,7 @@ const game = {
     },
     stage: app.stage
 };
-
-
+game.bulletFactory = new BulletFactory(game);
 
 PIXI.loader
     .add([
@@ -64,6 +64,7 @@ PIXI.loader
         "data/imgGround.bmp",
         "data/imgLava.bmp",
         "data/imgRocks.bmp",
+        "data/imgbullets.bmp",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -89,6 +90,7 @@ function setup() {
     game.textures['tankTexture'] = TextureCache["data/imgTanks.bmp"];
     game.textures['rockTexture'] = TextureCache["data/imgRocks.bmp"];
     game.textures['lavaTexture'] = TextureCache["data/imgLava.bmp"];
+    game.textures['bulletTexture'] = TextureCache["data/imgbullets.bmp"];
 
     var tankRectangle = new Rectangle(0, 0, 48, 48);
     game.textures['tankTexture'].frame = tankRectangle;
@@ -110,6 +112,8 @@ function gameLoop() {
     game.lastTick = game.tick;
     game.tick = new Date().getTime();
     game.timePassed = (game.tick - game.lastTick);
+
+    game.bulletFactory.cycle();
 
     play(game);
     draw(game);

@@ -1,7 +1,10 @@
+import {TIMER_SHOOT_LASER} from "./constants";
 /**
  * Created by alan on 27/03/17.
  */
 
+
+var lastShot = 0;
 
 var keyboard = (keyCode) => {
     var key = {};
@@ -45,7 +48,8 @@ export const setupInputs = (game) => {    //Capture the keyboard arrow keys
     var left = keyboard(37),
         up = keyboard(38),
         right = keyboard(39),
-        down = keyboard(40);
+        down = keyboard(40),
+        shift = keyboard(16)
 
 
     //Left arrow key `press` method
@@ -82,4 +86,29 @@ export const setupInputs = (game) => {    //Capture the keyboard arrow keys
     down.release = function () {
         game.player.isMoving = 0;
     };
-}
+
+    shift.press = function () {
+        console.log("shift key pressed");
+        if (game.tick > lastShot) {
+            lastShot = game.tick + TIMER_SHOOT_LASER;
+
+            console.log("Player fired shot ");
+
+            var fDir = game.player.direction;
+
+            console.log("direction " + fDir);
+
+            var x = (Math.sin((fDir / 16) * 3.14));
+            var y = (Math.cos((fDir / 16) * 3.14)) * -1;
+
+            var x = ((game.player.defaultOffset.x + 20 ) + (x * 20));
+            var y = ((game.player.defaultOffset.y + 20 ) + (y * 20));
+
+            console.log(x);
+            console.log(y);
+
+            game.bulletFactory.newBullet(x, y, 0, game.player.direction);
+        }
+
+    }
+};

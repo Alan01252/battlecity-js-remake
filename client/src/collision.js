@@ -20,37 +20,18 @@ var checkTiles = (game, playerRect) => {
 
     var map = game["map"];
 
-    var left = Math.floor((playerRect.x) / 48) ;
+    var left = Math.floor((playerRect.x) / 48);
     var right = Math.floor((playerRect.x + playerRect.w) / 48);
-    var top  = Math.floor((playerRect.y) / 48);
+    var top = Math.floor((playerRect.y) / 48);
     var bottom = Math.floor((playerRect.y + playerRect.h) / 48);
 
-    for(var i = 0; i < 10; i++)  {
-        var row = [];
-        for(var j = 0; j < 10; j++)  {
-            if (top == i && left == j) {
-                row.push("x");
-            } else {
-                row.push(map[j][i]);
-            }
-        }
-        console.log(row.join());
+    if (left && right && top && bottom) {
+        //Map Terrain (lava, rocks, CC corners)
+        if (map[left][top] != 0) return COLLISION_BLOCKING;
+        if (map[right][top] != 0) return COLLISION_BLOCKING; //top right corner
+        if (map[right][bottom] != 0) return COLLISION_BLOCKING; //bottom right corner
+        if (map[left][bottom] != 0) return COLLISION_BLOCKING; //bottom left corner
     }
-    console.log("x left" + left);
-    console.log("x right" + right);
-    console.log("y top" + top);
-    console.log("y bottom" + bottom);
-
-    console.log("left top contains " + map[left][top]);
-    console.log("right top contains " + map[right][top]);
-    console.log("bottom left contains " + map[left][bottom]);
-    console.log("bottom right contains " + map[right][bottom]);
-
-    //Map Terrain (lava, rocks, CC corners)
-    if (map[left][top] != 0) return COLLISION_BLOCKING;
-    if (map[right][top] != 0) return COLLISION_BLOCKING; //top right corner
-    if (map[right][bottom] != 0) return COLLISION_BLOCKING; //bottom right corner
-    if (map[left][bottom] != 0) return COLLISION_BLOCKING; //bottom left corner
 
     return 0;
 

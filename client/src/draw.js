@@ -4,45 +4,21 @@ import {Rectangle} from '../node_modules/pixi.js/dist/pixi.min';
 
 import {MAP_SQUARE_LAVA, MAP_SQUARE_ROCK} from './constants'
 
-var spriteCache = [];
+
+var cachedTextures = [];
 
 var drawGround = (game, stage, groundOffsetX, groundOffsetY) => {
     for (var i = -6; i < 6; i++) {
         for (var j = -6; j < 6; j++) {
             var imgGround = new Sprite(game.textures['groundTexture']);
-            imgGround.x = (128 * i) + groundOffsetX;
-            imgGround.y = (128 * j) + groundOffsetY;
+            imgGround.x = (128 * i);
+            imgGround.y = (128 * j);
             stage.addChild(imgGround);
         }
     }
 };
 
-
-var cachedTextures = [];
-
-export const draw = (game) => {
-
-    var stage = game.stage;
-
-
-
-    for (var i = stage.children.length - 1; i >= 0; i--) {
-        stage.children[i].destroy();
-        stage.removeChild(stage.children[i]);
-    }
-
-    var offsetX = game.player.offset.x % 48; // Number of tank tiles on x axis
-    var offsetY = game.player.offset.y % 48; // Number of tank tiles on y axis
-
-    var groundOffsetX = game.player.offset.x % 128; // Number of tank tiles on x axis
-    var groundOffsetY = game.player.offset.y % 128; // Number of tank tiles on y axis
-
-    var exactX = game.player.offset.x / 48;
-    var exactY = game.player.offset.y / 48;
-
-
-    drawGround(game, stage, groundOffsetX, groundOffsetY);
-
+var drawTiles = (game, stage, exactX, exactY) => {
 
     for (var i = -16; i < 16; i++) {
         for (var j = -16; j < 16; j++) {
@@ -95,6 +71,9 @@ export const draw = (game) => {
             }
         }
     }
+};
+
+var drawTank = (game, stage) => {
 
     var tmpText = game.textures['tankTexture'].clone();
     var tankRect = new Rectangle(Math.floor((game.player.direction / 2)) * 48, 0, 48, 48);
@@ -102,6 +81,55 @@ export const draw = (game) => {
     var playerTank = new Sprite(tmpText);
     playerTank.x = game.player.defaultOffset.x;
     playerTank.y = game.player.defaultOffset.y;
-    stage.addChild(playerTank);
 
+    stage.addChild(playerTank);
+};
+
+var drawBullets = (game, stage) => {
+    var bullet = game.bulletFactory.getHead();
+
+
+    while (bullet) {
+
+        var tmpText = game.textures['bulletTexture'].clone();
+        var bulletRect = new Rectangle(bullet.animation * 8, 0, 8, 8);
+        tmpText.frame = bulletRect;
+        var sprite = new Sprite(tmpText);
+        sprite.x = bullet.x;
+        sprite.y = bullet.y;
+
+        bullet.animation++;
+        if (bullet.animation > 3) {
+            bullet.animation = 0;
+        }
+
+        stage.addChild(sprite);
+
+        bullet = bullet.next;
+    }
+};
+
+
+export const draw = (game) => {
+
+    var stage = game.stage;
+
+
+    for (var i = stage.children.length - 1; i >= 0; i--) {
+        stage.children[i].destroy();
+        stage.removeChild(stage.children[i]);
+    }
+
+
+    var groundOffsetX = game.player.offset.x % 128; // Number of tank tiles on x axis
+    var groundOffsetY = game.player.offset.y % 128; // Number of tank tiles on y axis
+
+    var exactX = game.player.offset.x / 48;
+    var exactY = game.player.offset.y / 48;
+
+
+    drawGround(game, stage, groundOffsetX, groundOffsetY);
+    drawTiles(game, stage, exactX, exactY);
+    drawTank(game, stage);
+    drawBullets(game, stage);
 };
