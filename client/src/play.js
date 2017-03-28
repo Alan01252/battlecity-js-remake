@@ -45,8 +45,7 @@ var movePlayer = (game) => {
             game.player.offset.x = 0;
             break;
         case COLLISION_MAP_EDGE_RIGHT:
-            game.player.offset.y = (511) * 48;
-
+            game.player.offset.x = (511) * 48;
             break;
         case COLLISION_BLOCKING:
             console.log("blocking");

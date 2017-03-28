@@ -28,7 +28,7 @@ var drawTiles = (game, stage, exactX, exactY) => {
             var tileY = Math.floor(exactY + j);
 
 
-            if (tileX >= 0 && tileY >= 0 && tileX <= 512 && tileY <= 512) {
+            if (tileX >= 0 && tileY >= 0 && tileX < 512 && tileY < 512) {
 
                 if (game.map[tileX][tileY] == MAP_SQUARE_LAVA) {
 

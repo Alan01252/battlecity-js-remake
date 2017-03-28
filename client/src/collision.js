@@ -9,9 +9,9 @@ var gap = 8;
 
 var checkEdges = (player) => {
     if (player.offset.x < 0) return COLLISION_MAP_EDGE_LEFT;
-    if (player.offset.y > (511 * 48)) return COLLISION_MAP_EDGE_RIGHT;
+    if (player.offset.x > (510 * 48)) return COLLISION_MAP_EDGE_RIGHT;
     if (player.offset.y < 0) return COLLISION_MAP_EDGE_TOP;
-    if (player.offset.y > (511 * 48)) return COLLISION_MAP_EDGE_BOTTOM;
+    if (player.offset.y > (510 * 48)) return COLLISION_MAP_EDGE_BOTTOM;
 
     return 0;
 };
