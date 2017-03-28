@@ -8,7 +8,9 @@ import {
     loader
 } from './node_modules/pixi.js/dist/pixi.min';
 
-import {draw} from './src/draw'
+import {drawChanging} from './src/drawChanging'
+import {drawStatic} from './src/drawStatic'
+
 import {play} from './src/play';
 import * as mapBuilder from "./src/mapBuilder";
 import BulletFactory from "./src/factories/BulletFactory"
@@ -24,11 +26,23 @@ if (!utils.isWebGLSupported()) {
     type = "canvas"
 }
 
-PIXI.glCore.VertexArrayObject.FORCE_NATIVE = true;
-PIXI.settings.SPRITE_MAX_TEXTURES = 1;
 
-var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y, {transparent: true, antialias: true, legacy: true});
+var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
 document.body.appendChild(app.view);
+
+var backgroundContainer = new PIXI.Container();
+var tileContainer = new PIXI.Container();
+var lavaContainer = new PIXI.particles.ParticleContainer();
+var rockContainer = new PIXI.particles.ParticleContainer();
+var objectContainer = new PIXI.Container();
+
+
+app.stage.addChild(backgroundContainer);
+app.stage.addChild(tileContainer);
+app.stage.addChild(lavaContainer);
+app.stage.addChild(rockContainer);
+app.stage.addChild(objectContainer);
+
 
 const game = {
     map: [],
@@ -36,6 +50,7 @@ const game = {
     tick: 0,
     lastTick: 0,
     timePassed: 0,
+    staticTick: 0,
     textures: [],
     maxMapX: RESOLUTION_X - 200,
     maxMapY: RESOLUTION_Y,
@@ -60,7 +75,12 @@ const game = {
             vy: 0
         }
     },
-    stage: app.stage
+    stage: app.stage,
+    backgroundContainer: backgroundContainer,
+    tileContainer: tileContainer,
+    rockContainer: rockContainer,
+    lavaContainer: lavaContainer,
+    objectContainer: objectContainer
 };
 game.bulletFactory = new BulletFactory(game);
 game.socketListener = new SocketListener(game);
@@ -113,6 +133,7 @@ function setup() {
     playersTank.vy = 0;
 
     setupInputs(game);
+    drawStatic(game);
 
     game.socketListener.listen();
     game.socketListener.on("connected", () => {
@@ -127,6 +148,10 @@ function setup() {
 
 function gameLoop() {
 
+    if (game.staticTick > game.tick) {
+        game.staticTick = game.tick + 1000;
+        drawStatic(game);
+    }
 
     game.lastTick = game.tick;
     game.tick = new Date().getTime();
@@ -135,7 +160,7 @@ function gameLoop() {
     game.bulletFactory.cycle();
     game.socketListener.cycle();
 
-    draw(game);
+    drawChanging(game);
     play(game);
 
     requestAnimationFrame(gameLoop);
