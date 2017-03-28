@@ -101,8 +101,8 @@ var drawBullets = (game, stage) => {
         }
 
         var sprite = new Sprite(cachedTextures['bullet']);
-        sprite.x = ((bullet.x + 40) + (376 - game.player.offset.x));
-        sprite.y = ((bullet.y + 40) + (376 - game.player.offset.y));
+        sprite.x = ((bullet.x + 52) + (376 - game.player.offset.x));
+        sprite.y = ((bullet.y + 24) + (376 - game.player.offset.y));
 
         console.log(sprite.x);
         console.log("draw b " + bullet.x + " " + game.player.offset.x);

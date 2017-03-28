@@ -124,10 +124,10 @@ function gameLoop() {
     game.bulletFactory.cycle();
 
 
-    var fDir = -game.player.direction;
-
-
     /*
+     var fDir = -game.player.direction;
+
+
      var x = (Math.sin((fDir / 16) * 3.14) * -1);
      var y = (Math.cos((fDir / 16) * 3.14) * -1);
 
@@ -136,7 +136,6 @@ function gameLoop() {
 
      game.bulletFactory.newBullet(x2, y2, 0, game.player.direction);
      */
-
     draw(game);
     play(game);
 
