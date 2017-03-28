@@ -131,7 +131,6 @@ var drawBullets = (game, stage) => {
 
     while (bullet) {
 
-
         if (!cachedTextures['bullet']) {
             var tmpText = game.textures['bulletTexture'].clone();
             var bulletRect = new Rectangle(bullet.animation * 8, 0, 8, 8);

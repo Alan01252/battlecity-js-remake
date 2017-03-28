@@ -36,16 +36,19 @@ class BulletFactory {
                 bullet.life = BULLET_DEAD;
             }
 
-            if (collidedWithCurrentPlayer(this.game, bullet)) {
 
-                console.log("Bullet collided with me");
-                bullet.life = BULLET_DEAD;
-                if (bullet.shooter !== this.game.player.id) {
+            if (bullet.shooter !== this.game.player.id) {
+
+                if (collidedWithCurrentPlayer(this.game, bullet)) {
+                    console.log("Bullet collided with me");
+                    bullet.life = BULLET_DEAD;
                     if (this.game.player.health > 0) {
                         this.game.player.health -= bullet.damage;
                     }
                 }
             }
+
+
             if (collidedWithAnotherPlayer(this.game, bullet)) {
                 console.log("Bullet collided with me");
                 bullet.life = BULLET_DEAD;
