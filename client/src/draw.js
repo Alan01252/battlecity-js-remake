@@ -91,12 +91,20 @@ var drawBullets = (game, stage) => {
 
     while (bullet) {
 
-        var tmpText = game.textures['bulletTexture'].clone();
-        var bulletRect = new Rectangle(bullet.animation * 8, 0, 8, 8);
-        tmpText.frame = bulletRect;
-        var sprite = new Sprite(tmpText);
-        sprite.x = bullet.x;
-        sprite.y = bullet.y;
+
+        if (!cachedTextures['bullet']) {
+            var tmpText = game.textures['bulletTexture'].clone();
+            var bulletRect = new Rectangle(bullet.animation * 8, 0, 8, 8);
+            tmpText.frame = bulletRect;
+            cachedTextures['bullet'] = tmpText;
+        }
+
+        var sprite = new Sprite(cachedTextures['bullet']);
+        sprite.x = ((bullet.x + 40) + (376 - game.player.offset.x));
+        sprite.y = ((bullet.y + 40)  + (376 - game.player.offset.y));
+
+        console.log(sprite.x);
+        console.log("draw b " + bullet.x + " " + game.player.offset.x);
 
         bullet.animation++;
         if (bullet.animation > 3) {

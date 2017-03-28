@@ -20,10 +20,10 @@ if (!utils.isWebGLSupported()) {
     type = "canvas"
 }
 
+PIXI.glCore.VertexArrayObject.FORCE_NATIVE = true;
+PIXI.settings.SPRITE_MAX_TEXTURES = 1;
 
-
-
-var app = new PIXI.Application();
+var app = new PIXI.Application(800,800,{ transparent: true, antialias: true, legacy:true });
 document.body.appendChild(app.view);
 
 const game = {
@@ -40,15 +40,15 @@ const game = {
         timeTurn: 0,
         direction: 0,
         defaultOffset: {
-            x: (800/2) -24,
-            y: (800/2) -24
+            x: (800 / 2) - 24,
+            y: (800 / 2) - 24
         },
         groundOffset: {
             x: 48,
             y: 48
         },
         offset: {
-            x: 0,
+            x: 340,
             y: 0,
             vx: 0,
             vy: 0
@@ -78,13 +78,12 @@ function loadProgressHandler(loader, resource) {
 }
 
 
-
 function setup() {
     console.log("everything loaded");
 
 
     var mapData = PIXI.loader.resources["data/map.dat"].data;
-    mapBuilder.build(game,mapData);
+    mapBuilder.build(game, mapData);
 
     game.textures['groundTexture'] = TextureCache["data/imgGround.bmp"];
     game.textures['tankTexture'] = TextureCache["data/imgTanks.bmp"];
@@ -106,7 +105,6 @@ function setup() {
 
 
 function gameLoop() {
-    requestAnimationFrame(gameLoop);
 
 
     game.lastTick = game.tick;
@@ -115,8 +113,26 @@ function gameLoop() {
 
     game.bulletFactory.cycle();
 
-    play(game);
+
+
+    var fDir = -game.player.direction;
+
+
+    /*
+    var x = (Math.sin((fDir / 16) * 3.14) * -1);
+    var y = (Math.cos((fDir / 16) * 3.14) * -1);
+
+    var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
+    var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
+
+    game.bulletFactory.newBullet(x2, y2, 0, game.player.direction);
+     */
+
     draw(game);
+    play(game);
+
+
+    requestAnimationFrame(gameLoop);
 
 }
 

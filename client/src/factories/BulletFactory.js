@@ -1,4 +1,7 @@
 import {MOVEMENT_SPEED_BULLET} from "../constants";
+import {BULLET_ALIVE} from "../constants";
+import {BULLET_DEAD} from "../constants";
+import {collidedWithRock} from "../collision-bullet";
 
 class BulletFactory {
 
@@ -14,16 +17,25 @@ class BulletFactory {
             var fDir = bullet.angle;
 
 
-            var x = (Math.sin((fDir / 16) * 3.14)) * this.game.timePassed * MOVEMENT_SPEED_BULLET;
-            var y = ((Math.cos((fDir / 16) * 3.14)) * -1) * this.game.timePassed * MOVEMENT_SPEED_BULLET;
+            var x = (Math.sin((fDir / 16) * 3.14) * -1 ) * this.game.timePassed * MOVEMENT_SPEED_BULLET;
+            var y = (Math.cos((fDir / 16) * 3.14) * -1) * this.game.timePassed * MOVEMENT_SPEED_BULLET;
 
             bullet.x += x;
             bullet.y += y;
 
+            if ( bullet.x < 0 || bullet.y < 0) {
+                bullet.life = BULLET_DEAD;
+            }
 
-            if (bullet.x > 1000 || bullet.y > 1000 || bullet.x < -1000 || bullet.y < -1000) {
+            if (collidedWithRock(this.game, bullet)) {
+                console.log("Bullet collided");
+                bullet.life = BULLET_DEAD;
+            }
+
+            if (bullet.life == BULLET_DEAD) {
                 bullet = this.deleteBullet(bullet)
-            } else {
+            }
+            else {
                 bullet = bullet.next;
             }
         }
@@ -50,6 +62,7 @@ class BulletFactory {
         var bullet = {
             "x": x,
             "y": y,
+            "life": BULLET_ALIVE,
             "animation": 0,
             "type": type,
             "angle": angle,
@@ -57,8 +70,6 @@ class BulletFactory {
             "previous": null
         };
 
-        console.log("Adding bullet");
-        console.log(bullet);
 
         if (this.bulletListHead) {
             this.bulletListHead.previous = bullet;

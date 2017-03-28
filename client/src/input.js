@@ -94,20 +94,17 @@ export const setupInputs = (game) => {    //Capture the keyboard arrow keys
 
             console.log("Player fired shot ");
 
-            var fDir = game.player.direction;
 
-            console.log("direction " + fDir);
+            var fDir = -game.player.direction;
 
-            var x = (Math.sin((fDir / 16) * 3.14));
-            var y = (Math.cos((fDir / 16) * 3.14)) * -1;
+            var x = (Math.sin((fDir / 16) * 3.14) * -1);
+            var y = (Math.cos((fDir / 16) * 3.14) * -1);
 
-            var x = ((game.player.defaultOffset.x + 20 ) + (x * 20));
-            var y = ((game.player.defaultOffset.y + 20 ) + (y * 20));
+            var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
+            var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
 
-            console.log(x);
-            console.log(y);
+            game.bulletFactory.newBullet(x2, y2, 0, fDir);
 
-            game.bulletFactory.newBullet(x, y, 0, game.player.direction);
         }
 
     }

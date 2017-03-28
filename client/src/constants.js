@@ -12,4 +12,7 @@ export const COLLISION_MAP_EDGE_TOP = 202;
 export const COLLISION_MAP_EDGE_BOTTOM = 203;
 
 
+export const BULLET_ALIVE = 1;
+export const BULLET_DEAD = -1;
+
 export const TIMER_SHOOT_LASER = 650;

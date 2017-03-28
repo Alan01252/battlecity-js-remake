@@ -26,6 +26,7 @@ var turnPlayer = (game) => {
 
 
 var movePlayer = (game) => {
+
     var fDir = -game.player.direction;
     var velocity = (Math.sin((fDir / 16) * 3.14) * game.player.isMoving) * (game.timePassed * MOVEMENT_SPEED_PLAYER);
     if (velocity > 20) {
@@ -34,6 +35,7 @@ var movePlayer = (game) => {
     if (velocity < -20) {
         velocity = -20;
     }
+
     game.player.offset.x += velocity;
 
     console.log("position" + checkPlayerCollision(game));
@@ -47,6 +49,7 @@ var movePlayer = (game) => {
 
             break;
         case COLLISION_BLOCKING:
+            console.log("blocking");
             game.player.offset.x -= velocity;
             break;
         case 0:
@@ -73,15 +76,15 @@ var movePlayer = (game) => {
             game.player.offset.y = (511) * 48;
             break;
         case COLLISION_BLOCKING:
+            console.log("blocking y");
             game.player.offset.y -= velocity;
             break;
         case 0:
             break;
     }
 
-    console.log("players x" + game.player.offset.x + " players y " + game.player.offset.y);
-    console.log("players ground x" + ((game.player.groundOffset.x + game.player.offset.x)
-        + " players ground y " + (game.player.groundOffset.y + game.player.offset.y)));
+    console.log("moved player to x " + game.player.offset.x);
+    console.log("moved player to y " + game.player.offset.y);
 
 };
 
