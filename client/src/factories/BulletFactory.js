@@ -2,6 +2,8 @@ import {MOVEMENT_SPEED_BULLET} from "../constants";
 import {BULLET_ALIVE} from "../constants";
 import {BULLET_DEAD} from "../constants";
 import {collidedWithRock} from "../collision-bullet";
+import {collidedWithCurrentPlayer} from "../collision-bullet";
+import {DAMAGE_LASER} from "../constants";
 
 class BulletFactory {
 
@@ -23,13 +25,19 @@ class BulletFactory {
             bullet.x += x;
             bullet.y += y;
 
-            if ( bullet.x < 0 || bullet.y < 0) {
+            // Offscreen
+            if ( bullet.x < 0 || bullet.x > 24576 || bullet.y < 0 || bullet.y > 24576) {
                 bullet.life = BULLET_DEAD;
             }
 
             if (collidedWithRock(this.game, bullet)) {
-                console.log("Bullet collided");
+                console.log("Bullet collided with rock");
                 bullet.life = BULLET_DEAD;
+            }
+
+            if (collidedWithCurrentPlayer(this.game, bullet)) {
+                bullet.life = BULLET_DEAD;
+                this.game.player.health -= bullet.damage;
             }
 
             if (bullet.life == BULLET_DEAD) {
@@ -64,6 +72,7 @@ class BulletFactory {
             "x": x,
             "y": y,
             "life": BULLET_ALIVE,
+            "damage": DAMAGE_LASER,
             "animation": 0,
             "type": type,
             "angle": angle,
