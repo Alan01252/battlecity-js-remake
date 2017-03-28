@@ -87,6 +87,13 @@ var drawPlayer = (game, stage) => {
 };
 
 var drawOtherPlayers = (game, stage) => {
+
+
+    var myCurrentOffsetX = (game.player.offset.x + game.player.defaultOffset.x);
+    var myCurrentOffsetY = (game.player.offset.y + game.player.defaultOffset.y);
+
+    console.log("This players x,y " + myCurrentOffsetX + " " + myCurrentOffsetY);
+
     Object.keys(game.otherPlayers).forEach((id) => {
 
         var player = game.otherPlayers[id];
@@ -97,8 +104,11 @@ var drawOtherPlayers = (game, stage) => {
         var playerTank = new Sprite(tmpText);
 
 
-        playerTank.x = ((player.offset.x) + (game.player.defaultOffset.x - game.player.offset.x));
-        playerTank.y = ((player.offset.y) + (game.player.defaultOffset.y - game.player.offset.y));
+        playerTank.x = ((player.offset.x) + (game.player.defaultOffset.x - Math.floor(game.player.offset.x/48) * 48));
+        playerTank.y = ((player.offset.y) + (game.player.defaultOffset.y - Math.floor(game.player.offset.y/48) * 48));
+
+        console.log("player tank" + playerTank.x);
+
 
         stage.addChild(playerTank);
     });
@@ -119,7 +129,7 @@ var drawBullets = (game, stage) => {
         }
 
         var sprite = new Sprite(cachedTextures['bullet']);
-        sprite.x = ((bullet.x + 48) + (game.player.defaultOffset.x - game.player.offset.x));
+        sprite.x = ((bullet.x + 48) + (game.player.defaultOffset.x - (game.player.offset.x)));
         sprite.y = ((bullet.y + 48) + (game.player.defaultOffset.y - game.player.offset.y));
         sprite.anchor = {x: 1, y: 1};
 
