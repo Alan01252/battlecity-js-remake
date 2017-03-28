@@ -37,7 +37,9 @@ class BulletFactory {
 
             if (collidedWithCurrentPlayer(this.game, bullet)) {
                 bullet.life = BULLET_DEAD;
-                this.game.player.health -= bullet.damage;
+                if (this.game.player.health > 0) {
+                    this.game.player.health -= bullet.damage;
+                }
             }
 
             if (bullet.life == BULLET_DEAD) {

@@ -15,7 +15,7 @@ var rectangleCollision = (rect1, rect2) => {
     if (rect1.h < rect2.y)
         return false;
     if (rect2.h < rect1.y)
-        return true;
+        return false;
 
     return 1;
 
@@ -40,6 +40,11 @@ export const collidedWithRock = (game, bullet) => {
 };
 
 export const collidedWithCurrentPlayer = (game, bullet) => {
+
+    if (bullet.shooter === game.player.id) {
+        return false;
+    }
+
     var playerRect = {
         x: parseInt(game.player.offset.x),
         y: parseInt(game.player.offset.y),

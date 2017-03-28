@@ -90,6 +90,11 @@ var movePlayer = (game) => {
 
 };
 
+var killPlayer = (game) => {
+    game.player.offset.x = 0;
+    game.player.offset.y = 0;
+};
+
 export const play = (game) => {
     if (game.player.isTurning) {
         turnPlayer(game)
@@ -97,5 +102,9 @@ export const play = (game) => {
 
     if (game.player.isMoving) {
         movePlayer(game);
+    }
+
+    if (game.player.health === 0) {
+        killPlayer(game);
     }
 };
