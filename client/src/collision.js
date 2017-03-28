@@ -46,8 +46,8 @@ export const checkPlayerCollision = (game) => {
      * @type {{x: *, y: *, w: number, h: number}}
      */
     var playerRect = {
-        x: parseInt(game.player.offset.x - gap),
-        y: parseInt(game.player.offset.y - gap),
+        x: parseInt(game.player.offset.x + gap),
+        y: parseInt(game.player.offset.y + gap),
         w: 48 - gap - gap,
         h: 48 - gap - gap
     };
