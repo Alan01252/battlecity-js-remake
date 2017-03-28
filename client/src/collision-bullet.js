@@ -21,6 +21,18 @@ var rectangleCollision = (rect1, rect2) => {
 
 };
 
+var collidedWithPlayer = (playerRect, bullet)=> {
+
+    var bulletRect = {
+        x: bullet.x,
+        y: bullet.y,
+        w: 4,
+        h: 4
+    };
+
+    return rectangleCollision(playerRect, bulletRect);
+};
+
 export const collidedWithRock = (game, bullet) => {
 
     console.log("bulletx " + bullet.x);
@@ -39,11 +51,20 @@ export const collidedWithRock = (game, bullet) => {
     return false;
 };
 
-export const collidedWithCurrentPlayer = (game, bullet) => {
+export const collidedWithAnotherPlayer = (game, bullet) => {
 
-    if (bullet.shooter === game.player.id) {
-        return false;
-    }
+    return Object.keys(game.otherPlayers).some((id) => {
+        var playerRect = {
+            x: parseInt(game.otherPlayers[id].offset.x),
+            y: parseInt(game.otherPlayers[id].offset.y),
+            w: 48,
+            h: 48
+        };
+        return collidedWithPlayer(playerRect, bullet)
+    });
+};
+
+export const collidedWithCurrentPlayer = (game, bullet) => {
 
     var playerRect = {
         x: parseInt(game.player.offset.x),
@@ -52,12 +73,5 @@ export const collidedWithCurrentPlayer = (game, bullet) => {
         h: 48
     };
 
-    var bulletRect = {
-        x: bullet.x,
-        y: bullet.y,
-        w: 4,
-        h: 4
-    };
-
-    return rectangleCollision(playerRect, bulletRect);
+    return collidedWithPlayer(playerRect, bullet);
 };
