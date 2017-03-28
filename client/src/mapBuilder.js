@@ -1,4 +1,3 @@
-import {setupInputs} from './input';
 import {MAP_SQUARE_LAVA} from "./constants";
 import {MAP_SQUARE_ROCK} from "./constants";
 import {MAP_SQUARE_BUILDING} from "./constants";
@@ -80,5 +79,5 @@ export const build = (game, mapData) => {
     createMap(game);
     createTiles(game);
     populateTiles(game,mapData);
-    setupInputs(game);
+
 };

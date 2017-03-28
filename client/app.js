@@ -12,10 +12,11 @@ import {draw} from './src/draw'
 import {play} from './src/play';
 import * as mapBuilder from "./src/mapBuilder";
 import BulletFactory from "./src/factories/BulletFactory"
+import SocketListener from "./src/SocketListener"
 import {RESOLUTION_X} from "./src/constants";
 import {RESOLUTION_Y} from "./src/constants";
 import {MAX_HEALTH} from "./src/constants";
-
+import {setupInputs} from './src/input';
 
 var type = "WebGL";
 
@@ -38,6 +39,7 @@ const game = {
     textures: [],
     maxMapX: RESOLUTION_X - 200,
     maxMapY: RESOLUTION_Y,
+    otherPlayers: {},
     player: {
         health: MAX_HEALTH,
         isTurning: 0,
@@ -52,7 +54,7 @@ const game = {
             y: 48
         },
         offset: {
-            x: 340,
+            x: 0,
             y: 0,
             vx: 0,
             vy: 0
@@ -61,6 +63,7 @@ const game = {
     stage: app.stage
 };
 game.bulletFactory = new BulletFactory(game);
+game.socketListener = new SocketListener(game);
 
 PIXI.loader
     .add([
@@ -109,8 +112,16 @@ function setup() {
     playersTank.vx = 0;
     playersTank.vy = 0;
 
+    setupInputs(game);
 
-    gameLoop();
+    game.socketListener.listen();
+    game.socketListener.on("connected", () => {
+        game.socketListener.enterGame();
+        console.log("Connected starting game");
+        gameLoop();
+    });
+
+
 }
 
 
@@ -122,23 +133,10 @@ function gameLoop() {
     game.timePassed = (game.tick - game.lastTick);
 
     game.bulletFactory.cycle();
+    game.socketListener.cycle();
 
-
-    /*
-     var fDir = -game.player.direction;
-
-
-     var x = (Math.sin((fDir / 16) * 3.14) * -1);
-     var y = (Math.cos((fDir / 16) * 3.14) * -1);
-
-     var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
-     var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
-
-     game.bulletFactory.newBullet(x2, y2, 0, game.player.direction);
-     */
     draw(game);
     play(game);
-
 
     requestAnimationFrame(gameLoop);
 

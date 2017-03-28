@@ -74,7 +74,7 @@ var drawTiles = (game, stage, exactX, exactY) => {
     }
 };
 
-var drawTank = (game, stage) => {
+var drawPlayer = (game, stage) => {
 
     var tmpText = game.textures['tankTexture'].clone();
     var tankRect = new Rectangle(Math.floor((game.player.direction / 2)) * 48, 0, 48, 48);
@@ -84,6 +84,24 @@ var drawTank = (game, stage) => {
     playerTank.y = game.player.defaultOffset.y;
 
     stage.addChild(playerTank);
+};
+
+var drawOtherPlayers = (game, stage) => {
+    Object.keys(game.otherPlayers).forEach((id) => {
+
+        var player = game.otherPlayers[id];
+
+        var tmpText = game.textures['tankTexture'].clone();
+        var tankRect = new Rectangle(Math.floor((player.direction / 2)) * 48, 48 * 2, 48, 48);
+        tmpText.frame = tankRect;
+        var playerTank = new Sprite(tmpText);
+
+
+        playerTank.x = ((player.offset.x) + (376 - game.player.offset.x));
+        playerTank.y = ((player.offset.y) + (376 - game.player.offset.y));
+
+        stage.addChild(playerTank);
+    });
 };
 
 var drawBullets = (game, stage) => {
@@ -141,7 +159,7 @@ var drawHealth = (game, stage) => {
     tmpText.frame = healthPercent;
 
     var health = new Sprite(tmpText);
-    health.anchor = {x:1, y:1};
+    health.anchor = {x: 1, y: 1};
     health.x = game.maxMapX + (137 + 38);
     health.y = 160 + 87;
 
@@ -169,8 +187,10 @@ export const draw = (game) => {
 
     drawGround(game, stage, groundOffsetX, groundOffsetY);
     drawTiles(game, stage, exactX, exactY);
-    drawTank(game, stage);
+    drawPlayer(game, stage);
+    drawOtherPlayers(game, stage);
     drawBullets(game, stage);
     drawPanel(game, stage);
     drawHealth(game, stage)
+
 };

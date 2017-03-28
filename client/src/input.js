@@ -70,7 +70,6 @@ export const setupInputs = (game) => {    //Capture the keyboard arrow keys
         game.player.isTurning = 0;
     };
 
-
     //Up
     up.press = function () {
         game.player.isMoving = -1;
