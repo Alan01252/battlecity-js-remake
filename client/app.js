@@ -12,6 +12,9 @@ import {draw} from './src/draw'
 import {play} from './src/play';
 import * as mapBuilder from "./src/mapBuilder";
 import BulletFactory from "./src/factories/BulletFactory"
+import {RESOLUTION_X} from "./src/constants";
+import {RESOLUTION_Y} from "./src/constants";
+import {MAX_HEALTH} from "./src/constants";
 
 
 var type = "WebGL";
@@ -23,7 +26,7 @@ if (!utils.isWebGLSupported()) {
 PIXI.glCore.VertexArrayObject.FORCE_NATIVE = true;
 PIXI.settings.SPRITE_MAX_TEXTURES = 1;
 
-var app = new PIXI.Application(800,800,{ transparent: true, antialias: true, legacy:true });
+var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y, {transparent: true, antialias: true, legacy: true});
 document.body.appendChild(app.view);
 
 const game = {
@@ -33,15 +36,16 @@ const game = {
     lastTick: 0,
     timePassed: 0,
     textures: [],
-    maxMapX: 800,
-    maxMapY: 800,
+    maxMapX: RESOLUTION_X - 200,
+    maxMapY: RESOLUTION_Y,
     player: {
+        health: MAX_HEALTH,
         isTurning: 0,
         timeTurn: 0,
         direction: 0,
         defaultOffset: {
-            x: (800 / 2) - 24,
-            y: (800 / 2) - 24
+            x: ((RESOLUTION_X - 200) / 2) - 24,
+            y: (RESOLUTION_Y / 2) - 24
         },
         groundOffset: {
             x: 48,
@@ -65,6 +69,9 @@ PIXI.loader
         "data/imgLava.bmp",
         "data/imgRocks.bmp",
         "data/imgbullets.bmp",
+        "data/imgInterface.bmp",
+        "data/imgInterfaceBottom.bmp",
+        "data/imgHealth.bmp",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -90,6 +97,9 @@ function setup() {
     game.textures['rockTexture'] = TextureCache["data/imgRocks.bmp"];
     game.textures['lavaTexture'] = TextureCache["data/imgLava.bmp"];
     game.textures['bulletTexture'] = TextureCache["data/imgbullets.bmp"];
+    game.textures['interfaceTop'] = TextureCache["data/imgInterface.bmp"];
+    game.textures['interfaceBottom'] = TextureCache["data/imgInterfaceBottom.bmp"];
+    game.textures['health'] = TextureCache["data/imgHealth.bmp"];
 
     var tankRectangle = new Rectangle(0, 0, 48, 48);
     game.textures['tankTexture'].frame = tankRectangle;
@@ -114,18 +124,17 @@ function gameLoop() {
     game.bulletFactory.cycle();
 
 
-
     var fDir = -game.player.direction;
 
 
     /*
-    var x = (Math.sin((fDir / 16) * 3.14) * -1);
-    var y = (Math.cos((fDir / 16) * 3.14) * -1);
+     var x = (Math.sin((fDir / 16) * 3.14) * -1);
+     var y = (Math.cos((fDir / 16) * 3.14) * -1);
 
-    var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
-    var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
+     var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
+     var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
 
-    game.bulletFactory.newBullet(x2, y2, 0, game.player.direction);
+     game.bulletFactory.newBullet(x2, y2, 0, game.player.direction);
      */
 
     draw(game);

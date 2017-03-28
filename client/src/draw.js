@@ -3,13 +3,14 @@ import {Sprite} from '../node_modules/pixi.js/dist/pixi.min';
 import {Rectangle} from '../node_modules/pixi.js/dist/pixi.min';
 
 import {MAP_SQUARE_LAVA, MAP_SQUARE_ROCK} from './constants'
+import {MAX_HEALTH} from "./constants";
 
 
 var cachedTextures = [];
 
 var drawGround = (game, stage, groundOffsetX, groundOffsetY) => {
-    for (var i = -6; i < 6; i++) {
-        for (var j = -6; j < 6; j++) {
+    for (var i = -12; i < 12; i++) {
+        for (var j = -12; j < 12; j++) {
             var imgGround = new Sprite(game.textures['groundTexture']);
             imgGround.x = (128 * i);
             imgGround.y = (128 * j);
@@ -101,7 +102,7 @@ var drawBullets = (game, stage) => {
 
         var sprite = new Sprite(cachedTextures['bullet']);
         sprite.x = ((bullet.x + 40) + (376 - game.player.offset.x));
-        sprite.y = ((bullet.y + 40)  + (376 - game.player.offset.y));
+        sprite.y = ((bullet.y + 40) + (376 - game.player.offset.y));
 
         console.log(sprite.x);
         console.log("draw b " + bullet.x + " " + game.player.offset.x);
@@ -117,6 +118,36 @@ var drawBullets = (game, stage) => {
     }
 };
 
+var drawPanel = (game, stage) => {
+
+    var interfaceTop = new Sprite(game.textures["interfaceTop"]);
+    interfaceTop.x = game.maxMapX;
+    interfaceTop.y = 0;
+    stage.addChild(interfaceTop);
+
+    var interfaceBottom = new Sprite(game.textures["interfaceBottom"]);
+    interfaceBottom.x = game.maxMapX;
+    interfaceBottom.y = 430;
+    stage.addChild(interfaceBottom);
+};
+
+var drawHealth = (game, stage) => {
+
+    var percent = game.player.health / MAX_HEALTH;
+
+
+    var tmpText = game.textures['health'].clone();
+    var healthPercent = new Rectangle(0, 0, 38, percent * 87);
+    tmpText.frame = healthPercent;
+
+    var health = new Sprite(tmpText);
+    health.anchor = {x:1, y:1};
+    health.x = game.maxMapX + (137 + 38);
+    health.y = 160 + 87;
+
+
+    stage.addChild(health);
+};
 
 export const draw = (game) => {
 
@@ -140,4 +171,6 @@ export const draw = (game) => {
     drawTiles(game, stage, exactX, exactY);
     drawTank(game, stage);
     drawBullets(game, stage);
+    drawPanel(game, stage);
+    drawHealth(game, stage)
 };

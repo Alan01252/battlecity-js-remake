@@ -1,3 +1,7 @@
+export const RESOLUTION_X = 1024;
+export const RESOLUTION_Y = 768;
+
+
 export const MAP_SQUARE_LAVA = 1;
 export const MAP_SQUARE_ROCK = 2;
 export const MAP_SQUARE_BUILDING = 3;
@@ -16,3 +20,5 @@ export const BULLET_ALIVE = 1;
 export const BULLET_DEAD = -1;
 
 export const TIMER_SHOOT_LASER = 650;
+
+export const MAX_HEALTH = 40;
