@@ -57,9 +57,10 @@ class BulletFactory {
         return returnBullet;
     }
 
-    newBullet(x, y, type, angle) {
+    newBullet(shooter, x, y, type, angle) {
 
         var bullet = {
+            "shooter": shooter,
             "x": x,
             "y": y,
             "life": BULLET_ALIVE,

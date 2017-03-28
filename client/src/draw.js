@@ -192,9 +192,6 @@ export const draw = (game) => {
     var stage = game.stage;
     stage.removeChildren();
 
-
-
-
     drawGround(game, stage);
     drawTiles(game, stage);
     drawPlayer(game, stage);

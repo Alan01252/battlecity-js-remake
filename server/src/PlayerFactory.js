@@ -1,4 +1,6 @@
 var Player = require("./Player");
+var Bullet = require("./Bullet");
+
 var debug = require('debug')('BattleCity:PlayerFactory');
 
 class PlayerFactory {
@@ -33,6 +35,16 @@ class PlayerFactory {
                     var playerJson = JSON.stringify(this.players[socket.id]);
                     debug(playerJson);
                     socket.broadcast.emit('player', playerJson);
+                }
+            });
+
+            socket.on('bullet_shot', (bullet) => {
+
+                if (this.players[socket.id]) {
+                    /**
+                     * TODO : Share the bullet library with client/server so bullet x/y is in sync on server and client
+                     */
+                    socket.broadcast.emit('bullet_shot', bullet);
                 }
 
             })

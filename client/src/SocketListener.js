@@ -28,11 +28,22 @@ class SocketListener extends EventEmitter {
             var player = JSON.parse(player);
             this.game.otherPlayers[player.id] = player;
         });
+
+        this.io.on("bullet_shot", (bullet) => {
+            var bullet = JSON.parse(bullet);
+            this.game.bulletFactory.newBullet(bullet.shooter, bullet.x, bullet.y, bullet.type, bullet.angle)
+        })
+    }
+
+
+    sendBulletShot(bullet) {
+        this.io.emit("bullet_shot", JSON.stringify(bullet));
     }
 
     enterGame() {
         console.log("Telling server we've entered the game");
         this.io.emit("enter_game", JSON.stringify(this.game.player));
+        return this.io.id;
     }
 
     cycle() {

@@ -116,7 +116,7 @@ function setup() {
 
     game.socketListener.listen();
     game.socketListener.on("connected", () => {
-        game.socketListener.enterGame();
+        game.player.id = game.socketListener.enterGame();
         console.log("Connected starting game");
         gameLoop();
     });
