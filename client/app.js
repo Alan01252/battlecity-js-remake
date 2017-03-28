@@ -46,8 +46,8 @@ const game = {
         timeTurn: 0,
         direction: 0,
         defaultOffset: {
-            x: ((RESOLUTION_X - 200) / 2) - 24,
-            y: (RESOLUTION_Y / 2) - 24
+            x: ((RESOLUTION_X - 200) / 2),
+            y: (RESOLUTION_Y / 2)
         },
         groundOffset: {
             x: 48,

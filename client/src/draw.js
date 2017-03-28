@@ -40,8 +40,8 @@ var drawTiles = (game, stage, exactX, exactY) => {
                     }
 
                     var tile = new Sprite(cachedTextures['lava' + tileX + "_" + tileY]);
-                    tile.x = (48 * i) + 376;
-                    tile.y = (48 * j) + 376;
+                    tile.x = (48 * i) + game.player.defaultOffset.x;
+                    tile.y = (48 * j) + game.player.defaultOffset.y;
                     stage.addChild(tile);
                 }
                 // Else if the map square is Rock, draw Rock
@@ -55,8 +55,8 @@ var drawTiles = (game, stage, exactX, exactY) => {
                     }
 
                     var tile = new Sprite(cachedTextures['rock' + tileX + "_" + tileY]);
-                    tile.x = (48 * i) + 376;
-                    tile.y = (48 * j) + 376;
+                    tile.x = (48 * i) + game.player.defaultOffset.x;
+                    tile.y = (48 * j) + game.player.defaultOffset.y;
                     stage.addChild(tile);
                 }
 
@@ -66,8 +66,8 @@ var drawTiles = (game, stage, exactX, exactY) => {
                 rectangle.beginFill(0x000);
                 rectangle.drawRect(0, 0, 48, 48);
                 rectangle.endFill();
-                rectangle.x = (48 * i) + 376;
-                rectangle.y = (48 * j) + 376;
+                rectangle.x = (48 * i) + game.player.defaultOffset.x;
+                rectangle.y = (48 * j) + game.player.defaultOffset.y;
                 stage.addChild(rectangle);
             }
         }
@@ -97,8 +97,8 @@ var drawOtherPlayers = (game, stage) => {
         var playerTank = new Sprite(tmpText);
 
 
-        playerTank.x = ((player.offset.x) + (376 - game.player.offset.x));
-        playerTank.y = ((player.offset.y) + (376 - game.player.offset.y));
+        playerTank.x = ((player.offset.x) + (game.player.defaultOffset.x - game.player.offset.x));
+        playerTank.y = ((player.offset.y) + (game.player.defaultOffset.y - game.player.offset.y));
 
         stage.addChild(playerTank);
     });
@@ -119,11 +119,10 @@ var drawBullets = (game, stage) => {
         }
 
         var sprite = new Sprite(cachedTextures['bullet']);
-        sprite.x = ((bullet.x + 52) + (376 - game.player.offset.x));
-        sprite.y = ((bullet.y + 24) + (376 - game.player.offset.y));
+        sprite.x = ((bullet.x + 48) + (game.player.defaultOffset.x - game.player.offset.x));
+        sprite.y = ((bullet.y + 48) + (game.player.defaultOffset.y - game.player.offset.y));
+        sprite.anchor = {x: 1, y: 1};
 
-        console.log(sprite.x);
-        console.log("draw b " + bullet.x + " " + game.player.offset.x);
 
         bullet.animation++;
         if (bullet.animation > 3) {

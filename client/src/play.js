@@ -36,6 +36,8 @@ var movePlayer = (game) => {
         velocity = -20;
     }
 
+
+    var preUpdate = game.player.offset.x;
     game.player.offset.x += velocity;
 
     console.log("position" + checkPlayerCollision(game));
@@ -49,7 +51,7 @@ var movePlayer = (game) => {
             break;
         case COLLISION_BLOCKING:
             console.log("blocking");
-            game.player.offset.x -= velocity;
+            game.player.offset.x = preUpdate;
             break;
         case 0:
             break;
@@ -64,6 +66,7 @@ var movePlayer = (game) => {
     }
 
 
+    var preUpdate = game.player.offset.y;
     game.player.offset.y += velocity;
 
 
@@ -76,7 +79,7 @@ var movePlayer = (game) => {
             break;
         case COLLISION_BLOCKING:
             console.log("blocking y");
-            game.player.offset.y -= velocity;
+            game.player.offset.y = preUpdate;
             break;
         case 0:
             break;
