@@ -6,13 +6,12 @@ import {MAP_SQUARE_LAVA, MAP_SQUARE_ROCK} from './constants'
 import {MAX_HEALTH} from "./constants";
 
 
-var playerTank = null;
-
 var drawGround = (game, stage) => {
 
 
     var groundOffsetX = game.player.offset.x % 128; // Number of tank tiles on x axis
     var groundOffsetY = game.player.offset.y % 128; // Number of tank tiles on y axis
+
 
     for (var i = 0; i < 12; i++) {
         for (var j = 0; j < 12; j++) {
@@ -24,6 +23,7 @@ var drawGround = (game, stage) => {
         }
     }
 };
+
 
 var drawTiles = (game) => {
 
@@ -45,9 +45,11 @@ var drawTiles = (game) => {
 
                 if (game.map[tileX][tileY] == MAP_SQUARE_LAVA) {
 
-                    var tmpText = game.textures['lavaTexture'].clone();
-                    var lavaRectangle = new Rectangle(game.tiles[tileX][tileY], 0, 48, 48);
-                    tmpText.frame = lavaRectangle;
+                    var tmpText = new PIXI.Texture(
+                        game.textures['lavaTexture'].baseTexture,
+                        new Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
+                    );
+
                     var tile = new Sprite(tmpText);
                     tile.x = (48 * i) + game.player.defaultOffset.x - offTileX;
                     tile.y = (48 * j) + game.player.defaultOffset.y - offTileY;
@@ -56,9 +58,10 @@ var drawTiles = (game) => {
                 // Else if the map square is Rock, draw Rock
                 else if (game.map[tileX][tileY] == MAP_SQUARE_ROCK) {
 
-                    var tmpText = game.textures['rockTexture'].clone();
-                    var lavaRectangle = new Rectangle(game.tiles[tileX][tileY], 0, 48, 48);
-                    tmpText.frame = lavaRectangle;
+                    var tmpText = new PIXI.Texture(
+                        game.textures['rockTexture'].baseTexture,
+                        new Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
+                    );
                     var tile = new Sprite(tmpText);
                     tile.x = (48 * i) + game.player.defaultOffset.x - offTileX;
                     tile.y = (48 * j) + game.player.defaultOffset.y - offTileY;
@@ -78,7 +81,6 @@ var drawTiles = (game) => {
         }
     }
 };
-
 
 
 var drawOtherPlayers = (game, stage) => {
@@ -131,17 +133,49 @@ var drawBullets = (game, stage) => {
 
 var drawPlayer = (game, stage) => {
 
-    var tmpText = game.textures['tankTexture'].clone();
-    var tankRect = new Rectangle(Math.floor((game.player.direction / 2)) * 48, 0, 48, 48);
-    tmpText.frame = tankRect;
-    playerTank = new Sprite(tmpText);
+
+    var tmpText = new PIXI.Texture(
+        game.textures['tankTexture'].baseTexture,
+        new Rectangle(Math.floor(game.player.direction/2) * 48, 0, 48, 48)
+
+    );
+    var playerTank = new Sprite(tmpText);
     playerTank.x = game.player.defaultOffset.x;
     playerTank.y = game.player.defaultOffset.y;
 
     stage.addChild(playerTank);
 };
 
+var drawPanel = (game, stage) => {
 
+    var interfaceTop = new Sprite(game.textures["interfaceTop"]);
+    interfaceTop.x = game.maxMapX;
+    interfaceTop.y = 0;
+    stage.addChild(interfaceTop);
+
+    var interfaceBottom = new Sprite(game.textures["interfaceBottom"]);
+    interfaceBottom.x = game.maxMapX;
+    interfaceBottom.y = 430;
+    stage.addChild(interfaceBottom);
+};
+
+var drawHealth = (game, stage) => {
+
+    var percent = game.player.health / MAX_HEALTH;
+
+    var tmpText = new PIXI.Texture(
+        game.textures['health'].baseTexture,
+        new Rectangle(0, 0, 38, percent * 87)
+    );
+
+    var health = new Sprite(tmpText);
+    health.anchor = {x: 1, y: 1};
+    health.x = game.maxMapX + (137 + 38);
+    health.y = 160 + 87;
+
+
+    stage.addChild(health);
+};
 
 
 export const drawChanging = (game) => {
@@ -151,15 +185,18 @@ export const drawChanging = (game) => {
     game.lavaContainer.removeChildren();
     game.backgroundContainer.removeChildren();
     game.rockContainer.removeChildren();
-    game.objectContainer.removeChild(playerTank);
+    game.objectContainer.removeChildren();
 
     drawPlayer(game, game.objectContainer);
     drawGround(game, game.backgroundContainer);
-    drawTiles(game, game.tileContainer);
+    drawTiles(game);
 
     drawOtherPlayers(game, game.tileContainer);
     drawBullets(game, game.tileContainer);
 
+
+    drawPanel(game, game.objectContainer);
+    drawHealth(game, game.objectContainer);
 
 
 };

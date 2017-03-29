@@ -54,7 +54,7 @@ export const setupInputs = (game) => {    //Capture the keyboard arrow keys
 
     //Left arrow key `press` method
     left.press = function () {
-        game.player.isTurning = -2;
+        game.player.isTurning = -1;
     };
 
     //Left arrow key `release` method
@@ -64,7 +64,7 @@ export const setupInputs = (game) => {    //Capture the keyboard arrow keys
 
     //Right
     right.press = function () {
-        game.player.isTurning = 2;
+        game.player.isTurning = 1;
     };
     right.release = function () {
         game.player.isTurning = 0;

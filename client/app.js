@@ -9,7 +9,6 @@ import {
 } from './node_modules/pixi.js/dist/pixi.min';
 
 import {drawChanging} from './src/drawChanging'
-import {drawStatic} from './src/drawStatic'
 
 import {play} from './src/play';
 import * as mapBuilder from "./src/mapBuilder";
@@ -20,6 +19,7 @@ import {RESOLUTION_Y} from "./src/constants";
 import {MAX_HEALTH} from "./src/constants";
 import {setupInputs} from './src/input';
 
+
 var type = "WebGL";
 
 if (!utils.isWebGLSupported()) {
@@ -29,6 +29,10 @@ if (!utils.isWebGLSupported()) {
 
 var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
 document.body.appendChild(app.view);
+
+var stats = new Stats();
+stats.showPanel(0);
+document.body.appendChild(stats.dom);
 
 var backgroundContainer = new PIXI.Container();
 var tileContainer = new PIXI.Container();
@@ -133,7 +137,6 @@ function setup() {
     playersTank.vy = 0;
 
     setupInputs(game);
-    drawStatic(game);
 
     game.socketListener.listen();
     game.socketListener.on("connected", () => {
@@ -148,10 +151,7 @@ function setup() {
 
 function gameLoop() {
 
-    if (game.staticTick > game.tick) {
-        game.staticTick = game.tick + 1000;
-        drawStatic(game);
-    }
+    stats.begin();
 
     game.lastTick = game.tick;
     game.tick = new Date().getTime();
@@ -163,6 +163,7 @@ function gameLoop() {
     drawChanging(game);
     play(game);
 
+    stats.end();
     requestAnimationFrame(gameLoop);
 
 }
