@@ -142,10 +142,9 @@ function setup() {
     game.socketListener.on("connected", () => {
         game.player.id = game.socketListener.enterGame();
         console.log("Connected starting game");
-        gameLoop();
     });
 
-
+    gameLoop();
 }
 
 
