@@ -1,13 +1,3 @@
-import {
-    utils,
-    Rectangle,
-    Container,
-    TextureCache,
-    Sprite,
-    resources,
-    loader
-} from './node_modules/pixi.js/dist/pixi.min';
-
 import {drawChanging} from './src/drawChanging'
 
 import {play} from './src/play';
@@ -22,31 +12,26 @@ import {setupInputs} from './src/input';
 
 var type = "WebGL";
 
-if (!utils.isWebGLSupported()) {
+if (!PIXI.utils.isWebGLSupported()) {
     type = "canvas"
 }
 
 
 var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
-document.body.appendChild(app.view);
+var renderer = PIXI.autoDetectRenderer(800, 600);
+
+document.getElementById("game").appendChild(app.view);
 
 var stats = new Stats();
 stats.showPanel(0);
-document.body.appendChild(stats.dom);
+document.getElementById("game").appendChild(stats.dom);
 
 var backgroundContainer = new PIXI.Container();
 var tileContainer = new PIXI.Container();
 var lavaContainer = new PIXI.particles.ParticleContainer();
 var rockContainer = new PIXI.particles.ParticleContainer();
 var objectContainer = new PIXI.Container();
-
-
-app.stage.addChild(backgroundContainer);
-app.stage.addChild(tileContainer);
-app.stage.addChild(lavaContainer);
-app.stage.addChild(rockContainer);
-app.stage.addChild(objectContainer);
-
+var groundTiles = null;
 
 const game = {
     map: [],
@@ -116,21 +101,37 @@ function setup() {
     console.log("everything loaded");
 
 
+    groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
+    for (var i = -10; i < 10; i++) {
+        for (var j = 0; j < 10; j++) {
+            groundTiles.addFrame("data/imgGround.png", i * 128, j * 128);
+        }
+    }
+    groundTiles.position.set(game.player.defaultOffset.x, game.player.defaultOffset.y);
+
+    app.stage.addChild(groundTiles);
+    app.stage.addChild(backgroundContainer);
+    app.stage.addChild(tileContainer);
+    app.stage.addChild(lavaContainer);
+    app.stage.addChild(rockContainer);
+    app.stage.addChild(objectContainer);
+
     var mapData = PIXI.loader.resources["data/map.dat"].data;
     mapBuilder.build(game, mapData);
 
-    game.textures['groundTexture'] = TextureCache["data/imgGround.png"];
-    game.textures['tankTexture'] = TextureCache["data/imgTanks.png"];
-    game.textures['rockTexture'] = TextureCache["data/imgRocks.png"];
-    game.textures['lavaTexture'] = TextureCache["data/imgLava.png"];
-    game.textures['bulletTexture'] = TextureCache["data/imgbullets.png"];
-    game.textures['interfaceTop'] = TextureCache["data/imgInterface.png"];
-    game.textures['interfaceBottom'] = TextureCache["data/imgInterfaceBottom.png"];
-    game.textures['health'] = TextureCache["data/imgHealth.png"];
+    game.textures['groundTexture'] = PIXI.utils.TextureCache["data/imgGround.png"];
+    game.textures['tankTexture'] = PIXI.utils.TextureCache["data/imgTanks.png"];
+    game.textures['rockTexture'] = PIXI.utils.TextureCache["data/imgRocks.png"];
+    game.textures['lavaTexture'] = PIXI.utils.TextureCache["data/imgLava.png"];
+    game.textures['bulletTexture'] = PIXI.utils.TextureCache["data/imgbullets.png"];
+    game.textures['interfaceTop'] = PIXI.utils.TextureCache["data/imgInterface.png"];
+    game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/imgInterfaceBottom.png"];
+    game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
 
-    var tankRectangle = new Rectangle(0, 0, 48, 48);
+
+    var tankRectangle = new PIXI.Rectangle(0, 0, 48, 48);
     game.textures['tankTexture'].frame = tankRectangle;
-    var playersTank = new Sprite(game.textures['tankTexture']);
+    var playersTank = new PIXI.Sprite(game.textures['tankTexture']);
     playersTank.x = game.player.groundOffset.x;
     playersTank.y = game.player.groundOffset.y;
     playersTank.vx = 0;
@@ -145,8 +146,39 @@ function setup() {
     });
 
     gameLoop();
+
+
 }
 
+var max = 0;
+var minX = 0;
+var maxX = 0;
+var minY = 0;
+var maxY = 0;
+
+
+function buildGroundTiles(groundTiles) {
+
+    if (parseInt(game.player.offset.x / 128) > maxX
+        || parseInt(game.player.offset.x / 128) < minX
+        || parseInt(game.player.offset.y / 128) > maxY
+        || parseInt(game.player.offset.y / 128) < minY
+    )
+    {
+        minX = (game.player.offset.x/128) -5;
+        maxX = (game.player.offset.x/128) + 5;
+        minY = (game.player.offset.y/128) - 5;
+        maxY = (game.player.offset.y/128) + 5;
+        groundTiles.clear();
+        groundTiles.position.set(game.player.defaultOffset.x + game.player.offset.x, game.player.defaultOffset.y + game.player.offset.y);
+        for (var i = -12; i < 12; i++) {
+            for (var j = -12; j < 12; j++) {
+                groundTiles.addFrame(game.textures["groundTexture"], i * 128, j * 128);
+            }
+        }
+    }
+    groundTiles.pivot.set(game.player.offset.x, game.player.offset.y)
+}
 
 function gameLoop() {
 
@@ -159,6 +191,8 @@ function gameLoop() {
     game.bulletFactory.cycle();
     game.socketListener.cycle();
 
+
+    buildGroundTiles(groundTiles)
     drawChanging(game);
     play(game);
 
