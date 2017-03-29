@@ -91,14 +91,14 @@ game.socketListener = new SocketListener(game);
 
 PIXI.loader
     .add([
-        "data/imgTanks.bmp",
-        "data/imgGround.bmp",
-        "data/imgLava.bmp",
-        "data/imgRocks.bmp",
-        "data/imgbullets.bmp",
-        "data/imgInterface.bmp",
-        "data/imgInterfaceBottom.bmp",
-        "data/imgHealth.bmp",
+        "data/imgTanks.png",
+        "data/imgGround.png",
+        "data/imgLava.png",
+        "data/imgRocks.png",
+        "data/imgbullets.png",
+        "data/imgInterface.png",
+        "data/imgInterfaceBottom.png",
+        "data/imgHealth.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -119,14 +119,14 @@ function setup() {
     var mapData = PIXI.loader.resources["data/map.dat"].data;
     mapBuilder.build(game, mapData);
 
-    game.textures['groundTexture'] = TextureCache["data/imgGround.bmp"];
-    game.textures['tankTexture'] = TextureCache["data/imgTanks.bmp"];
-    game.textures['rockTexture'] = TextureCache["data/imgRocks.bmp"];
-    game.textures['lavaTexture'] = TextureCache["data/imgLava.bmp"];
-    game.textures['bulletTexture'] = TextureCache["data/imgbullets.bmp"];
-    game.textures['interfaceTop'] = TextureCache["data/imgInterface.bmp"];
-    game.textures['interfaceBottom'] = TextureCache["data/imgInterfaceBottom.bmp"];
-    game.textures['health'] = TextureCache["data/imgHealth.bmp"];
+    game.textures['groundTexture'] = TextureCache["data/imgGround.png"];
+    game.textures['tankTexture'] = TextureCache["data/imgTanks.png"];
+    game.textures['rockTexture'] = TextureCache["data/imgRocks.png"];
+    game.textures['lavaTexture'] = TextureCache["data/imgLava.png"];
+    game.textures['bulletTexture'] = TextureCache["data/imgbullets.png"];
+    game.textures['interfaceTop'] = TextureCache["data/imgInterface.png"];
+    game.textures['interfaceBottom'] = TextureCache["data/imgInterfaceBottom.png"];
+    game.textures['health'] = TextureCache["data/imgHealth.png"];
 
     var tankRectangle = new Rectangle(0, 0, 48, 48);
     game.textures['tankTexture'].frame = tankRectangle;
