@@ -3,3 +3,9 @@ This is a port/remake of an old online game I used to play based on the code her
 https://github.com/Deceth/Battle-City
 
 Very much a work in progress / hobby project
+
+Basic playable version of the client here:
+
+https://alanhollis.com/battlecity-js-remake/
+
+Multiplayer will not run without a server running and js changed
