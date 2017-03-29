@@ -1,0 +1,20 @@
+{
+  "name": "battlecity-client",
+  "version": "0.0.0",
+  "description": "A remake of old battlecity game in js",
+  "main": "index.js",
+  "scripts": {
+    "start": "webpack --config webpack.config.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "eventemitter2": "^4.0.0",
+    "pixi.js": "^4.4.3",
+    "socket.io": "^1.7.3"
+  },
+  "devDependencies": {
+    "webpack": "^2.3.2",
+    "webpack-dev-server": "^2.4.2"
+  }
+}
