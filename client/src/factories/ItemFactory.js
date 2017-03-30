@@ -43,7 +43,7 @@ class ItemFactory {
     findItemByLocation() {
 
         var item = this.getHead();
-        var range = 5;
+        var range = 24;
         var foundItems = [];
 
         while (item) {
