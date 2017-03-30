@@ -1,4 +1,4 @@
-import {checkPlayerCollision} from "./collision";
+import {checkPlayerCollision} from "./collision/collision-player";
 
 import {MOVEMENT_SPEED_PLAYER} from './constants';
 import {COLLISION_MAP_EDGE_LEFT} from "./constants";

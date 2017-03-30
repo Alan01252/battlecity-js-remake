@@ -10,6 +10,7 @@ import {MAX_HEALTH} from "./src/constants";
 import {setupInputs} from './src/input';
 import {drawGround} from "./src/drawGround";
 import {drawTiles} from "./src/drawTiles";
+import BuildingFactory from "./src/factories/BuildingFactory";
 
 
 var type = "WebGL";
@@ -20,7 +21,6 @@ if (!PIXI.utils.isWebGLSupported()) {
 
 
 var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
-var renderer = PIXI.autoDetectRenderer(800, 600);
 
 document.getElementById("game").appendChild(app.view);
 
@@ -57,8 +57,8 @@ const game = {
             y: 48
         },
         offset: {
-            x: 1,
-            y: 1,
+            x: 1600,
+            y: 1800,
             vx: 0,
             vy: 0
         }
@@ -67,6 +67,7 @@ const game = {
     objectContainer: objectContainer
 };
 game.bulletFactory = new BulletFactory(game);
+game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
 
 PIXI.loader
@@ -79,6 +80,7 @@ PIXI.loader
         "data/imgInterface.png",
         "data/imgInterfaceBottom.png",
         "data/imgHealth.png",
+        "data/imgBuildings.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -107,15 +109,9 @@ function setup() {
     game.textures['interfaceTop'] = PIXI.utils.TextureCache["data/imgInterface.png"];
     game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/imgInterfaceBottom.png"];
     game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
+    game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
 
 
-    var tankRectangle = new PIXI.Rectangle(0, 0, 48, 48);
-    game.textures['tankTexture'].frame = tankRectangle;
-    var playersTank = new PIXI.Sprite(game.textures['tankTexture']);
-    playersTank.x = game.player.groundOffset.x;
-    playersTank.y = game.player.groundOffset.y;
-    playersTank.vx = 0;
-    playersTank.vy = 0;
 
     setupInputs(game);
 
@@ -124,7 +120,6 @@ function setup() {
         game.player.id = game.socketListener.enterGame();
         console.log("Connected starting game");
     });
-
 
 
     groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
@@ -138,13 +133,9 @@ function setup() {
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
 
+
     gameLoop();
-
-
 }
-
-
-
 
 
 function gameLoop() {
