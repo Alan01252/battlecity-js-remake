@@ -4,7 +4,9 @@
   "description": "A remake of old battlecity game in js",
   "main": "index.js",
   "scripts": {
-    "start": "webpack --config webpack.config.js"
+    "start": "webpack --config webpack.config.js",
+	"serve": "webpack-dev-server",
+	"deploy-client": "webpack && gh-pages -d ./"
   },
   "author": "",
   "license": "ISC",

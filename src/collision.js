@@ -57,7 +57,5 @@ export const checkPlayerCollision = (game) => {
         collision = checkTiles(game, playerRect);
     }
 
-    console.log(collision);
-
     return collision;
 };

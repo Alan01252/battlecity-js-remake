@@ -1,7 +1,3 @@
-import {Graphics} from '../node_modules/pixi.js/dist/pixi.min';
-import {Sprite} from '../node_modules/pixi.js/dist/pixi.min';
-import {Rectangle} from '../node_modules/pixi.js/dist/pixi.min';
-
 import {MAP_SQUARE_LAVA, MAP_SQUARE_ROCK} from './constants'
 import {MAX_HEALTH} from "./constants";
 
@@ -16,7 +12,7 @@ var drawGround = (game, stage) => {
     for (var i = 0; i < 12; i++) {
         for (var j = 0; j < 12; j++) {
 
-            var imgGround = new Sprite(game.textures['groundTexture']);
+            var imgGround = new PIXI.Sprite(game.textures['groundTexture']);
             imgGround.x = (128 * i - groundOffsetX);
             imgGround.y = (128 * j - groundOffsetY);
             stage.addChild(imgGround);
@@ -47,10 +43,10 @@ var drawTiles = (game) => {
 
                     var tmpText = new PIXI.Texture(
                         game.textures['lavaTexture'].baseTexture,
-                        new Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
+                        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
                     );
 
-                    var tile = new Sprite(tmpText);
+                    var tile = new PIXI.Sprite(tmpText);
                     tile.x = (48 * i) + game.player.defaultOffset.x - offTileX;
                     tile.y = (48 * j) + game.player.defaultOffset.y - offTileY;
                     game.lavaContainer.addChild(tile);
@@ -60,9 +56,9 @@ var drawTiles = (game) => {
 
                     var tmpText = new PIXI.Texture(
                         game.textures['rockTexture'].baseTexture,
-                        new Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
+                        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
                     );
-                    var tile = new Sprite(tmpText);
+                    var tile = new PIXI.Sprite(tmpText);
                     tile.x = (48 * i) + game.player.defaultOffset.x - offTileX;
                     tile.y = (48 * j) + game.player.defaultOffset.y - offTileY;
                     game.rockContainer.addChild(tile);
@@ -70,7 +66,7 @@ var drawTiles = (game) => {
 
             }
             else {
-                var rectangle = new Graphics();
+                var rectangle = new PIXI.Graphics();
                 rectangle.beginFill(0x000);
                 rectangle.drawRect(0, 0, 48, 48);
                 rectangle.endFill();
@@ -91,9 +87,9 @@ var drawOtherPlayers = (game, stage) => {
         var player = game.otherPlayers[id];
 
         var tmpText = game.textures['tankTexture'].clone();
-        var tankRect = new Rectangle(Math.floor((player.direction / 2)) * 48, 48 * 2, 48, 48);
+        var tankRect = new PIXI.Rectangle(Math.floor((player.direction / 2)) * 48, 48 * 2, 48, 48);
         tmpText.frame = tankRect;
-        var playerTank = new Sprite(tmpText);
+        var playerTank = new PIXI.Sprite(tmpText);
 
 
         playerTank.x = ((player.offset.x) + (game.player.defaultOffset.x - (game.player.offset.x / 48) * 48));
@@ -111,10 +107,10 @@ var drawBullets = (game, stage) => {
     while (bullet) {
 
         var tmpText = game.textures['bulletTexture'].clone();
-        var bulletRect = new Rectangle(bullet.animation * 8, 0, 8, 8);
+        var bulletRect = new PIXI.Rectangle(bullet.animation * 8, 0, 8, 8);
         tmpText.frame = bulletRect;
 
-        var sprite = new Sprite(tmpText);
+        var sprite = new PIXI.Sprite(tmpText);
         sprite.x = ((bullet.x + 48) + (game.player.defaultOffset.x - (game.player.offset.x)));
         sprite.y = ((bullet.y + 48) + (game.player.defaultOffset.y - game.player.offset.y));
         sprite.anchor = {x: 1, y: 1};
@@ -136,10 +132,10 @@ var drawPlayer = (game, stage) => {
 
     var tmpText = new PIXI.Texture(
         game.textures['tankTexture'].baseTexture,
-        new Rectangle(Math.floor(game.player.direction/2) * 48, 0, 48, 48)
+        new PIXI.Rectangle(Math.floor(game.player.direction/2) * 48, 0, 48, 48)
 
     );
-    var playerTank = new Sprite(tmpText);
+    var playerTank = new PIXI.Sprite(tmpText);
     playerTank.x = game.player.defaultOffset.x;
     playerTank.y = game.player.defaultOffset.y;
 
@@ -148,12 +144,12 @@ var drawPlayer = (game, stage) => {
 
 var drawPanel = (game, stage) => {
 
-    var interfaceTop = new Sprite(game.textures["interfaceTop"]);
+    var interfaceTop = new PIXI.Sprite(game.textures["interfaceTop"]);
     interfaceTop.x = game.maxMapX;
     interfaceTop.y = 0;
     stage.addChild(interfaceTop);
 
-    var interfaceBottom = new Sprite(game.textures["interfaceBottom"]);
+    var interfaceBottom = new PIXI.Sprite(game.textures["interfaceBottom"]);
     interfaceBottom.x = game.maxMapX;
     interfaceBottom.y = 430;
     stage.addChild(interfaceBottom);
@@ -165,10 +161,10 @@ var drawHealth = (game, stage) => {
 
     var tmpText = new PIXI.Texture(
         game.textures['health'].baseTexture,
-        new Rectangle(0, 0, 38, percent * 87)
+        new PIXI.Rectangle(0, 0, 38, percent * 87)
     );
 
-    var health = new Sprite(tmpText);
+    var health = new PIXI.Sprite(tmpText);
     health.anchor = {x: 1, y: 1};
     health.x = game.maxMapX + (137 + 38);
     health.y = 160 + 87;
@@ -180,23 +176,12 @@ var drawHealth = (game, stage) => {
 
 export const drawChanging = (game) => {
 
-
-    game.tileContainer.removeChildren();
-    game.lavaContainer.removeChildren();
-    game.backgroundContainer.removeChildren();
-    game.rockContainer.removeChildren();
     game.objectContainer.removeChildren();
 
     drawPlayer(game, game.objectContainer);
-    drawGround(game, game.backgroundContainer);
-    drawTiles(game);
-
-    drawOtherPlayers(game, game.tileContainer);
-    drawBullets(game, game.tileContainer);
-
+    drawOtherPlayers(game, game.objectContainer);
+    drawBullets(game, game.objectContainer);
 
     drawPanel(game, game.objectContainer);
     drawHealth(game, game.objectContainer);
-
-
 };

@@ -1,13 +1,3 @@
-import {
-    utils,
-    Rectangle,
-    Container,
-    TextureCache,
-    Sprite,
-    resources,
-    loader
-} from './node_modules/pixi.js/dist/pixi.min';
-
 import {drawChanging} from './src/drawChanging'
 
 import {play} from './src/play';
@@ -18,35 +8,29 @@ import {RESOLUTION_X} from "./src/constants";
 import {RESOLUTION_Y} from "./src/constants";
 import {MAX_HEALTH} from "./src/constants";
 import {setupInputs} from './src/input';
+import {drawGround} from "./src/drawGround";
+import {drawTiles} from "./src/drawTiles";
 
 
 var type = "WebGL";
 
-if (!utils.isWebGLSupported()) {
+if (!PIXI.utils.isWebGLSupported()) {
     type = "canvas"
 }
 
 
 var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
-document.body.appendChild(app.view);
+var renderer = PIXI.autoDetectRenderer(800, 600);
+
+document.getElementById("game").appendChild(app.view);
 
 var stats = new Stats();
 stats.showPanel(0);
-document.body.appendChild(stats.dom);
+document.getElementById("game").appendChild(stats.dom);
 
-var backgroundContainer = new PIXI.Container();
-var tileContainer = new PIXI.Container();
-var lavaContainer = new PIXI.particles.ParticleContainer();
-var rockContainer = new PIXI.particles.ParticleContainer();
 var objectContainer = new PIXI.Container();
-
-
-app.stage.addChild(backgroundContainer);
-app.stage.addChild(tileContainer);
-app.stage.addChild(lavaContainer);
-app.stage.addChild(rockContainer);
-app.stage.addChild(objectContainer);
-
+var groundTiles = null;
+var backgroundTiles = null;
 
 const game = {
     map: [],
@@ -73,17 +57,13 @@ const game = {
             y: 48
         },
         offset: {
-            x: 0,
-            y: 0,
+            x: 1,
+            y: 1,
             vx: 0,
             vy: 0
         }
     },
     stage: app.stage,
-    backgroundContainer: backgroundContainer,
-    tileContainer: tileContainer,
-    rockContainer: rockContainer,
-    lavaContainer: lavaContainer,
     objectContainer: objectContainer
 };
 game.bulletFactory = new BulletFactory(game);
@@ -113,24 +93,25 @@ function loadProgressHandler(loader, resource) {
 
 
 function setup() {
-    console.log("everything loaded");
+    console.log("loaded");
 
 
     var mapData = PIXI.loader.resources["data/map.dat"].data;
     mapBuilder.build(game, mapData);
 
-    game.textures['groundTexture'] = TextureCache["data/imgGround.png"];
-    game.textures['tankTexture'] = TextureCache["data/imgTanks.png"];
-    game.textures['rockTexture'] = TextureCache["data/imgRocks.png"];
-    game.textures['lavaTexture'] = TextureCache["data/imgLava.png"];
-    game.textures['bulletTexture'] = TextureCache["data/imgbullets.png"];
-    game.textures['interfaceTop'] = TextureCache["data/imgInterface.png"];
-    game.textures['interfaceBottom'] = TextureCache["data/imgInterfaceBottom.png"];
-    game.textures['health'] = TextureCache["data/imgHealth.png"];
+    game.textures['groundTexture'] = PIXI.utils.TextureCache["data/imgGround.png"];
+    game.textures['tankTexture'] = PIXI.utils.TextureCache["data/imgTanks.png"];
+    game.textures['rockTexture'] = PIXI.utils.TextureCache["data/imgRocks.png"];
+    game.textures['lavaTexture'] = PIXI.utils.TextureCache["data/imgLava.png"];
+    game.textures['bulletTexture'] = PIXI.utils.TextureCache["data/imgbullets.png"];
+    game.textures['interfaceTop'] = PIXI.utils.TextureCache["data/imgInterface.png"];
+    game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/imgInterfaceBottom.png"];
+    game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
 
-    var tankRectangle = new Rectangle(0, 0, 48, 48);
+
+    var tankRectangle = new PIXI.Rectangle(0, 0, 48, 48);
     game.textures['tankTexture'].frame = tankRectangle;
-    var playersTank = new Sprite(game.textures['tankTexture']);
+    var playersTank = new PIXI.Sprite(game.textures['tankTexture']);
     playersTank.x = game.player.groundOffset.x;
     playersTank.y = game.player.groundOffset.y;
     playersTank.vx = 0;
@@ -144,8 +125,26 @@ function setup() {
         console.log("Connected starting game");
     });
 
+
+
+    groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
+    backgroundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
+
+
+    app.stage.addChild(groundTiles);
+    app.stage.addChild(backgroundTiles);
+    app.stage.addChild(objectContainer);
+
+    drawGround(game, groundTiles);
+    drawTiles(game, backgroundTiles);
+
     gameLoop();
+
+
 }
+
+
+
 
 
 function gameLoop() {
@@ -159,6 +158,9 @@ function gameLoop() {
     game.bulletFactory.cycle();
     game.socketListener.cycle();
 
+
+    drawGround(game, groundTiles);
+    drawTiles(game, backgroundTiles);
     drawChanging(game);
     play(game);
 
