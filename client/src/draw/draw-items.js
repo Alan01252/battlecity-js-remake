@@ -1,3 +1,23 @@
+var getItemsWithingRange = function (itemFactory, player) {
+
+    var item = itemFactory.getHead();
+    var range = 40 * 48;
+    var foundItems = [];
+    while (item) {
+
+        if (item.x > (player.offset.x - range)
+            && item.x < (player.offset.x + range)
+            && item.y > (player.offset.y - range)
+            && item.y < (player.offset.y + range)
+        ) {
+            foundItems.push(item)
+        }
+
+        item = item.next;
+    }
+    return foundItems
+};
+
 export const drawItems = (game, itemTiles) => {
 
 
@@ -8,25 +28,7 @@ export const drawItems = (game, itemTiles) => {
     if (game.forceDraw) {
         itemTiles.clear();
 
-
-        var range = 40 * 48;
-        var item = game.itemFactory.getHead();
-
-        var foundItems = [];
-        while (item) {
-
-            if (item.x > (game.player.offset.x - range)
-                && item.x < (game.player.offset.x + range)
-                && item.y > (game.player.offset.y - range)
-                && item.y < (game.player.offset.y + range)
-            ) {
-                console.log("Found item");
-                foundItems.push(item)
-            }
-
-            item = item.next;
-        }
-
+        var foundItems = getItemsWithingRange(game.itemFactory, game.player);
         foundItems.forEach((item, index) => {
             console.log(game.player.offset.x - item.x);
             var tmpText = new PIXI.Texture(
