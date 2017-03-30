@@ -23,6 +23,7 @@ import {CAN_BUILD} from "./src/constants";
 import {CANT_BUILD} from "./src/constants";
 import {drawItems} from "./src/draw/draw-items";
 import {ITEM_TYPE_TURRET} from "./src/constants";
+import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 
 
 var type = "WebGL";
@@ -41,6 +42,7 @@ stats.showPanel(0);
 document.getElementById("game").appendChild(stats.dom);
 
 var objectContainer = new PIXI.Container();
+var panelContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
 var itemTiles = null;
@@ -165,6 +167,7 @@ function setup() {
     app.stage.addChild(backgroundTiles);
     app.stage.addChild(itemTiles);
     app.stage.addChild(objectContainer);
+    app.stage.addChild(panelContainer);
 
 
     game.itemFactory.newItem(null, 1600, 1800, ITEM_TYPE_TURRET);
@@ -175,6 +178,7 @@ function setup() {
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
     drawItems(game, itemTiles);
+    drawPanelInterface(game, panelContainer);
 
 
     game.forceDraw = false;
@@ -202,6 +206,7 @@ function gameLoop() {
     drawItems(game, itemTiles);
     drawChanging(game);
     drawBuilding(game);
+    drawPanelInterface(game, panelContainer);
     play(game);
 
 

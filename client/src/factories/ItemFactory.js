@@ -35,7 +35,7 @@ class ItemFactory {
     pickupItem() {
         var item = this.findItemByLocation();
         if (item) {
-            item.owner = this.game.player.id
+            item.owner = this.game.player.id;
             this.game.forceDraw = true;
         }
     }
@@ -44,7 +44,6 @@ class ItemFactory {
 
         var item = this.getHead();
         var range = 24;
-        var foundItems = [];
 
         while (item) {
 
