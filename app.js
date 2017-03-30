@@ -13,16 +13,16 @@ import {drawChanging} from "./src/draw/draw-changing"
 
 import BuildingFactory from "./src/factories/BuildingFactory";
 import BulletFactory from "./src/factories/BulletFactory"
+import ItemFactory from "./src/factories/ItemFactory";
 
 
 import SocketListener from "./src/SocketListener"
 import {setupBuildingMenu} from "./src/draw/draw-building-interface";
 import {drawBuilding} from "./src/draw/draw-building-interface";
-import {CAN_BUILD_HOUSE} from "./src/constants";
-import {CAN_BUILD_LASER_RESEARCH} from "./src/constants";
-import {CAN_BUILD_TURRET_RESEARCH} from "./src/constants";
 import {CAN_BUILD} from "./src/constants";
 import {CANT_BUILD} from "./src/constants";
+import {drawItems} from "./src/draw/draw-items";
+import {ITEM_TYPE_TURRET} from "./src/constants";
 
 
 var type = "WebGL";
@@ -43,12 +43,13 @@ document.getElementById("game").appendChild(stats.dom);
 var objectContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
+var itemTiles = null;
+
 var menuContainer = null;
 
 const game = {
     map: [],
     tiles: [],
-    buildings: [],
     tick: 0,
     lastTick: 0,
     timePassed: 0,
@@ -62,7 +63,9 @@ const game = {
         x: ((RESOLUTION_X - 200) / 2),
         y: (RESOLUTION_Y / 2)
     },
+    buildings: {},
     player: {
+        id: -1,
         city: {
             canBuild: {
                 CAN_BUILD_HOUSE: CAN_BUILD,
@@ -93,6 +96,7 @@ const game = {
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
+game.itemFactory = new ItemFactory(game);
 
 PIXI.loader
     .add([
@@ -154,25 +158,36 @@ function setup() {
 
     groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
     backgroundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
+    itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['imageItems'], true);
 
 
     app.stage.addChild(groundTiles);
     app.stage.addChild(backgroundTiles);
+    app.stage.addChild(itemTiles);
     app.stage.addChild(objectContainer);
 
+
+    game.itemFactory.newItem(null, 1600, 1800, ITEM_TYPE_TURRET);
+
     setupBuildingMenu(game);
+
+    game.forceDraw = true;
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
+    drawItems(game, itemTiles);
+
+
+    game.forceDraw = false;
 
 
     gameLoop();
 }
 
 
-
 function gameLoop() {
 
     stats.begin();
+
 
     game.lastTick = game.tick;
     game.tick = new Date().getTime();
@@ -181,16 +196,16 @@ function gameLoop() {
     game.bulletFactory.cycle();
     game.socketListener.cycle();
 
-
-    if (game.forceDraw) {
-       setupBuildingMenu(game);
-    }
-
+    setupBuildingMenu(game);
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
+    drawItems(game, itemTiles);
     drawChanging(game);
     drawBuilding(game);
     play(game);
+
+
+    game.forceDraw = false;
 
 
     stats.end();

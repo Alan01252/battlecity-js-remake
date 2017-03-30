@@ -12,9 +12,11 @@ class BulletFactory {
     newBuilding(owner, x, y, type) {
 
         var building = {
+            "id": x + "_" + y,
             "owner": owner,
             "x": x,
             "y": y,
+            "items": 1,
             "type": type,
             "next": null,
             "previous": null
