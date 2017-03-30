@@ -2,9 +2,7 @@ export const RESOLUTION_X = 1024;
 export const RESOLUTION_Y = 768;
 
 
-export const MAP_SQUARE_LAVA = 1;
-export const MAP_SQUARE_ROCK = 2;
-export const MAP_SQUARE_BUILDING = 3;
+
 
 export const MOVEMENT_SPEED_PLAYER = 0.50;
 export const MOVEMENT_SPEED_BULLET = 0.80;
@@ -24,4 +22,12 @@ export const DAMAGE_LASER = 5;
 
 export const MAX_HEALTH = 40;
 
+export const MAP_SQUARE_LAVA = 1;
+export const MAP_SQUARE_ROCK = 2;
+export const MAP_SQUARE_BUILDING = 3;
+
 export const BUILDING_COMMAND_CENTER = 0;
+export const BUILDING_FACTORY = 1;
+export const BUILDING_REPAIR = 2;
+export const BUILDING_HOUSE = 3;
+export const BUILDING_RESEARCH = 4;

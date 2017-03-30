@@ -1,4 +1,4 @@
-import {TIMER_SHOOT_LASER} from "./constants";
+import {TIMER_SHOOT_LASER} from "../constants";
 /**
  * Created by alan on 27/03/17.
  */
@@ -44,7 +44,7 @@ var keyboard = (keyCode) => {
 };
 
 
-export const setupInputs = (game) => {    //Capture the keyboard arrow keys
+export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow keys
     var left = keyboard(37),
         up = keyboard(38),
         right = keyboard(39),
@@ -102,7 +102,7 @@ export const setupInputs = (game) => {    //Capture the keyboard arrow keys
             var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
             var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
 
-            var bullet = game.bulletFactory.newBullet(game.player.id, x2, y2, 0, angle);
+            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, angle);
             game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: angle});
 
         }

@@ -3,7 +3,10 @@ import {play} from './src/play';
 import {RESOLUTION_X} from "./src/constants";
 import {RESOLUTION_Y} from "./src/constants";
 import {MAX_HEALTH} from "./src/constants";
-import {setupInputs} from './src/input';
+
+import {setupKeyboardInputs} from './src/input/input-keyboard';
+import {setupMouseInputs} from './src/input/input-mouse';
+
 import {drawGround} from "./src/draw/draw-ground";
 import {drawTiles} from "./src/draw/draw-tiles";
 import {drawChanging} from "./src/draw/draw-changing"
@@ -13,6 +16,10 @@ import BulletFactory from "./src/factories/BulletFactory"
 
 
 import SocketListener from "./src/SocketListener"
+import {BUILDING_HOUSE} from "./src/constants";
+import {MAP_SQUARE_BUILDING} from "./src/constants";
+import {setupBuildingMenu} from "./src/draw/draw-building";
+import {drawBuilding} from "./src/draw/draw-building";
 
 
 var type = "WebGL";
@@ -33,6 +40,7 @@ document.getElementById("game").appendChild(stats.dom);
 var objectContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
+var menuContainer = null;
 
 const game = {
     map: [],
@@ -45,6 +53,11 @@ const game = {
     maxMapX: RESOLUTION_X - 200,
     maxMapY: RESOLUTION_Y,
     otherPlayers: {},
+    showBuildMenu: false,
+    buildMenuOffset: {
+        x: ((RESOLUTION_X - 200) / 2),
+        y: (RESOLUTION_Y / 2)
+    },
     player: {
         health: MAX_HEALTH,
         isTurning: 0,
@@ -53,10 +66,6 @@ const game = {
         defaultOffset: {
             x: ((RESOLUTION_X - 200) / 2),
             y: (RESOLUTION_Y / 2)
-        },
-        groundOffset: {
-            x: 48,
-            y: 48
         },
         offset: {
             x: 1600,
@@ -83,6 +92,7 @@ PIXI.loader
         "data/imgInterfaceBottom.png",
         "data/imgHealth.png",
         "data/imgBuildings.png",
+        "data/imgBuildIcons.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -112,9 +122,11 @@ function setup() {
     game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/imgInterfaceBottom.png"];
     game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
     game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
+    game.textures['buildingIcons'] = PIXI.utils.TextureCache["data/imgBuildIcons.png"];
 
 
-    setupInputs(game);
+    setupKeyboardInputs(game);
+    setupMouseInputs(game);
 
     game.socketListener.listen();
     game.socketListener.on("connected", () => {
@@ -131,12 +143,14 @@ function setup() {
     app.stage.addChild(backgroundTiles);
     app.stage.addChild(objectContainer);
 
+    setupBuildingMenu(game);
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
 
 
     gameLoop();
 }
+
 
 
 function gameLoop() {
@@ -153,8 +167,11 @@ function gameLoop() {
 
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
+
     drawChanging(game);
+    drawBuilding(game);
     play(game);
+
 
     stats.end();
     requestAnimationFrame(gameLoop);
