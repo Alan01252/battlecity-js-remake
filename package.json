@@ -5,15 +5,16 @@
   "main": "index.js",
   "scripts": {
     "start": "webpack --config webpack.config.js",
-	"serve": "webpack-dev-server",
-	"deploy-client": "webpack && gh-pages -d ./"
+    "serve": "webpack-dev-server",
+    "deploy-client": "webpack && gh-pages -d ./"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "eventemitter2": "^4.0.0",
     "pixi.js": "^4.4.3",
-    "socket.io": "^1.7.3"
+    "socket.io": "^1.7.3",
+    "underscore": "^1.8.3"
   },
   "devDependencies": {
     "webpack": "^2.3.2",

@@ -3,6 +3,7 @@ import {getPlayerRect} from "./collision-helpers";
 
 
 import {MAP_SQUARE_ROCK} from "../constants";
+import {BUILDING_HAS_BAY} from "../constants";
 
 
 var collided = (testRect, bullet)=> {
@@ -57,6 +58,10 @@ export const collidedWithBuilding = (game, bullet) => {
             w: 144,
             h: 96,
         };
+
+        if (building.type < BUILDING_HAS_BAY) {
+            buildingRect.h = buildingRect.h - 48;
+        }
         if (collided(buildingRect, bullet)) {
             return true;
         }
