@@ -5,7 +5,7 @@ import {getPlayerRect} from "./collision-helpers";
 import {MAP_SQUARE_ROCK} from "../constants";
 
 
-var collidedWithPlayer = (playerRect, bullet)=> {
+var collided = (testRect, bullet)=> {
 
     var bulletRect = {
         x: bullet.x,
@@ -14,7 +14,7 @@ var collidedWithPlayer = (playerRect, bullet)=> {
         h: 4
     };
 
-    return rectangleCollision(playerRect, bulletRect);
+    return rectangleCollision(testRect, bulletRect);
 };
 
 export const collidedWithRock = (game, bullet) => {
@@ -38,10 +38,30 @@ export const collidedWithRock = (game, bullet) => {
 export const collidedWithAnotherPlayer = (game, bullet) => {
 
     return Object.keys(game.otherPlayers).some((id) => {
-        return collidedWithPlayer(getPlayerRect(game.otherPlayers[id]), bullet)
+        return collided(getPlayerRect(game.otherPlayers[id]), bullet)
     });
 };
 
 export const collidedWithCurrentPlayer = (game, bullet) => {
-    return collidedWithPlayer(getPlayerRect(game.player), bullet);
+    return collided(getPlayerRect(game.player), bullet);
 };
+
+export const collidedWithBuilding = (game, bullet) => {
+    var building = game.buildingFactory.getHead();
+
+    while (building) {
+
+        var buildingRect = {
+            x: (building.x) * 48,
+            y: (building.y) * 48,
+            w: 144,
+            h: 96,
+        };
+        if (collided(buildingRect, bullet)) {
+            return true;
+        }
+
+        building = building.next;
+    }
+    return false;
+}

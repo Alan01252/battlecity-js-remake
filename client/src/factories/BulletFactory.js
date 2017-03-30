@@ -6,6 +6,7 @@ import {DAMAGE_LASER} from "../constants";
 import {collidedWithRock} from "../collision/collision-bullet";
 import {collidedWithCurrentPlayer} from "../collision/collision-bullet";
 import {collidedWithAnotherPlayer} from "../collision/collision-bullet";
+import {collidedWithBuilding} from "../collision/collision-bullet";
 
 class BulletFactory {
 
@@ -37,6 +38,14 @@ class BulletFactory {
                 bullet.life = BULLET_DEAD;
             }
 
+            if (collidedWithBuilding(this.game, bullet)) {
+                bullet.life = BULLET_DEAD;
+            }
+
+            if (collidedWithAnotherPlayer(this.game, bullet)) {
+                console.log("Bullet collided with me");
+                bullet.life = BULLET_DEAD;
+            }
 
             if (bullet.shooter !== this.game.player.id) {
 
@@ -47,12 +56,6 @@ class BulletFactory {
                         this.game.player.health -= bullet.damage;
                     }
                 }
-            }
-
-
-            if (collidedWithAnotherPlayer(this.game, bullet)) {
-                console.log("Bullet collided with me");
-                bullet.life = BULLET_DEAD;
             }
 
             if (bullet.life == BULLET_DEAD) {

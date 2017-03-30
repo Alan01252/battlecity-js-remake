@@ -41,9 +41,6 @@ var checkTiles = (game, playerRect) => {
 var checkBuildings = (game) => {
     var building = game.buildingFactory.getHead();
 
-    console.log((game.player.offset.x / 48) * 48);
-    console.log((game.player.offset.y / 48) * 48);
-
     while (building) {
 
         var buildingRect = {
