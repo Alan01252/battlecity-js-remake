@@ -1,4 +1,4 @@
-import {MAX_HEALTH} from "./constants";
+import {MAX_HEALTH} from "../constants";
 
 
 var drawPlayer = (game, stage) => {

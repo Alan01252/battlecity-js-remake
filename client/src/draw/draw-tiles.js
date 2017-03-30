@@ -1,6 +1,6 @@
-import {MAP_SQUARE_LAVA} from "./constants";
-import {MAP_SQUARE_ROCK} from "./constants";
-import {MAP_SQUARE_BUILDING} from "./constants";
+import {MAP_SQUARE_LAVA} from "../constants";
+import {MAP_SQUARE_ROCK} from "../constants";
+import {MAP_SQUARE_BUILDING} from "../constants";
 
 var minTX = 0;
 var maxTX = 0;

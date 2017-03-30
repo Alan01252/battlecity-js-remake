@@ -1,16 +1,18 @@
-import {drawChanging} from './src/drawChanging'
-
-import {play} from './src/play';
 import * as mapBuilder from "./src/mapBuilder";
-import BulletFactory from "./src/factories/BulletFactory"
-import SocketListener from "./src/SocketListener"
+import {play} from './src/play';
 import {RESOLUTION_X} from "./src/constants";
 import {RESOLUTION_Y} from "./src/constants";
 import {MAX_HEALTH} from "./src/constants";
 import {setupInputs} from './src/input';
-import {drawGround} from "./src/drawGround";
-import {drawTiles} from "./src/drawTiles";
+import {drawGround} from "./src/draw/draw-ground";
+import {drawTiles} from "./src/draw/draw-tiles";
+import {drawChanging} from "./src/draw/draw-changing"
+
 import BuildingFactory from "./src/factories/BuildingFactory";
+import BulletFactory from "./src/factories/BulletFactory"
+
+
+import SocketListener from "./src/SocketListener"
 
 
 var type = "WebGL";
@@ -110,7 +112,6 @@ function setup() {
     game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/imgInterfaceBottom.png"];
     game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
     game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
-
 
 
     setupInputs(game);
