@@ -20,7 +20,6 @@ if (!PIXI.utils.isWebGLSupported()) {
 
 
 var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
-var renderer = PIXI.autoDetectRenderer(800, 600);
 
 document.getElementById("game").appendChild(app.view);
 
@@ -31,6 +30,7 @@ document.getElementById("game").appendChild(stats.dom);
 var objectContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
+var playerTank = null;
 
 const game = {
     map: [],
@@ -126,7 +126,6 @@ function setup() {
     });
 
 
-
     groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
     backgroundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
 
@@ -138,13 +137,23 @@ function setup() {
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
 
+    var tmpText = new PIXI.Texture(
+        game.textures['tankTexture'].baseTexture,
+        new PIXI.Rectangle(0, 0, 48, 48)
+    );
+
+    playerTank = new PIXI.Sprite(tmpText);
+    playerTank.x = game.player.defaultOffset.x;
+    playerTank.y = game.player.defaultOffset.y;
+    playerTank.anchor.set(0.5);
+
+
+    app.stage.addChild(playerTank);
+
     gameLoop();
 
 
 }
-
-
-
 
 
 function gameLoop() {
@@ -157,6 +166,8 @@ function gameLoop() {
 
     game.bulletFactory.cycle();
     game.socketListener.cycle();
+
+    playerTank.rotation = game.player.direction;
 
 
     drawGround(game, groundTiles);

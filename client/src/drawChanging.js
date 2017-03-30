@@ -127,20 +127,6 @@ var drawBullets = (game, stage) => {
     }
 };
 
-var drawPlayer = (game, stage) => {
-
-
-    var tmpText = new PIXI.Texture(
-        game.textures['tankTexture'].baseTexture,
-        new PIXI.Rectangle(Math.floor(game.player.direction/2) * 48, 0, 48, 48)
-
-    );
-    var playerTank = new PIXI.Sprite(tmpText);
-    playerTank.x = game.player.defaultOffset.x;
-    playerTank.y = game.player.defaultOffset.y;
-
-    stage.addChild(playerTank);
-};
 
 var drawPanel = (game, stage) => {
 
@@ -176,9 +162,9 @@ var drawHealth = (game, stage) => {
 
 export const drawChanging = (game) => {
 
+
     game.objectContainer.removeChildren();
 
-    drawPlayer(game, game.objectContainer);
     drawOtherPlayers(game, game.objectContainer);
     drawBullets(game, game.objectContainer);
 
