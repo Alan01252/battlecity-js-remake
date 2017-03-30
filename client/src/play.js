@@ -40,7 +40,7 @@ var movePlayer = (game) => {
     var preUpdate = game.player.offset.x;
     game.player.offset.x += velocity;
 
-    console.log("position" + checkPlayerCollision(game));
+    //console.log("position" + checkPlayerCollision(game));
 
     switch (checkPlayerCollision(game)) {
         case COLLISION_MAP_EDGE_LEFT:
@@ -85,8 +85,8 @@ var movePlayer = (game) => {
             break;
     }
 
-    console.log("moved player to x " + game.player.offset.x);
-    console.log("moved player to y " + game.player.offset.y);
+    //console.log("moved player to x " + game.player.offset.x);
+    //console.log("moved player to y " + game.player.offset.y);
 
 };
 
