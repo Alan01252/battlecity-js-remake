@@ -42,6 +42,18 @@ export const CAN_BUILD_TURRET_RESEARCH = 409;
 export const CAN_BUILD_LASER_FACTORY = 112;
 export const CAN_BUILD_TURRET_FACTORY = 109;
 
+export const ITEM_TYPE_CLOAK = 0;
+export const ITEM_TYPE_ROCKET = 1;
+export const ITEM_TYPE_MEDKIT = 2;
+export const ITEM_TYPE_BOMB = 3;
+export const ITEM_TYPE_MINE = 4;
+export const ITEM_TYPE_ORB = 5;
+export const ITEM_TYPE_FLARE = 6;
+export const ITEM_TYPE_DFG = 7;
+export const ITEM_TYPE_WALL = 8;
+export const ITEM_TYPE_TURRET = 9;
+export const ITEM_TYPE_SLEEPER = 10;
+export const ITEM_TYPE_PLASMA = 11;
 
 export const DEPENDENCY_TREE = [
     {'id': CAN_BUILD_HOUSE, 'parentid': 0},

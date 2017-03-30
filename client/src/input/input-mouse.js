@@ -10,6 +10,7 @@ export const setupMouseInputs = (game) => {
         console.log("mouse click");
         console.log(event.data.global.x);
         game.showBuildMenu = !game.showBuildMenu;
+        game.forceDraw = true;
         console.log(game.showBuildMenu);
         game.buildMenuOffset = {
             x: event.data.global.x,

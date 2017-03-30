@@ -53,70 +53,74 @@ var dependencyTree = unflatten(DEPENDENCY_TREE);
 
 export const setupBuildingMenu = (game) => {
 
-    menuContainer.removeChildren();
+
+    if (game.forceDraw) {
+
+        menuContainer.removeChildren();
 
 
-    var canBuild = game.player.city.canBuild;
+        var canBuild = game.player.city.canBuild;
 
 
-    var canBuildList = Object.keys(game.player.city.canBuild);
+        var canBuildList = Object.keys(game.player.city.canBuild);
 
 
-    var y = 0;
-    canBuildList.forEach((id, index) => {
-        if (canBuild[id] == CAN_BUILD) {
-            y++
-        }
-    });
+        var y = 0;
+        canBuildList.forEach((id, index) => {
+            if (canBuild[id] == CAN_BUILD) {
+                y++
+            }
+        });
 
 
-    var graphics = new PIXI.Graphics();
-    graphics.lineStyle(2, 0x00000, 0);
-    graphics.beginFill(0x000000, 1);
-    graphics.drawRect(game.buildMenuOffset.x, game.buildMenuOffset.y, 180, y * 16);
-    graphics.endFill();
-    menuContainer.addChild(graphics);
+        var graphics = new PIXI.Graphics();
+        graphics.lineStyle(2, 0x00000, 0);
+        graphics.beginFill(0x000000, 1);
+        graphics.drawRect(game.buildMenuOffset.x, game.buildMenuOffset.y, 180, y * 16);
+        graphics.endFill();
+        menuContainer.addChild(graphics);
 
-    y = 0;
-    canBuildList.forEach((id, index) => {
+        y = 0;
+        canBuildList.forEach((id, index) => {
 
-        if (canBuild[id] == CAN_BUILD) {
-            var buildingType = LABELS[id].TYPE;
-
-
-            var click = () => {
-                game.isBuilding = buildingType;
-            };
-
-            var tmpText = new PIXI.Texture(
-                game.textures['buildingIcons'].baseTexture,
-                new PIXI.Rectangle(LABELS[id].ICON * 16, 0, 16, 16)
-            );
-
-            var buildIcon = new PIXI.Sprite(tmpText);
-            buildIcon.x = game.buildMenuOffset.x - 16;
-            buildIcon.y = game.buildMenuOffset.y + (y * 16);
-            buildIcon.interactive = true;
-            buildIcon.iconType = LABELS[id].IMAGE;
-            buildIcon.on('mousedown', click);
+            if (canBuild[id] == CAN_BUILD) {
+                var buildingType = LABELS[id].TYPE;
 
 
-            var basicText = new PIXI.Text(LABELS[id].LABEL, {fontSize: 12, fill: 0xFFFFFF});
-            basicText.x = game.buildMenuOffset.x;
-            basicText.y = game.buildMenuOffset.y + (y * 16);
-            basicText.interactive = true;
-            basicText.on('mousedown', click);
+                var click = () => {
+                    game.isBuilding = buildingType;
+                };
 
-            menuContainer.addChild(buildIcon);
-            menuContainer.addChild(basicText);
+                var tmpText = new PIXI.Texture(
+                    game.textures['buildingIcons'].baseTexture,
+                    new PIXI.Rectangle(LABELS[id].ICON * 16, 0, 16, 16)
+                );
 
-            y++;
-        }
+                var buildIcon = new PIXI.Sprite(tmpText);
+                buildIcon.x = game.buildMenuOffset.x - 16;
+                buildIcon.y = game.buildMenuOffset.y + (y * 16);
+                buildIcon.interactive = true;
+                buildIcon.iconType = LABELS[id].IMAGE;
+                buildIcon.on('mousedown', click);
 
-    });
+
+                var basicText = new PIXI.Text(LABELS[id].LABEL, {fontSize: 12, fill: 0xFFFFFF});
+                basicText.x = game.buildMenuOffset.x;
+                basicText.y = game.buildMenuOffset.y + (y * 16);
+                basicText.interactive = true;
+                basicText.on('mousedown', click);
+
+                menuContainer.addChild(buildIcon);
+                menuContainer.addChild(basicText);
+
+                y++;
+            }
+
+        });
 
 
-    menuContainer.visible = false;
+        menuContainer.visible = false;
+    }
 
 
     game.stage.addChild(menuContainer);
@@ -178,17 +182,23 @@ export const drawBuilding = (game) => {
                 var tempId = LABELS[id].TYPE;
                 console.log(tempId + " " + game.isBuilding);
                 if (parseInt(tempId) == game.isBuilding) {
-                    console.log("here");
-                    game.player.city.canBuild[id] = HAS_BUILT;
+
+                    if (tempId != CAN_BUILD_HOUSE) {
+                        game.player.city.canBuild[id] = HAS_BUILT;
+                    }
 
                     var node = searchTree(dependencyTree[0], tempId);
                     if (node && node.children) {
                         node.children.forEach((item) => {
                             Object.keys(game.player.city.canBuild).forEach((id) => {
-                                var tempId = LABELS[id].TYPE;
-                                console.log("finding children" + tempId + " " + item.id)
-                                if (parseInt(tempId) == item.id) {
-                                    game.player.city.canBuild[id] = CAN_BUILD;
+
+
+                                if (game.player.city.canBuild[id] !== HAS_BUILT) {
+                                    var tempId = LABELS[id].TYPE;
+                                    console.log("finding children" + tempId + " " + item.id)
+                                    if (parseInt(tempId) == item.id) {
+                                        game.player.city.canBuild[id] = CAN_BUILD;
+                                    }
                                 }
                             });
                         })

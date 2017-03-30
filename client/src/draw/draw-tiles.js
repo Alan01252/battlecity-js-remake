@@ -27,17 +27,13 @@ var drawRocks = (game, backgroundTiles, i, j, tileX, tileY) => {
     backgroundTiles.addFrame(tmpText, i * 48, j * 48);
 };
 
+
 var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
 
 
     var type = game.tiles[tileX][tileY];
     var subType = type % 100;
-    console.log(subType);
-
-    //Research or factory etc
     var baseType = parseInt(type / 100);
-
-    console.log("type: " + type);
 
 
     var tmpText = new PIXI.Texture(
@@ -52,6 +48,11 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
         new PIXI.Rectangle(subType * 32, 0, 32, 32)
     );
 
+    console.log(i);
+    console.log(j);
+    console.log("i == " + i * 48);
+    console.log("j == " + j * 48);
+
     switch (baseType) {
         case BUILDING_RESEARCH:
             backgroundTiles.addFrame(tmpText, (i * 48) + 14, (j * 48) + 100);
@@ -65,7 +66,6 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
 };
 
 var setRedrawBoundaries = (game) => {
-    game.forceDraw = false;
     minTX = (game.player.offset.x / 48) - 20;
     maxTX = (game.player.offset.x / 48) + 20;
     minTY = (game.player.offset.y / 48) - 20;

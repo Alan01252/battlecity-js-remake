@@ -30,9 +30,6 @@ var checkBuildings = (game, buildingRect) => {
         };
 
         if (rectangleCollision(buildingRect, buildingRect2)) {
-
-            console.log(buildingRect);
-            console.log(buildingRect2);
             return true;
         }
 

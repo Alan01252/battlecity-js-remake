@@ -51,6 +51,7 @@ export const checkTiles = (game, rect) => {
     var top = Math.floor((rect.y) / 48);
     var bottom = Math.floor((rect.y + rect.h) / 48);
 
+    /*
     console.log("left, top ", left + "," + top );
     console.log("right, top ", right + "," + top );
 
@@ -62,6 +63,7 @@ export const checkTiles = (game, rect) => {
     console.log(map[right][top]);
     console.log(map[left][bottom]);
     console.log(map[right][bottom]);
+    */
 
     if (left && right && top && bottom) {
         //Map Terrain (lava, rocks)
