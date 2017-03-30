@@ -1,6 +1,8 @@
 import {MAP_SQUARE_LAVA} from "../constants";
 import {MAP_SQUARE_ROCK} from "../constants";
 import {MAP_SQUARE_BUILDING} from "../constants";
+import {BUILDING_FACTORY} from "../constants";
+import {BUILDING_RESEARCH} from "../constants";
 
 var minTX = 0;
 var maxTX = 0;
@@ -28,13 +30,38 @@ var drawRocks = (game, backgroundTiles, i, j, tileX, tileY) => {
 var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
 
 
+    var type = game.tiles[tileX][tileY];
+    var subType = type % 100;
+    console.log(subType);
+
+    //Research or factory etc
+    var baseType = parseInt(type / 100);
+
+    console.log("type: " + type);
+
+
     var tmpText = new PIXI.Texture(
         game.textures['buildings'].baseTexture,
-        new PIXI.Rectangle(0, game.tiles[tileX][tileY] * 144, 144, 144)
+        new PIXI.Rectangle(0, baseType * 144, 144, 144, 144)
     );
 
-
     backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+
+    var tmpText = new PIXI.Texture(
+        game.textures['imageItems'].baseTexture,
+        new PIXI.Rectangle(subType * 32, 0, 32, 32)
+    );
+
+    switch (baseType) {
+        case BUILDING_RESEARCH:
+            backgroundTiles.addFrame(tmpText, (i * 48) + 14, (j * 48) + 100);
+            break;
+        case BUILDING_FACTORY:
+            backgroundTiles.addFrame(tmpText, (i * 48) + 56, (j * 48) + 52);
+            break;
+    }
+
+
 };
 
 var setRedrawBoundaries = (game) => {

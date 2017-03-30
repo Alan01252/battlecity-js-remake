@@ -31,3 +31,57 @@ export const BUILDING_HOUSE = 3;
 export const BUILDING_RESEARCH = 4;
 
 export const BUILDING_HAS_BAY = 3;
+
+export const CANT_BUILD = 0;
+export const CAN_BUILD = 1;
+export const HAS_BUILT = 2;
+
+export const CAN_BUILD_HOUSE = 300;
+export const CAN_BUILD_LASER_RESEARCH = 412;
+export const CAN_BUILD_TURRET_RESEARCH = 409;
+export const CAN_BUILD_LASER_FACTORY = 112;
+export const CAN_BUILD_TURRET_FACTORY = 112;
+
+
+export const DEPENDENCY_TREE = [
+    {'id': CAN_BUILD_HOUSE, 'parentid': 0},
+    {'id': CAN_BUILD_LASER_RESEARCH, 'parentid': CAN_BUILD_HOUSE},
+    {'id': CAN_BUILD_TURRET_RESEARCH, 'parentid': CAN_BUILD_HOUSE},
+    {'id': CAN_BUILD_LASER_FACTORY, 'parentid': CAN_BUILD_LASER_RESEARCH},
+    {'id': CAN_BUILD_TURRET_FACTORY, 'parentid': CAN_BUILD_TURRET_RESEARCH},
+];
+
+
+export const LABELS = {
+    CAN_BUILD_HOUSE: {
+        ICON: 0,
+        IMAGE: BUILDING_HOUSE,
+        TYPE: CAN_BUILD_HOUSE,
+        LABEL: "Housing",
+    },
+    CAN_BUILD_LASER_RESEARCH: {
+        ICON: 1,
+        TYPE: CAN_BUILD_LASER_RESEARCH,
+        IMAGE: BUILDING_RESEARCH,
+        LABEL: "Laser Research",
+    },
+    CAN_BUILD_TURRET_RESEARCH: {
+        ICON: 2,
+        TYPE: CAN_BUILD_TURRET_RESEARCH,
+        IMAGE: BUILDING_RESEARCH,
+        LABEL: "Turret Research",
+    },
+    CAN_BUILD_LASER_FACTORY: {
+        ICON: 1,
+        TYPE: CAN_BUILD_LASER_FACTORY,
+        IMAGE: BUILDING_FACTORY,
+        LABEL: "Laser Factory",
+    },
+    CAN_BUILD_TURRET_FACTORY: {
+        ICON: 2,
+        TYPE: CAN_BUILD_TURRET_RESEARCH,
+        IMAGE: BUILDING_FACTORY,
+        LABEL: "Turret Factory",
+    }
+
+};

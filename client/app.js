@@ -18,6 +18,11 @@ import BulletFactory from "./src/factories/BulletFactory"
 import SocketListener from "./src/SocketListener"
 import {setupBuildingMenu} from "./src/draw/draw-building-interface";
 import {drawBuilding} from "./src/draw/draw-building-interface";
+import {CAN_BUILD_HOUSE} from "./src/constants";
+import {CAN_BUILD_LASER_RESEARCH} from "./src/constants";
+import {CAN_BUILD_TURRET_RESEARCH} from "./src/constants";
+import {CAN_BUILD} from "./src/constants";
+import {CANT_BUILD} from "./src/constants";
 
 
 var type = "WebGL";
@@ -43,6 +48,7 @@ var menuContainer = null;
 const game = {
     map: [],
     tiles: [],
+    buildings: [],
     tick: 0,
     lastTick: 0,
     timePassed: 0,
@@ -57,6 +63,15 @@ const game = {
         y: (RESOLUTION_Y / 2)
     },
     player: {
+        city: {
+            canBuild: {
+                CAN_BUILD_HOUSE: CAN_BUILD,
+                CAN_BUILD_LASER_RESEARCH: CAN_BUILD,
+                CAN_BUILD_TURRET_RESEARCH: CAN_BUILD,
+                CAN_BUILD_LASER_FACTORY: CANT_BUILD,
+                CAN_BUILD_TURRET_FACTORY: CANT_BUILD
+            }
+        },
         health: MAX_HEALTH,
         isTurning: 0,
         timeTurn: 0,
@@ -91,6 +106,8 @@ PIXI.loader
         "data/imgHealth.png",
         "data/imgBuildings.png",
         "data/imgBuildIcons.png",
+        "data/imgIcons.png",
+        "data/imgitems.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -121,6 +138,8 @@ function setup() {
     game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
     game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
     game.textures['buildingIcons'] = PIXI.utils.TextureCache["data/imgBuildIcons.png"];
+    game.textures['imageIcons'] = PIXI.utils.TextureCache["data/imgIcons.png"];
+    game.textures['imageItems'] = PIXI.utils.TextureCache["data/imgitems.png"];
 
 
     setupKeyboardInputs(game);
@@ -163,9 +182,12 @@ function gameLoop() {
     game.socketListener.cycle();
 
 
+    if (game.forceDraw) {
+       setupBuildingMenu(game);
+    }
+
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
-
     drawChanging(game);
     drawBuilding(game);
     play(game);
