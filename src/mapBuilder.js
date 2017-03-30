@@ -60,6 +60,7 @@ function populateTiles(game, mapData) {
 
             if ((game.map[i][j] == MAP_SQUARE_BUILDING)) {
                 game.buildingFactory.newBuilding(null, i, j, BUILDING_COMMAND_CENTER);
+                game.map[i][j] == BUILDING_COMMAND_CENTER;
             }
             else if ((game.map[i][j] == MAP_SQUARE_LAVA) || (game.map[i][j] == MAP_SQUARE_ROCK)) {
 

@@ -63,7 +63,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 33);
+/******/ 	return __webpack_require__(__webpack_require__.s = 35);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -79,21 +79,13 @@ const RESOLUTION_Y = 768;
 
 
 
-const MAP_SQUARE_LAVA = 1;
-/* harmony export (immutable) */ __webpack_exports__["j"] = MAP_SQUARE_LAVA;
-
-const MAP_SQUARE_ROCK = 2;
-/* harmony export (immutable) */ __webpack_exports__["k"] = MAP_SQUARE_ROCK;
-
-const MAP_SQUARE_BUILDING = 3;
-/* harmony export (immutable) */ __webpack_exports__["l"] = MAP_SQUARE_BUILDING;
 
 
 const MOVEMENT_SPEED_PLAYER = 0.50;
 /* harmony export (immutable) */ __webpack_exports__["d"] = MOVEMENT_SPEED_PLAYER;
 
 const MOVEMENT_SPEED_BULLET = 0.80;
-/* harmony export (immutable) */ __webpack_exports__["o"] = MOVEMENT_SPEED_BULLET;
+/* harmony export (immutable) */ __webpack_exports__["p"] = MOVEMENT_SPEED_BULLET;
 
 
 const COLLISION_BLOCKING = 2;
@@ -114,25 +106,47 @@ const COLLISION_MAP_EDGE_BOTTOM = 203;
 
 
 const BULLET_ALIVE = 1;
-/* harmony export (immutable) */ __webpack_exports__["q"] = BULLET_ALIVE;
+/* harmony export (immutable) */ __webpack_exports__["r"] = BULLET_ALIVE;
 
 const BULLET_DEAD = -1;
-/* harmony export (immutable) */ __webpack_exports__["p"] = BULLET_DEAD;
+/* harmony export (immutable) */ __webpack_exports__["q"] = BULLET_DEAD;
 
 const TIMER_SHOOT_LASER = 650;
-/* harmony export (immutable) */ __webpack_exports__["m"] = TIMER_SHOOT_LASER;
+/* harmony export (immutable) */ __webpack_exports__["n"] = TIMER_SHOOT_LASER;
 
 
 const DAMAGE_LASER = 5;
-/* harmony export (immutable) */ __webpack_exports__["r"] = DAMAGE_LASER;
+/* harmony export (immutable) */ __webpack_exports__["s"] = DAMAGE_LASER;
 
 
 const MAX_HEALTH = 40;
 /* harmony export (immutable) */ __webpack_exports__["c"] = MAX_HEALTH;
 
 
+const MAP_SQUARE_LAVA = 1;
+/* harmony export (immutable) */ __webpack_exports__["l"] = MAP_SQUARE_LAVA;
+
+const MAP_SQUARE_ROCK = 2;
+/* harmony export (immutable) */ __webpack_exports__["m"] = MAP_SQUARE_ROCK;
+
+const MAP_SQUARE_BUILDING = 3;
+/* harmony export (immutable) */ __webpack_exports__["k"] = MAP_SQUARE_BUILDING;
+
+
 const BUILDING_COMMAND_CENTER = 0;
-/* harmony export (immutable) */ __webpack_exports__["n"] = BUILDING_COMMAND_CENTER;
+/* harmony export (immutable) */ __webpack_exports__["o"] = BUILDING_COMMAND_CENTER;
+
+const BUILDING_FACTORY = 1;
+/* unused harmony export BUILDING_FACTORY */
+
+const BUILDING_REPAIR = 2;
+/* unused harmony export BUILDING_REPAIR */
+
+const BUILDING_HOUSE = 3;
+/* harmony export (immutable) */ __webpack_exports__["j"] = BUILDING_HOUSE;
+
+const BUILDING_RESEARCH = 4;
+/* unused harmony export BUILDING_RESEARCH */
 
 
 /***/ }),
@@ -173,7 +187,7 @@ module.exports = g;
  * Expose `debug()` as the module.
  */
 
-exports = module.exports = __webpack_require__(38);
+exports = module.exports = __webpack_require__(40);
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
@@ -344,7 +358,7 @@ function localstorage(){
   } catch (e) {}
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(64)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(66)))
 
 /***/ }),
 /* 3 */
@@ -354,15 +368,15 @@ function localstorage(){
  * Module dependencies.
  */
 
-var keys = __webpack_require__(46);
-var hasBinary = __webpack_require__(19);
-var sliceBuffer = __webpack_require__(48);
-var after = __webpack_require__(47);
-var utf8 = __webpack_require__(51);
+var keys = __webpack_require__(48);
+var hasBinary = __webpack_require__(20);
+var sliceBuffer = __webpack_require__(50);
+var after = __webpack_require__(49);
+var utf8 = __webpack_require__(53);
 
 var base64encoder;
 if (global && global.ArrayBuffer) {
-  base64encoder = __webpack_require__(49);
+  base64encoder = __webpack_require__(51);
 }
 
 /**
@@ -420,7 +434,7 @@ var err = { type: 'error', data: 'parser error' };
  * Create a blob api even for blob builder when vendor prefixes exist
  */
 
-var Blob = __webpack_require__(50);
+var Blob = __webpack_require__(52);
 
 /**
  * Encodes a packet.
@@ -1182,7 +1196,7 @@ const collidedWithRock = (game, bullet) => {
     if (tileX > 0 && tileY > 0) {
         console.log(tileX + " " + tileY);
         console.log(game.map[tileX][tileY]);
-        return game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_1__constants__["k" /* MAP_SQUARE_ROCK */];
+        return game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_1__constants__["m" /* MAP_SQUARE_ROCK */];
     }
     return false;
 };
@@ -1274,6 +1288,138 @@ const getPlayerRect = (player) => {
 
 /***/ }),
 /* 8 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__constants__ = __webpack_require__(0);
+
+
+
+
+var menuContainer = new PIXI.Container();
+
+const setupBuildingMenu = (game) => {
+
+    var graphics = new PIXI.Graphics();
+    graphics.lineStyle(2, 0x00000, 0);
+    graphics.beginFill(0x000000, 1);
+    graphics.drawRect(game.buildMenuOffset.x, game.buildMenuOffset.y, 180, 16);
+    graphics.endFill();
+
+    var tmpText = new PIXI.Texture(
+        game.textures['buildingIcons'].baseTexture,
+        new PIXI.Rectangle(0, 0, 16, 16)
+    );
+
+    var click = () => {
+        console.log("build icon clicked " + buildIcon.iconType);
+        game.isBuilding = buildIcon.iconType;
+    };
+
+    var buildIcon = new PIXI.Sprite(tmpText);
+    buildIcon.x = game.buildMenuOffset.x - 16;
+    buildIcon.y = game.buildMenuOffset.y;
+    buildIcon.interactive = true;
+    buildIcon.iconType = __WEBPACK_IMPORTED_MODULE_0__constants__["j" /* BUILDING_HOUSE */];
+    buildIcon.on('mousedown', click);
+
+
+    var basicText = new PIXI.Text('Housing', {fontSize: 12, fill: 0xFFFFFF});
+    basicText.x = game.buildMenuOffset.x;
+    basicText.y = game.buildMenuOffset.y;
+    basicText.interactive = true;
+    basicText.on('mousedown', click);
+
+    menuContainer.addChild(graphics);
+    menuContainer.addChild(buildIcon);
+    menuContainer.addChild(basicText);
+    menuContainer.visible = false;
+
+
+    game.stage.addChild(menuContainer);
+};
+/* harmony export (immutable) */ __webpack_exports__["a"] = setupBuildingMenu;
+
+
+const drawBuilding = (game) => {
+
+
+    menuContainer.visible = game.showBuildMenu;
+
+    if (game.isBuilding && !game.isDragging) {
+
+        game.isDragging = true;
+        var tmpText = new PIXI.Texture(
+            game.textures['buildings'].baseTexture,
+            new PIXI.Rectangle(0, (game.isBuilding) * 144, 144, 144)
+        );
+
+        var building = new PIXI.Sprite(tmpText);
+        building.x = game.buildMenuOffset.x;
+        building.y = game.buildMenuOffset.y;
+        building.alpha = 0.5;
+        building.interactive = true;
+        building.buttonMode = true;
+
+        game.stage.addChild(building);
+
+        building
+            .on('pointerdown', onDragStart)
+            .on('pointerup', onDragEnd)
+            .on('pointerupoutside', onDragEnd)
+            .on('pointermove', onDragMove);
+
+        function onDragStart(event) {
+            this.data = event.data;
+            this.alpha = 0.5;
+            this.dragging = true;
+        }
+
+        function onDragEnd(event) {
+            this.alpha = 1;
+            this.dragging = false;
+            building.dragging = false;
+
+
+            var offTileX = Math.floor(game.player.offset.x % 48);
+            var offTileY = Math.floor(game.player.offset.y % 48);
+            var x = Math.floor((game.player.offset.x - game.player.defaultOffset.x + offTileX + event.data.global.x) / 48);
+            var y = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + event.data.global.y) / 48);
+
+            if (game.buildingFactory.newBuilding(null, x, y, game.isBuilding)) {
+                game.map[x][y] = __WEBPACK_IMPORTED_MODULE_0__constants__["k" /* MAP_SQUARE_BUILDING */];
+                game.tiles[x][y] = game.isBuilding;
+            }
+
+            // set the interaction data to null
+            this.data = null;
+
+            game.isBuilding = false;
+            game.isDragging = false;
+            game.forceDraw = true;
+            game.showBuildMenu = false;
+            building.destroy();
+
+        }
+
+        function onDragMove() {
+            if (this.dragging) {
+                var newPosition = this.data.getLocalPosition(this.parent);
+                this.x = newPosition.x;
+                this.y = newPosition.y;
+            }
+        }
+
+    }
+
+
+};
+/* harmony export (immutable) */ __webpack_exports__["b"] = drawBuilding;
+
+
+
+/***/ }),
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /**
@@ -1436,12 +1582,12 @@ Transport.prototype.onClose = function () {
 
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {// browser shim for xmlhttprequest module
 
-var hasCORS = __webpack_require__(52);
+var hasCORS = __webpack_require__(54);
 
 module.exports = function (opts) {
   var xdomain = opts.xdomain;
@@ -1480,7 +1626,7 @@ module.exports = function (opts) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ (function(module, exports) {
 
 /**
@@ -1523,7 +1669,7 @@ exports.decode = function(qs){
 
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -1531,11 +1677,11 @@ exports.decode = function(qs){
  * Module dependencies.
  */
 
-var debug = __webpack_require__(57)('socket.io-parser');
-var json = __webpack_require__(61);
-var Emitter = __webpack_require__(56);
-var binary = __webpack_require__(55);
-var isBuf = __webpack_require__(22);
+var debug = __webpack_require__(59)('socket.io-parser');
+var json = __webpack_require__(63);
+var Emitter = __webpack_require__(58);
+var binary = __webpack_require__(57);
+var isBuf = __webpack_require__(23);
 
 /**
  * Protocol version.
@@ -1933,7 +2079,7 @@ function error(data){
 
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -1941,15 +2087,15 @@ function error(data){
  * Module dependencies.
  */
 
-var eio = __webpack_require__(40);
-var Socket = __webpack_require__(14);
+var eio = __webpack_require__(42);
+var Socket = __webpack_require__(15);
 var Emitter = __webpack_require__(4);
-var parser = __webpack_require__(11);
-var on = __webpack_require__(13);
-var bind = __webpack_require__(15);
+var parser = __webpack_require__(12);
+var on = __webpack_require__(14);
+var bind = __webpack_require__(16);
 var debug = __webpack_require__(2)('socket.io-client:manager');
-var indexOf = __webpack_require__(20);
-var Backoff = __webpack_require__(37);
+var indexOf = __webpack_require__(21);
+var Backoff = __webpack_require__(39);
 
 /**
  * IE6+ hasOwnProperty
@@ -2499,7 +2645,7 @@ Manager.prototype.onreconnect = function () {
 
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports) {
 
 
@@ -2529,7 +2675,7 @@ function on (obj, ev, fn) {
 
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -2537,13 +2683,13 @@ function on (obj, ev, fn) {
  * Module dependencies.
  */
 
-var parser = __webpack_require__(11);
+var parser = __webpack_require__(12);
 var Emitter = __webpack_require__(4);
-var toArray = __webpack_require__(62);
-var on = __webpack_require__(13);
-var bind = __webpack_require__(15);
+var toArray = __webpack_require__(64);
+var on = __webpack_require__(14);
+var bind = __webpack_require__(16);
 var debug = __webpack_require__(2)('socket.io-client:socket');
-var hasBin = __webpack_require__(19);
+var hasBin = __webpack_require__(20);
 
 /**
  * Module exports.
@@ -2954,7 +3100,7 @@ Socket.prototype.compress = function (compress) {
 
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports) {
 
 /**
@@ -2983,17 +3129,17 @@ module.exports = function(obj, fn){
 
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {/**
  * Module dependencies
  */
 
-var XMLHttpRequest = __webpack_require__(9);
-var XHR = __webpack_require__(44);
-var JSONP = __webpack_require__(43);
-var websocket = __webpack_require__(45);
+var XMLHttpRequest = __webpack_require__(10);
+var XHR = __webpack_require__(46);
+var JSONP = __webpack_require__(45);
+var websocket = __webpack_require__(47);
 
 /**
  * Export transports.
@@ -3043,18 +3189,18 @@ function polling (opts) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /**
  * Module dependencies.
  */
 
-var Transport = __webpack_require__(8);
-var parseqs = __webpack_require__(10);
+var Transport = __webpack_require__(9);
+var parseqs = __webpack_require__(11);
 var parser = __webpack_require__(3);
 var inherit = __webpack_require__(5);
-var yeast = __webpack_require__(18);
+var yeast = __webpack_require__(19);
 var debug = __webpack_require__(2)('engine.io-client:polling');
 
 /**
@@ -3068,7 +3214,7 @@ module.exports = Polling;
  */
 
 var hasXHR2 = (function () {
-  var XMLHttpRequest = __webpack_require__(9);
+  var XMLHttpRequest = __webpack_require__(10);
   var xhr = new XMLHttpRequest({ xdomain: false });
   return null != xhr.responseType;
 })();
@@ -3294,7 +3440,7 @@ Polling.prototype.uri = function () {
 
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3369,7 +3515,7 @@ module.exports = yeast;
 
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {
@@ -3377,7 +3523,7 @@ module.exports = yeast;
  * Module requirements.
  */
 
-var isArray = __webpack_require__(54);
+var isArray = __webpack_require__(56);
 
 /**
  * Module exports.
@@ -3435,7 +3581,7 @@ function hasBinary(data) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ (function(module, exports) {
 
 
@@ -3450,7 +3596,7 @@ module.exports = function(arr, obj){
 };
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ (function(module, exports) {
 
 /**
@@ -3495,7 +3641,7 @@ module.exports = function parseuri(str) {
 
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {
@@ -3515,7 +3661,7 @@ function isBuf(obj) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ (function(module, exports) {
 
 module.exports = function(module) {
@@ -3543,13 +3689,13 @@ module.exports = function(module) {
 
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__node_modules_socket_io_client__ = __webpack_require__(35);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__node_modules_socket_io_client__ = __webpack_require__(37);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__node_modules_socket_io_client___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0__node_modules_socket_io_client__);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__node_modules_eventemitter2__ = __webpack_require__(34);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__node_modules_eventemitter2__ = __webpack_require__(36);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__node_modules_eventemitter2___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1__node_modules_eventemitter2__);
 
 
@@ -3610,7 +3756,7 @@ class SocketListener extends __WEBPACK_IMPORTED_MODULE_1__node_modules_eventemit
 /* harmony default export */ __webpack_exports__["a"] = (SocketListener);
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3729,7 +3875,7 @@ const drawChanging = (game) => {
 
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3770,7 +3916,7 @@ const drawGround = (game, groundTiles) => {
 
 
 /***/ }),
-/* 27 */
+/* 28 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3789,6 +3935,7 @@ var drawLava = (game, backgroundTiles, i, j, tileX, tileY) => {
         game.textures['lavaTexture'].baseTexture,
         new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
     );
+
     backgroundTiles.addFrame(tmpText, i * 48, j * 48);
 };
 
@@ -3801,12 +3948,12 @@ var drawRocks = (game, backgroundTiles, i, j, tileX, tileY) => {
     backgroundTiles.addFrame(tmpText, i * 48, j * 48);
 };
 
-var drawCommandCenter = (game, backgroundTiles, i, j, tileX, tileY) => {
+var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
 
 
     var tmpText = new PIXI.Texture(
         game.textures['buildings'].baseTexture,
-        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 144, 144)
+        new PIXI.Rectangle(0, game.tiles[tileX][tileY] * 144, 144, 144)
     );
 
 
@@ -3814,6 +3961,7 @@ var drawCommandCenter = (game, backgroundTiles, i, j, tileX, tileY) => {
 };
 
 var setRedrawBoundaries = (game) => {
+    game.forceDraw = false;
     minTX = (game.player.offset.x / 48) - 20;
     maxTX = (game.player.offset.x / 48) + 20;
     minTY = (game.player.offset.y / 48) - 20;
@@ -3821,6 +3969,11 @@ var setRedrawBoundaries = (game) => {
 };
 
 var needToRedraw = (game) => {
+
+    if (game.forceDraw) {
+        return true;
+    }
+
     if ((game.player.offset.x / 48) >= maxTX
         || (game.player.offset.x / 48) <= minTX
         || (game.player.offset.y / 48) >= maxTY
@@ -3857,16 +4010,16 @@ const drawTiles = (game, backgroundTiles) => {
 
                 if (tileX >= 0 && tileY >= 0 && tileX < 512 && tileY < 512) {
 
-                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["j" /* MAP_SQUARE_LAVA */]) {
+                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["l" /* MAP_SQUARE_LAVA */]) {
                         drawLava(game, backgroundTiles, i, j, tileX, tileY);
                     }
 
-                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["k" /* MAP_SQUARE_ROCK */]) {
+                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["m" /* MAP_SQUARE_ROCK */]) {
                         drawRocks(game, backgroundTiles, i, j, tileX, tileY);
                     }
 
-                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["l" /* MAP_SQUARE_BUILDING */]) {
-                        drawCommandCenter(game, backgroundTiles, i, j, tileX, tileY);
+                    if (game.map[tileX][tileY] >= __WEBPACK_IMPORTED_MODULE_0__constants__["k" /* MAP_SQUARE_BUILDING */]) {
+                        drawBuilding(game, backgroundTiles, i, j, tileX, tileY);
                     }
                 }
             }
@@ -3882,7 +4035,7 @@ const drawTiles = (game, backgroundTiles) => {
 
 
 /***/ }),
-/* 28 */
+/* 29 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3948,7 +4101,7 @@ class BulletFactory {
 /* harmony default export */ __webpack_exports__["a"] = (BulletFactory);
 
 /***/ }),
-/* 29 */
+/* 30 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3978,43 +4131,43 @@ class BulletFactory {
             var fDir = bullet.angle;
 
 
-            var x = (Math.sin((fDir / 16) * 3.14) * -1 ) * this.game.timePassed * __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* MOVEMENT_SPEED_BULLET */];
-            var y = (Math.cos((fDir / 16) * 3.14) * -1) * this.game.timePassed * __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* MOVEMENT_SPEED_BULLET */];
+            var x = (Math.sin((fDir / 16) * 3.14) * -1 ) * this.game.timePassed * __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* MOVEMENT_SPEED_BULLET */];
+            var y = (Math.cos((fDir / 16) * 3.14) * -1) * this.game.timePassed * __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* MOVEMENT_SPEED_BULLET */];
 
             bullet.x += x;
             bullet.y += y;
 
             // Offscreen
             if (bullet.x < 0 || bullet.x > 24576 || bullet.y < 0 || bullet.y > 24576) {
-                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* BULLET_DEAD */];
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* BULLET_DEAD */];
             }
 
             if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["a" /* collidedWithRock */])(this.game, bullet)) {
                 console.log("Bullet collided with rock");
-                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* BULLET_DEAD */];
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* BULLET_DEAD */];
             }
 
             if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["b" /* collidedWithBuilding */])(this.game, bullet)) {
-                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* BULLET_DEAD */];
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* BULLET_DEAD */];
             }
 
             if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["c" /* collidedWithAnotherPlayer */])(this.game, bullet)) {
                 console.log("Bullet collided with me");
-                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* BULLET_DEAD */];
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* BULLET_DEAD */];
             }
 
             if (bullet.shooter !== this.game.player.id) {
 
                 if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["d" /* collidedWithCurrentPlayer */])(this.game, bullet)) {
                     console.log("Bullet collided with me");
-                    bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* BULLET_DEAD */];
+                    bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* BULLET_DEAD */];
                     if (this.game.player.health > 0) {
                         this.game.player.health -= bullet.damage;
                     }
                 }
             }
 
-            if (bullet.life == __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* BULLET_DEAD */]) {
+            if (bullet.life == __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* BULLET_DEAD */]) {
                 bullet = this.deleteBullet(bullet)
             }
             else {
@@ -4045,8 +4198,8 @@ class BulletFactory {
             "shooter": shooter,
             "x": x,
             "y": y,
-            "life": __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* BULLET_ALIVE */],
-            "damage": __WEBPACK_IMPORTED_MODULE_0__constants__["r" /* DAMAGE_LASER */],
+            "life": __WEBPACK_IMPORTED_MODULE_0__constants__["r" /* BULLET_ALIVE */],
+            "damage": __WEBPACK_IMPORTED_MODULE_0__constants__["s" /* DAMAGE_LASER */],
             "animation": 0,
             "type": type,
             "angle": angle,
@@ -4075,7 +4228,7 @@ class BulletFactory {
 
 
 /***/ }),
-/* 30 */
+/* 31 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -4126,7 +4279,7 @@ var keyboard = (keyCode) => {
 };
 
 
-const setupInputs = (game) => {    //Capture the keyboard arrow keys
+const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow keys
     var left = keyboard(37),
         up = keyboard(38),
         right = keyboard(39),
@@ -4171,7 +4324,7 @@ const setupInputs = (game) => {    //Capture the keyboard arrow keys
     shift.press = function () {
         console.log("shift key pressed");
         if (game.tick > lastShot) {
-            lastShot = game.tick + __WEBPACK_IMPORTED_MODULE_0__constants__["m" /* TIMER_SHOOT_LASER */];
+            lastShot = game.tick + __WEBPACK_IMPORTED_MODULE_0__constants__["n" /* TIMER_SHOOT_LASER */];
 
             console.log("Player fired shot ");
 
@@ -4184,18 +4337,45 @@ const setupInputs = (game) => {    //Capture the keyboard arrow keys
             var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
             var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
 
-            var bullet = game.bulletFactory.newBullet(game.player.id, x2, y2, 0, angle);
+            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, angle);
             game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: angle});
 
         }
 
     }
 };
-/* harmony export (immutable) */ __webpack_exports__["a"] = setupInputs;
+/* harmony export (immutable) */ __webpack_exports__["a"] = setupKeyboardInputs;
 
 
 /***/ }),
-/* 31 */
+/* 32 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+
+const setupMouseInputs = (game) => {
+
+    game.stage.hitArea = new PIXI.Rectangle(0, 0, game.maxMapX, game.maxMapY);
+
+    game.stage.interactive = true;
+    game.stage.buttonMode = true;
+
+    game.stage.on('mousedown', (event) => {
+        console.log("mouse click");
+        console.log(event.data.global.x);
+        game.showBuildMenu = !game.showBuildMenu;
+        console.log(game.showBuildMenu);
+        game.buildMenuOffset = {
+            x: event.data.global.x,
+            y: event.data.global.y
+        }
+    });
+};
+/* harmony export (immutable) */ __webpack_exports__["a"] = setupMouseInputs;
+
+
+/***/ }),
+/* 33 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -4260,13 +4440,14 @@ function populateTiles(game, mapData) {
         // j === x axis
         for (var i = 0; i < game.map.length; i++) {
 
-            if ((game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["l" /* MAP_SQUARE_BUILDING */])) {
-                game.buildingFactory.newBuilding(null, i, j, __WEBPACK_IMPORTED_MODULE_0__constants__["n" /* BUILDING_COMMAND_CENTER */]);
+            if ((game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["k" /* MAP_SQUARE_BUILDING */])) {
+                game.buildingFactory.newBuilding(null, i, j, __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* BUILDING_COMMAND_CENTER */]);
+                game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* BUILDING_COMMAND_CENTER */];
             }
-            else if ((game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["j" /* MAP_SQUARE_LAVA */]) || (game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["k" /* MAP_SQUARE_ROCK */])) {
+            else if ((game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["l" /* MAP_SQUARE_LAVA */]) || (game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["m" /* MAP_SQUARE_ROCK */])) {
 
                 var currentTile = game.map[i][j];
-                if (currentTile == __WEBPACK_IMPORTED_MODULE_0__constants__["j" /* MAP_SQUARE_LAVA */] || currentTile == __WEBPACK_IMPORTED_MODULE_0__constants__["k" /* MAP_SQUARE_ROCK */]) {
+                if (currentTile == __WEBPACK_IMPORTED_MODULE_0__constants__["l" /* MAP_SQUARE_LAVA */] || currentTile == __WEBPACK_IMPORTED_MODULE_0__constants__["m" /* MAP_SQUARE_ROCK */]) {
 
                     var isLeft = (i == 0 || game.map[i - 1][j] != currentTile) | 0;
                     var isRight = ((i == 511 || game.map[i + 1][j] != currentTile)) | 0;
@@ -4289,11 +4470,11 @@ const build = (game, mapData) => {
 
 
 /***/ }),
-/* 32 */
+/* 34 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__collision_collision_player__ = __webpack_require__(65);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__collision_collision_player__ = __webpack_require__(67);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__constants__ = __webpack_require__(0);
 
 
@@ -4410,21 +4591,32 @@ const play = (game) => {
 
 
 /***/ }),
-/* 33 */
+/* 35 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__src_drawChanging__ = __webpack_require__(25);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__src_play__ = __webpack_require__(32);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__src_mapBuilder__ = __webpack_require__(31);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__src_factories_BulletFactory__ = __webpack_require__(29);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__src_SocketListener__ = __webpack_require__(24);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__src_constants__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__src_input__ = __webpack_require__(30);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__src_drawGround__ = __webpack_require__(26);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__src_drawTiles__ = __webpack_require__(27);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__src_factories_BuildingFactory__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__src_mapBuilder__ = __webpack_require__(33);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__src_play__ = __webpack_require__(34);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__src_constants__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__src_input_input_keyboard__ = __webpack_require__(31);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__src_input_input_mouse__ = __webpack_require__(32);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__src_draw_draw_ground__ = __webpack_require__(27);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__src_draw_draw_tiles__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__src_draw_draw_changing__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__src_factories_BuildingFactory__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__src_factories_BulletFactory__ = __webpack_require__(30);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_10__src_SocketListener__ = __webpack_require__(25);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_11__src_draw_draw_building__ = __webpack_require__(8);
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4447,7 +4639,7 @@ if (!PIXI.utils.isWebGLSupported()) {
 }
 
 
-var app = new PIXI.Application(__WEBPACK_IMPORTED_MODULE_5__src_constants__["a" /* RESOLUTION_X */], __WEBPACK_IMPORTED_MODULE_5__src_constants__["b" /* RESOLUTION_Y */]);
+var app = new PIXI.Application(__WEBPACK_IMPORTED_MODULE_2__src_constants__["a" /* RESOLUTION_X */], __WEBPACK_IMPORTED_MODULE_2__src_constants__["b" /* RESOLUTION_Y */]);
 
 document.getElementById("game").appendChild(app.view);
 
@@ -4458,6 +4650,7 @@ document.getElementById("game").appendChild(stats.dom);
 var objectContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
+var menuContainer = null;
 
 const game = {
     map: [],
@@ -4467,21 +4660,22 @@ const game = {
     timePassed: 0,
     staticTick: 0,
     textures: [],
-    maxMapX: __WEBPACK_IMPORTED_MODULE_5__src_constants__["a" /* RESOLUTION_X */] - 200,
-    maxMapY: __WEBPACK_IMPORTED_MODULE_5__src_constants__["b" /* RESOLUTION_Y */],
+    maxMapX: __WEBPACK_IMPORTED_MODULE_2__src_constants__["a" /* RESOLUTION_X */] - 200,
+    maxMapY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["b" /* RESOLUTION_Y */],
     otherPlayers: {},
+    showBuildMenu: false,
+    buildMenuOffset: {
+        x: ((__WEBPACK_IMPORTED_MODULE_2__src_constants__["a" /* RESOLUTION_X */] - 200) / 2),
+        y: (__WEBPACK_IMPORTED_MODULE_2__src_constants__["b" /* RESOLUTION_Y */] / 2)
+    },
     player: {
-        health: __WEBPACK_IMPORTED_MODULE_5__src_constants__["c" /* MAX_HEALTH */],
+        health: __WEBPACK_IMPORTED_MODULE_2__src_constants__["c" /* MAX_HEALTH */],
         isTurning: 0,
         timeTurn: 0,
         direction: 0,
         defaultOffset: {
-            x: ((__WEBPACK_IMPORTED_MODULE_5__src_constants__["a" /* RESOLUTION_X */] - 200) / 2),
-            y: (__WEBPACK_IMPORTED_MODULE_5__src_constants__["b" /* RESOLUTION_Y */] / 2)
-        },
-        groundOffset: {
-            x: 48,
-            y: 48
+            x: ((__WEBPACK_IMPORTED_MODULE_2__src_constants__["a" /* RESOLUTION_X */] - 200) / 2),
+            y: (__WEBPACK_IMPORTED_MODULE_2__src_constants__["b" /* RESOLUTION_Y */] / 2)
         },
         offset: {
             x: 1600,
@@ -4493,9 +4687,9 @@ const game = {
     stage: app.stage,
     objectContainer: objectContainer
 };
-game.bulletFactory = new __WEBPACK_IMPORTED_MODULE_3__src_factories_BulletFactory__["a" /* default */](game);
-game.buildingFactory = new __WEBPACK_IMPORTED_MODULE_9__src_factories_BuildingFactory__["a" /* default */](game);
-game.socketListener = new __WEBPACK_IMPORTED_MODULE_4__src_SocketListener__["a" /* default */](game);
+game.bulletFactory = new __WEBPACK_IMPORTED_MODULE_9__src_factories_BulletFactory__["a" /* default */](game);
+game.buildingFactory = new __WEBPACK_IMPORTED_MODULE_8__src_factories_BuildingFactory__["a" /* default */](game);
+game.socketListener = new __WEBPACK_IMPORTED_MODULE_10__src_SocketListener__["a" /* default */](game);
 
 PIXI.loader
     .add([
@@ -4508,6 +4702,7 @@ PIXI.loader
         "data/imgInterfaceBottom.png",
         "data/imgHealth.png",
         "data/imgBuildings.png",
+        "data/imgBuildIcons.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -4526,7 +4721,7 @@ function setup() {
 
 
     var mapData = PIXI.loader.resources["data/map.dat"].data;
-    __WEBPACK_IMPORTED_MODULE_2__src_mapBuilder__["a" /* build */](game, mapData);
+    __WEBPACK_IMPORTED_MODULE_0__src_mapBuilder__["a" /* build */](game, mapData);
 
     game.textures['groundTexture'] = PIXI.utils.TextureCache["data/imgGround.png"];
     game.textures['tankTexture'] = PIXI.utils.TextureCache["data/imgTanks.png"];
@@ -4537,10 +4732,11 @@ function setup() {
     game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/imgInterfaceBottom.png"];
     game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
     game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
+    game.textures['buildingIcons'] = PIXI.utils.TextureCache["data/imgBuildIcons.png"];
 
 
-
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_6__src_input__["a" /* setupInputs */])(game);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_3__src_input_input_keyboard__["a" /* setupKeyboardInputs */])(game);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4__src_input_input_mouse__["a" /* setupMouseInputs */])(game);
 
     game.socketListener.listen();
     game.socketListener.on("connected", () => {
@@ -4557,12 +4753,14 @@ function setup() {
     app.stage.addChild(backgroundTiles);
     app.stage.addChild(objectContainer);
 
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_7__src_drawGround__["a" /* drawGround */])(game, groundTiles);
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_8__src_drawTiles__["a" /* drawTiles */])(game, backgroundTiles);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_11__src_draw_draw_building__["a" /* setupBuildingMenu */])(game);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__src_draw_draw_ground__["a" /* drawGround */])(game, groundTiles);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_6__src_draw_draw_tiles__["a" /* drawTiles */])(game, backgroundTiles);
 
 
     gameLoop();
 }
+
 
 
 function gameLoop() {
@@ -4577,10 +4775,13 @@ function gameLoop() {
     game.socketListener.cycle();
 
 
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_7__src_drawGround__["a" /* drawGround */])(game, groundTiles);
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_8__src_drawTiles__["a" /* drawTiles */])(game, backgroundTiles);
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__src_drawChanging__["a" /* drawChanging */])(game);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__src_draw_draw_ground__["a" /* drawGround */])(game, groundTiles);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_6__src_draw_draw_tiles__["a" /* drawTiles */])(game, backgroundTiles);
+
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_7__src_draw_draw_changing__["a" /* drawChanging */])(game);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_11__src_draw_draw_building__["b" /* drawBuilding */])(game);
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__src_play__["a" /* play */])(game);
+
 
     stats.end();
     requestAnimationFrame(gameLoop);
@@ -4591,7 +4792,7 @@ function gameLoop() {
 
 
 /***/ }),
-/* 34 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var __WEBPACK_AMD_DEFINE_RESULT__;/*!
@@ -5367,7 +5568,7 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/*!
 
 
 /***/ }),
-/* 35 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -5375,9 +5576,9 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/*!
  * Module dependencies.
  */
 
-var url = __webpack_require__(36);
-var parser = __webpack_require__(11);
-var Manager = __webpack_require__(12);
+var url = __webpack_require__(38);
+var parser = __webpack_require__(12);
+var Manager = __webpack_require__(13);
 var debug = __webpack_require__(2)('socket.io-client');
 
 /**
@@ -5477,12 +5678,12 @@ exports.connect = lookup;
  * @api public
  */
 
-exports.Manager = __webpack_require__(12);
-exports.Socket = __webpack_require__(14);
+exports.Manager = __webpack_require__(13);
+exports.Socket = __webpack_require__(15);
 
 
 /***/ }),
-/* 36 */
+/* 38 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {
@@ -5490,7 +5691,7 @@ exports.Socket = __webpack_require__(14);
  * Module dependencies.
  */
 
-var parseuri = __webpack_require__(21);
+var parseuri = __webpack_require__(22);
 var debug = __webpack_require__(2)('socket.io-client:url');
 
 /**
@@ -5564,7 +5765,7 @@ function url (uri, loc) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 37 */
+/* 39 */
 /***/ (function(module, exports) {
 
 
@@ -5655,7 +5856,7 @@ Backoff.prototype.setJitter = function(jitter){
 
 
 /***/ }),
-/* 38 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -5671,7 +5872,7 @@ exports.coerce = coerce;
 exports.disable = disable;
 exports.enable = enable;
 exports.enabled = enabled;
-exports.humanize = __webpack_require__(39);
+exports.humanize = __webpack_require__(41);
 
 /**
  * The currently active debug mode names, and names to skip.
@@ -5861,7 +6062,7 @@ function coerce(val) {
 
 
 /***/ }),
-/* 39 */
+/* 41 */
 /***/ (function(module, exports) {
 
 /**
@@ -6016,19 +6217,19 @@ function plural(ms, n, name) {
 
 
 /***/ }),
-/* 40 */
+/* 42 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
-module.exports = __webpack_require__(41);
+module.exports = __webpack_require__(43);
 
 
 /***/ }),
-/* 41 */
+/* 43 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
-module.exports = __webpack_require__(42);
+module.exports = __webpack_require__(44);
 
 /**
  * Exports parser
@@ -6040,21 +6241,21 @@ module.exports.parser = __webpack_require__(3);
 
 
 /***/ }),
-/* 42 */
+/* 44 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {/**
  * Module dependencies.
  */
 
-var transports = __webpack_require__(16);
+var transports = __webpack_require__(17);
 var Emitter = __webpack_require__(4);
 var debug = __webpack_require__(2)('engine.io-client:socket');
-var index = __webpack_require__(20);
+var index = __webpack_require__(21);
 var parser = __webpack_require__(3);
-var parseuri = __webpack_require__(21);
-var parsejson = __webpack_require__(53);
-var parseqs = __webpack_require__(10);
+var parseuri = __webpack_require__(22);
+var parsejson = __webpack_require__(55);
+var parseqs = __webpack_require__(11);
 
 /**
  * Module exports.
@@ -6186,8 +6387,8 @@ Socket.protocol = parser.protocol; // this is an int
  */
 
 Socket.Socket = Socket;
-Socket.Transport = __webpack_require__(8);
-Socket.transports = __webpack_require__(16);
+Socket.Transport = __webpack_require__(9);
+Socket.transports = __webpack_require__(17);
 Socket.parser = __webpack_require__(3);
 
 /**
@@ -6785,7 +6986,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 43 */
+/* 45 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {
@@ -6793,7 +6994,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
  * Module requirements.
  */
 
-var Polling = __webpack_require__(17);
+var Polling = __webpack_require__(18);
 var inherit = __webpack_require__(5);
 
 /**
@@ -7023,15 +7224,15 @@ JSONPPolling.prototype.doWrite = function (data, fn) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 44 */
+/* 46 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {/**
  * Module requirements.
  */
 
-var XMLHttpRequest = __webpack_require__(9);
-var Polling = __webpack_require__(17);
+var XMLHttpRequest = __webpack_require__(10);
+var Polling = __webpack_require__(18);
 var Emitter = __webpack_require__(4);
 var inherit = __webpack_require__(5);
 var debug = __webpack_require__(2)('engine.io-client:polling-xhr');
@@ -7454,24 +7655,24 @@ function unloadHandler () {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 45 */
+/* 47 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {/**
  * Module dependencies.
  */
 
-var Transport = __webpack_require__(8);
+var Transport = __webpack_require__(9);
 var parser = __webpack_require__(3);
-var parseqs = __webpack_require__(10);
+var parseqs = __webpack_require__(11);
 var inherit = __webpack_require__(5);
-var yeast = __webpack_require__(18);
+var yeast = __webpack_require__(19);
 var debug = __webpack_require__(2)('engine.io-client:websocket');
 var BrowserWebSocket = global.WebSocket || global.MozWebSocket;
 var NodeWebSocket;
 if (typeof window === 'undefined') {
   try {
-    NodeWebSocket = __webpack_require__(66);
+    NodeWebSocket = __webpack_require__(68);
   } catch (e) { }
 }
 
@@ -7746,7 +7947,7 @@ WS.prototype.check = function () {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 46 */
+/* 48 */
 /***/ (function(module, exports) {
 
 
@@ -7771,7 +7972,7 @@ module.exports = Object.keys || function keys (obj){
 
 
 /***/ }),
-/* 47 */
+/* 49 */
 /***/ (function(module, exports) {
 
 module.exports = after
@@ -7805,7 +8006,7 @@ function noop() {}
 
 
 /***/ }),
-/* 48 */
+/* 50 */
 /***/ (function(module, exports) {
 
 /**
@@ -7840,7 +8041,7 @@ module.exports = function(arraybuffer, start, end) {
 
 
 /***/ }),
-/* 49 */
+/* 51 */
 /***/ (function(module, exports) {
 
 /*
@@ -7913,7 +8114,7 @@ module.exports = function(arraybuffer, start, end) {
 
 
 /***/ }),
-/* 50 */
+/* 52 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {/**
@@ -8016,7 +8217,7 @@ module.exports = (function() {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 51 */
+/* 53 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(module, global) {var __WEBPACK_AMD_DEFINE_RESULT__;/*! https://mths.be/wtf8 v1.0.0 by @mathias */
@@ -8253,10 +8454,10 @@ module.exports = (function() {
 
 }(this));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(23)(module), __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(24)(module), __webpack_require__(1)))
 
 /***/ }),
-/* 52 */
+/* 54 */
 /***/ (function(module, exports) {
 
 
@@ -8279,7 +8480,7 @@ try {
 
 
 /***/ }),
-/* 53 */
+/* 55 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {/**
@@ -8317,7 +8518,7 @@ module.exports = function parsejson(data) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 54 */
+/* 56 */
 /***/ (function(module, exports) {
 
 module.exports = Array.isArray || function (arr) {
@@ -8326,7 +8527,7 @@ module.exports = Array.isArray || function (arr) {
 
 
 /***/ }),
-/* 55 */
+/* 57 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {/*global Blob,File*/
@@ -8335,8 +8536,8 @@ module.exports = Array.isArray || function (arr) {
  * Module requirements
  */
 
-var isArray = __webpack_require__(60);
-var isBuf = __webpack_require__(22);
+var isArray = __webpack_require__(62);
+var isBuf = __webpack_require__(23);
 
 /**
  * Replaces every Buffer | ArrayBuffer in packet with a numbered placeholder.
@@ -8474,7 +8675,7 @@ exports.removeBlobs = function(data, callback) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
 
 /***/ }),
-/* 56 */
+/* 58 */
 /***/ (function(module, exports) {
 
 
@@ -8644,7 +8845,7 @@ Emitter.prototype.hasListeners = function(event){
 
 
 /***/ }),
-/* 57 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -8654,7 +8855,7 @@ Emitter.prototype.hasListeners = function(event){
  * Expose `debug()` as the module.
  */
 
-exports = module.exports = __webpack_require__(58);
+exports = module.exports = __webpack_require__(60);
 exports.log = log;
 exports.formatArgs = formatArgs;
 exports.save = save;
@@ -8818,7 +9019,7 @@ function localstorage(){
 
 
 /***/ }),
-/* 58 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -8834,7 +9035,7 @@ exports.coerce = coerce;
 exports.disable = disable;
 exports.enable = enable;
 exports.enabled = enabled;
-exports.humanize = __webpack_require__(59);
+exports.humanize = __webpack_require__(61);
 
 /**
  * The currently active debug mode names, and names to skip.
@@ -9021,7 +9222,7 @@ function coerce(val) {
 
 
 /***/ }),
-/* 59 */
+/* 61 */
 /***/ (function(module, exports) {
 
 /**
@@ -9152,7 +9353,7 @@ function plural(ms, n, name) {
 
 
 /***/ }),
-/* 60 */
+/* 62 */
 /***/ (function(module, exports) {
 
 module.exports = Array.isArray || function (arr) {
@@ -9161,14 +9362,14 @@ module.exports = Array.isArray || function (arr) {
 
 
 /***/ }),
-/* 61 */
+/* 63 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(module, global) {var __WEBPACK_AMD_DEFINE_RESULT__;/*! JSON v3.3.2 | http://bestiejs.github.io/json3 | Copyright 2012-2014, Kit Cambridge | http://kit.mit-license.org */
 ;(function () {
   // Detect the `define` function exposed by asynchronous module loaders. The
   // strict `define` check is necessary for compatibility with `r.js`.
-  var isLoader = "function" === "function" && __webpack_require__(63);
+  var isLoader = "function" === "function" && __webpack_require__(65);
 
   // A set of types used to distinguish objects from primitives.
   var objectTypes = {
@@ -10068,10 +10269,10 @@ module.exports = Array.isArray || function (arr) {
   }
 }).call(this);
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(23)(module), __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(24)(module), __webpack_require__(1)))
 
 /***/ }),
-/* 62 */
+/* 64 */
 /***/ (function(module, exports) {
 
 module.exports = toArray
@@ -10090,7 +10291,7 @@ function toArray(list, index) {
 
 
 /***/ }),
-/* 63 */
+/* 65 */
 /***/ (function(module, exports) {
 
 /* WEBPACK VAR INJECTION */(function(__webpack_amd_options__) {/* globals __webpack_amd_options__ */
@@ -10099,7 +10300,7 @@ module.exports = __webpack_amd_options__;
 /* WEBPACK VAR INJECTION */}.call(exports, {}))
 
 /***/ }),
-/* 64 */
+/* 66 */
 /***/ (function(module, exports) {
 
 // shim for using process in browser
@@ -10285,7 +10486,7 @@ process.umask = function() { return 0; };
 
 
 /***/ }),
-/* 65 */
+/* 67 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -10392,7 +10593,7 @@ const checkPlayerCollision = (game) => {
 
 
 /***/ }),
-/* 66 */
+/* 68 */
 /***/ (function(module, exports) {
 
 /* (ignored) */

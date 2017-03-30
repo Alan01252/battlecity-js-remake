@@ -1,6 +1,6 @@
-import {MAP_SQUARE_LAVA} from "./constants";
-import {MAP_SQUARE_ROCK} from "./constants";
-import {MAP_SQUARE_BUILDING} from "./constants";
+import {MAP_SQUARE_LAVA} from "../constants";
+import {MAP_SQUARE_ROCK} from "../constants";
+import {MAP_SQUARE_BUILDING} from "../constants";
 
 var minTX = 0;
 var maxTX = 0;
@@ -12,6 +12,7 @@ var drawLava = (game, backgroundTiles, i, j, tileX, tileY) => {
         game.textures['lavaTexture'].baseTexture,
         new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
     );
+
     backgroundTiles.addFrame(tmpText, i * 48, j * 48);
 };
 
@@ -24,12 +25,12 @@ var drawRocks = (game, backgroundTiles, i, j, tileX, tileY) => {
     backgroundTiles.addFrame(tmpText, i * 48, j * 48);
 };
 
-var drawCommandCenter = (game, backgroundTiles, i, j, tileX, tileY) => {
+var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
 
 
     var tmpText = new PIXI.Texture(
         game.textures['buildings'].baseTexture,
-        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 144, 144)
+        new PIXI.Rectangle(0, game.tiles[tileX][tileY] * 144, 144, 144)
     );
 
 
@@ -37,6 +38,7 @@ var drawCommandCenter = (game, backgroundTiles, i, j, tileX, tileY) => {
 };
 
 var setRedrawBoundaries = (game) => {
+    game.forceDraw = false;
     minTX = (game.player.offset.x / 48) - 20;
     maxTX = (game.player.offset.x / 48) + 20;
     minTY = (game.player.offset.y / 48) - 20;
@@ -44,6 +46,11 @@ var setRedrawBoundaries = (game) => {
 };
 
 var needToRedraw = (game) => {
+
+    if (game.forceDraw) {
+        return true;
+    }
+
     if ((game.player.offset.x / 48) >= maxTX
         || (game.player.offset.x / 48) <= minTX
         || (game.player.offset.y / 48) >= maxTY
@@ -88,8 +95,8 @@ export const drawTiles = (game, backgroundTiles) => {
                         drawRocks(game, backgroundTiles, i, j, tileX, tileY);
                     }
 
-                    if (game.map[tileX][tileY] == MAP_SQUARE_BUILDING) {
-                        drawCommandCenter(game, backgroundTiles, i, j, tileX, tileY);
+                    if (game.map[tileX][tileY] >= MAP_SQUARE_BUILDING) {
+                        drawBuilding(game, backgroundTiles, i, j, tileX, tileY);
                     }
                 }
             }
