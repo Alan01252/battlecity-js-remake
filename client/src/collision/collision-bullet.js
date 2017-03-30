@@ -1,25 +1,9 @@
-import {MAP_SQUARE_ROCK} from "./constants";
+import {rectangleCollision} from "./collision-helpers";
+import {getPlayerRect} from "./collision-helpers";
 
 
-var rectangleCollision = (rect1, rect2) => {
-    rect1.w += rect1.x;
-    rect1.h += rect1.y;
-    rect2.w += rect2.x;
-    rect2.h += rect2.y;
+import {MAP_SQUARE_ROCK} from "../constants";
 
-    if (rect1.w < rect2.x)
-        return false;
-    if (rect2.w < rect1.x)
-        return false;
-
-    if (rect1.h < rect2.y)
-        return false;
-    if (rect2.h < rect1.y)
-        return false;
-
-    return 1;
-
-};
 
 var collidedWithPlayer = (playerRect, bullet)=> {
 
@@ -54,24 +38,10 @@ export const collidedWithRock = (game, bullet) => {
 export const collidedWithAnotherPlayer = (game, bullet) => {
 
     return Object.keys(game.otherPlayers).some((id) => {
-        var playerRect = {
-            x: parseInt(game.otherPlayers[id].offset.x),
-            y: parseInt(game.otherPlayers[id].offset.y),
-            w: 48,
-            h: 48
-        };
-        return collidedWithPlayer(playerRect, bullet)
+        return collidedWithPlayer(getPlayerRect(game.otherPlayers[id]), bullet)
     });
 };
 
 export const collidedWithCurrentPlayer = (game, bullet) => {
-
-    var playerRect = {
-        x: parseInt(game.player.offset.x),
-        y: parseInt(game.player.offset.y),
-        w: 48,
-        h: 48
-    };
-
-    return collidedWithPlayer(playerRect, bullet);
+    return collidedWithPlayer(getPlayerRect(game.player), bullet);
 };

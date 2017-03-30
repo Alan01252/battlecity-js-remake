@@ -1,6 +1,7 @@
 import {MAP_SQUARE_LAVA} from "./constants";
 import {MAP_SQUARE_ROCK} from "./constants";
 import {MAP_SQUARE_BUILDING} from "./constants";
+import {BUILDING_COMMAND_CENTER} from "./constants";
 
 function createMap(game) {
     for (var i = 0; i < 512; i++) {
@@ -51,12 +52,14 @@ function populateTiles(game, mapData) {
         }
     }
 
+    var buildings = 0;
     // i == y axis
     for (var j = 0; j < game.map.length; j++) {
         // j === x axis
         for (var i = 0; i < game.map.length; i++) {
 
             if ((game.map[i][j] == MAP_SQUARE_BUILDING)) {
+                game.buildingFactory.newBuilding(null, i, j, BUILDING_COMMAND_CENTER);
             }
             else if ((game.map[i][j] == MAP_SQUARE_LAVA) || (game.map[i][j] == MAP_SQUARE_ROCK)) {
 
@@ -77,6 +80,6 @@ function populateTiles(game, mapData) {
 export const build = (game, mapData) => {
     createMap(game);
     createTiles(game);
-    populateTiles(game,mapData);
+    populateTiles(game, mapData);
 
 };

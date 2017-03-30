@@ -1,9 +1,59 @@
 import {MAP_SQUARE_LAVA} from "./constants";
 import {MAP_SQUARE_ROCK} from "./constants";
+import {MAP_SQUARE_BUILDING} from "./constants";
+
 var minTX = 0;
 var maxTX = 0;
 var minTY = 0;
 var maxTY = 0;
+
+var drawLava = (game, backgroundTiles, i, j, tileX, tileY) => {
+    var tmpText = new PIXI.Texture(
+        game.textures['lavaTexture'].baseTexture,
+        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
+    );
+    backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+};
+
+
+var drawRocks = (game, backgroundTiles, i, j, tileX, tileY) => {
+    var tmpText = new PIXI.Texture(
+        game.textures['rockTexture'].baseTexture,
+        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
+    );
+    backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+};
+
+var drawCommandCenter = (game, backgroundTiles, i, j, tileX, tileY) => {
+
+
+    var tmpText = new PIXI.Texture(
+        game.textures['buildings'].baseTexture,
+        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 144, 144)
+    );
+
+
+    backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+};
+
+var setRedrawBoundaries = (game) => {
+    minTX = (game.player.offset.x / 48) - 20;
+    maxTX = (game.player.offset.x / 48) + 20;
+    minTY = (game.player.offset.y / 48) - 20;
+    maxTY = (game.player.offset.y / 48) + 20;
+};
+
+var needToRedraw = (game) => {
+    if ((game.player.offset.x / 48) >= maxTX
+        || (game.player.offset.x / 48) <= minTX
+        || (game.player.offset.y / 48) >= maxTY
+        || (game.player.offset.y / 48) <= minTY
+    ) {
+        return true;
+    }
+    return false;
+};
+
 
 export const drawTiles = (game, backgroundTiles) => {
 
@@ -12,19 +62,10 @@ export const drawTiles = (game, backgroundTiles) => {
     var offTileY = Math.floor(game.player.offset.y % 48);
 
 
-    backgroundTiles.pivot.set(game.player.offset.x, game.player.offset.y);
+    if (needToRedraw(game)) {
 
-    if ((game.player.offset.x / 48) >= maxTX
-        || (game.player.offset.x / 48) <= minTX
-        || (game.player.offset.y / 48) >= maxTY
-        || (game.player.offset.y / 48) <= minTY
-    ) {
+        setRedrawBoundaries(game);
 
-
-        minTX = (game.player.offset.x / 48) - 20;
-        maxTX = (game.player.offset.x / 48) + 20;
-        minTY = (game.player.offset.y / 48) - 20;
-        maxTY = (game.player.offset.y / 48) + 20;
         backgroundTiles.clear();
 
         var exactX = Math.floor(game.player.offset.x / 48);
@@ -40,23 +81,22 @@ export const drawTiles = (game, backgroundTiles) => {
                 if (tileX >= 0 && tileY >= 0 && tileX < 512 && tileY < 512) {
 
                     if (game.map[tileX][tileY] == MAP_SQUARE_LAVA) {
-                        var tmpText = new PIXI.Texture(
-                            game.textures['lavaTexture'].baseTexture,
-                            new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
-                        );
-                        backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+                        drawLava(game, backgroundTiles, i, j, tileX, tileY);
                     }
-                    // Else if the map square is Rock, draw Rock
-                    else if (game.map[tileX][tileY] == MAP_SQUARE_ROCK) {
-                        var tmpText = new PIXI.Texture(
-                            game.textures['rockTexture'].baseTexture,
-                            new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
-                        );
-                        backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+
+                    if (game.map[tileX][tileY] == MAP_SQUARE_ROCK) {
+                        drawRocks(game, backgroundTiles, i, j, tileX, tileY);
+                    }
+
+                    if (game.map[tileX][tileY] == MAP_SQUARE_BUILDING) {
+                        drawCommandCenter(game, backgroundTiles, i, j, tileX, tileY);
                     }
                 }
             }
         }
+
         backgroundTiles.position.set(game.player.defaultOffset.x + game.player.offset.x - offTileX, game.player.defaultOffset.y + game.player.offset.y - offTileY);
     }
+
+    backgroundTiles.pivot.set(game.player.offset.x, game.player.offset.y);
 };

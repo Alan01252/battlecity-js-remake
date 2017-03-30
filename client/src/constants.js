@@ -23,3 +23,5 @@ export const TIMER_SHOOT_LASER = 650;
 export const DAMAGE_LASER = 5;
 
 export const MAX_HEALTH = 40;
+
+export const BUILDING_COMMAND_CENTER = 0;

@@ -10,6 +10,7 @@ import {MAX_HEALTH} from "./src/constants";
 import {setupInputs} from './src/input';
 import {drawGround} from "./src/drawGround";
 import {drawTiles} from "./src/drawTiles";
+import BuildingFactory from "./src/factories/BuildingFactory";
 
 
 var type = "WebGL";
@@ -30,7 +31,6 @@ document.getElementById("game").appendChild(stats.dom);
 var objectContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
-var playerTank = null;
 
 const game = {
     map: [],
@@ -57,8 +57,8 @@ const game = {
             y: 48
         },
         offset: {
-            x: 1,
-            y: 1,
+            x: 1600,
+            y: 1800,
             vx: 0,
             vy: 0
         }
@@ -67,6 +67,7 @@ const game = {
     objectContainer: objectContainer
 };
 game.bulletFactory = new BulletFactory(game);
+game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
 
 PIXI.loader
@@ -79,6 +80,7 @@ PIXI.loader
         "data/imgInterface.png",
         "data/imgInterfaceBottom.png",
         "data/imgHealth.png",
+        "data/imgBuildings.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -107,15 +109,9 @@ function setup() {
     game.textures['interfaceTop'] = PIXI.utils.TextureCache["data/imgInterface.png"];
     game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/imgInterfaceBottom.png"];
     game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
+    game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
 
 
-    var tankRectangle = new PIXI.Rectangle(0, 0, 48, 48);
-    game.textures['tankTexture'].frame = tankRectangle;
-    var playersTank = new PIXI.Sprite(game.textures['tankTexture']);
-    playersTank.x = game.player.groundOffset.x;
-    playersTank.y = game.player.groundOffset.y;
-    playersTank.vx = 0;
-    playersTank.vy = 0;
 
     setupInputs(game);
 
@@ -137,22 +133,8 @@ function setup() {
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
 
-    var tmpText = new PIXI.Texture(
-        game.textures['tankTexture'].baseTexture,
-        new PIXI.Rectangle(0, 0, 48, 48)
-    );
-
-    playerTank = new PIXI.Sprite(tmpText);
-    playerTank.x = game.player.defaultOffset.x;
-    playerTank.y = game.player.defaultOffset.y;
-    playerTank.anchor.set(0.5);
-
-
-    app.stage.addChild(playerTank);
 
     gameLoop();
-
-
 }
 
 
@@ -166,8 +148,6 @@ function gameLoop() {
 
     game.bulletFactory.cycle();
     game.socketListener.cycle();
-
-    playerTank.rotation = game.player.direction;
 
 
     drawGround(game, groundTiles);

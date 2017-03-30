@@ -1,10 +1,11 @@
 import {MOVEMENT_SPEED_BULLET} from "../constants";
 import {BULLET_ALIVE} from "../constants";
 import {BULLET_DEAD} from "../constants";
-import {collidedWithRock} from "../collision-bullet";
-import {collidedWithCurrentPlayer} from "../collision-bullet";
 import {DAMAGE_LASER} from "../constants";
-import {collidedWithAnotherPlayer} from "../collision-bullet";
+
+import {collidedWithRock} from "../collision/collision-bullet";
+import {collidedWithCurrentPlayer} from "../collision/collision-bullet";
+import {collidedWithAnotherPlayer} from "../collision/collision-bullet";
 
 class BulletFactory {
 
