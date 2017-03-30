@@ -40,7 +40,7 @@ export const CAN_BUILD_HOUSE = 300;
 export const CAN_BUILD_LASER_RESEARCH = 412;
 export const CAN_BUILD_TURRET_RESEARCH = 409;
 export const CAN_BUILD_LASER_FACTORY = 112;
-export const CAN_BUILD_TURRET_FACTORY = 112;
+export const CAN_BUILD_TURRET_FACTORY = 109;
 
 
 export const DEPENDENCY_TREE = [
@@ -79,7 +79,7 @@ export const LABELS = {
     },
     CAN_BUILD_TURRET_FACTORY: {
         ICON: 2,
-        TYPE: CAN_BUILD_TURRET_RESEARCH,
+        TYPE: CAN_BUILD_TURRET_FACTORY,
         IMAGE: BUILDING_FACTORY,
         LABEL: "Turret Factory",
     }
