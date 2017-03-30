@@ -48,9 +48,12 @@ export const setupBuildingMenu = (game) => {
 export const drawBuilding = (game) => {
 
 
-    menuContainer.visible = game.showBuildMenu;
+    if (!game.isDragging) {
+        menuContainer.visible = game.showBuildMenu;
+    }
 
     if (game.isBuilding && !game.isDragging) {
+
 
         game.isDragging = true;
         var tmpText = new PIXI.Texture(
@@ -80,9 +83,6 @@ export const drawBuilding = (game) => {
         }
 
         function onDragEnd(event) {
-            this.alpha = 1;
-            this.dragging = false;
-            building.dragging = false;
 
 
             var offTileX = Math.floor(game.player.offset.x % 48);
@@ -95,15 +95,14 @@ export const drawBuilding = (game) => {
                 game.tiles[x][y] = game.isBuilding;
             }
 
-            // set the interaction data to null
             this.data = null;
-
             game.isBuilding = false;
             game.isDragging = false;
             game.forceDraw = true;
             game.showBuildMenu = false;
+            this.dragging = false;
+            building.dragging = false;
             building.destroy();
-
         }
 
         function onDragMove() {

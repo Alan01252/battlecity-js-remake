@@ -16,10 +16,8 @@ import BulletFactory from "./src/factories/BulletFactory"
 
 
 import SocketListener from "./src/SocketListener"
-import {BUILDING_HOUSE} from "./src/constants";
-import {MAP_SQUARE_BUILDING} from "./src/constants";
-import {setupBuildingMenu} from "./src/draw/draw-building";
-import {drawBuilding} from "./src/draw/draw-building";
+import {setupBuildingMenu} from "./src/draw/draw-building-interface";
+import {drawBuilding} from "./src/draw/draw-building-interface";
 
 
 var type = "WebGL";

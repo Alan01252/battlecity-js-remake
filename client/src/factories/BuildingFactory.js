@@ -1,3 +1,4 @@
+import {checkBuildingCollision} from "../collision/collision-building";
 class BulletFactory {
 
     constructor(game) {
@@ -19,6 +20,11 @@ class BulletFactory {
             "previous": null
 
         };
+
+        if (checkBuildingCollision(this.game, building)) {
+            console.log("Collision");
+            return false;
+        }
 
 
         if (this.buildingListHead) {
