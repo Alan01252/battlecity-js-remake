@@ -63,7 +63,6 @@ function populateTiles(game, mapData) {
                 var currentTile = game.map[i][j];
                 if (currentTile == MAP_SQUARE_LAVA || currentTile == MAP_SQUARE_ROCK) {
 
-
                     var isLeft = (i == 0 || game.map[i - 1][j] != currentTile) | 0;
                     var isRight = ((i == 511 || game.map[i + 1][j] != currentTile)) | 0;
                     var isUp = (i == 0 || game.map[i][j - 1] != currentTile) | 0;

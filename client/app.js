@@ -8,6 +8,8 @@ import {RESOLUTION_X} from "./src/constants";
 import {RESOLUTION_Y} from "./src/constants";
 import {MAX_HEALTH} from "./src/constants";
 import {setupInputs} from './src/input';
+import {drawGround} from "./src/drawGround";
+import {drawTiles} from "./src/drawTiles";
 
 
 var type = "WebGL";
@@ -26,12 +28,9 @@ var stats = new Stats();
 stats.showPanel(0);
 document.getElementById("game").appendChild(stats.dom);
 
-var backgroundContainer = new PIXI.Container();
-var tileContainer = new PIXI.Container();
-var lavaContainer = new PIXI.particles.ParticleContainer();
-var rockContainer = new PIXI.particles.ParticleContainer();
 var objectContainer = new PIXI.Container();
 var groundTiles = null;
+var backgroundTiles = null;
 
 const game = {
     map: [],
@@ -58,17 +57,13 @@ const game = {
             y: 48
         },
         offset: {
-            x: 0,
-            y: 0,
+            x: 1,
+            y: 1,
             vx: 0,
             vy: 0
         }
     },
     stage: app.stage,
-    backgroundContainer: backgroundContainer,
-    tileContainer: tileContainer,
-    rockContainer: rockContainer,
-    lavaContainer: lavaContainer,
     objectContainer: objectContainer
 };
 game.bulletFactory = new BulletFactory(game);
@@ -98,23 +93,8 @@ function loadProgressHandler(loader, resource) {
 
 
 function setup() {
-    console.log("everything loaded");
+    console.log("loaded");
 
-
-    groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
-    for (var i = -10; i < 10; i++) {
-        for (var j = 0; j < 10; j++) {
-            groundTiles.addFrame("data/imgGround.png", i * 128, j * 128);
-        }
-    }
-    groundTiles.position.set(game.player.defaultOffset.x, game.player.defaultOffset.y);
-
-    app.stage.addChild(groundTiles);
-    app.stage.addChild(backgroundContainer);
-    app.stage.addChild(tileContainer);
-    app.stage.addChild(lavaContainer);
-    app.stage.addChild(rockContainer);
-    app.stage.addChild(objectContainer);
 
     var mapData = PIXI.loader.resources["data/map.dat"].data;
     mapBuilder.build(game, mapData);
@@ -145,40 +125,27 @@ function setup() {
         console.log("Connected starting game");
     });
 
+
+
+    groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
+    backgroundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
+
+
+    app.stage.addChild(groundTiles);
+    app.stage.addChild(backgroundTiles);
+    app.stage.addChild(objectContainer);
+
+    drawGround(game, groundTiles);
+    drawTiles(game, backgroundTiles);
+
     gameLoop();
 
 
 }
 
-var max = 0;
-var minX = 0;
-var maxX = 0;
-var minY = 0;
-var maxY = 0;
 
 
-function buildGroundTiles(groundTiles) {
 
-    if (parseInt(game.player.offset.x / 128) > maxX
-        || parseInt(game.player.offset.x / 128) < minX
-        || parseInt(game.player.offset.y / 128) > maxY
-        || parseInt(game.player.offset.y / 128) < minY
-    )
-    {
-        minX = (game.player.offset.x/128) -5;
-        maxX = (game.player.offset.x/128) + 5;
-        minY = (game.player.offset.y/128) - 5;
-        maxY = (game.player.offset.y/128) + 5;
-        groundTiles.clear();
-        groundTiles.position.set(game.player.defaultOffset.x + game.player.offset.x, game.player.defaultOffset.y + game.player.offset.y);
-        for (var i = -12; i < 12; i++) {
-            for (var j = -12; j < 12; j++) {
-                groundTiles.addFrame(game.textures["groundTexture"], i * 128, j * 128);
-            }
-        }
-    }
-    groundTiles.pivot.set(game.player.offset.x, game.player.offset.y)
-}
 
 function gameLoop() {
 
@@ -192,7 +159,8 @@ function gameLoop() {
     game.socketListener.cycle();
 
 
-    buildGroundTiles(groundTiles)
+    drawGround(game, groundTiles);
+    drawTiles(game, backgroundTiles);
     drawChanging(game);
     play(game);
 

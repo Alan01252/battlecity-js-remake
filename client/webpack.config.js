@@ -1,7 +1,14 @@
+var webpack = require("webpack");
+
+
 module.exports = {
     entry: './app.js',
     output: {
-        filename: './master/bundle.js'
+        filename: './static/bundle.js'
     },
-    devtool: 'source-map'
+    devtool: 'source-map',
+
+
+
+
 };
