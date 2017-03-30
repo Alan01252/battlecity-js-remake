@@ -5,14 +5,16 @@ var getItemsWithingRange = function (itemFactory, player) {
     var foundItems = [];
     while (item) {
 
-        if (item.x > (player.offset.x - range)
-            && item.x < (player.offset.x + range)
-            && item.y > (player.offset.y - range)
-            && item.y < (player.offset.y + range)
-        ) {
-            foundItems.push(item)
+        //no one is holding it
+        if (item.owner == null) {
+            if (item.x > (player.offset.x - range)
+                && item.x < (player.offset.x + range)
+                && item.y > (player.offset.y - range)
+                && item.y < (player.offset.y + range)
+            ) {
+                foundItems.push(item)
+            }
         }
-
         item = item.next;
     }
     return foundItems

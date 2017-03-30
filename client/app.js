@@ -65,6 +65,7 @@ const game = {
     },
     buildings: {},
     player: {
+        id: -1,
         city: {
             canBuild: {
                 CAN_BUILD_HOUSE: CAN_BUILD,

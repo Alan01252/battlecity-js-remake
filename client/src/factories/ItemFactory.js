@@ -32,6 +32,36 @@ class ItemFactory {
     }
 
 
+    pickupItem() {
+        var item = this.findItemByLocation();
+        if (item) {
+            item.owner = this.game.player.id
+            this.game.forceDraw = true;
+        }
+    }
+
+    findItemByLocation() {
+
+        var item = this.getHead();
+        var range = 5;
+        var foundItems = [];
+
+        while (item) {
+
+            if (item.x >= (this.game.player.offset.x - range)
+                && item.x <= (this.game.player.offset.x + range)
+                && item.y >= (this.game.player.offset.y - range)
+                && item.y <= (this.game.player.offset.y + range)
+            ) {
+                return item;
+            }
+
+            item = item.next;
+        }
+        return  null;
+    }
+
+
     deleteItem(item) {
         var returnItem = item.next;
 

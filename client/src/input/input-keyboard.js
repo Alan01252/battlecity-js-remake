@@ -49,20 +49,19 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         up = keyboard(38),
         right = keyboard(39),
         down = keyboard(40),
-        shift = keyboard(16)
+        shift = keyboard(16),
+        u = keyboard(85),
+        o = keyboard(79)
 
 
-    //Left arrow key `press` method
     left.press = function () {
         game.player.isTurning = -1;
     };
 
-    //Left arrow key `release` method
     left.release = function () {
         game.player.isTurning = 0;
     };
 
-    //Right
     right.press = function () {
         game.player.isTurning = 1;
     };
@@ -70,7 +69,6 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         game.player.isTurning = 0;
     };
 
-    //Up
     up.press = function () {
         game.player.isMoving = -1;
     };
@@ -78,12 +76,15 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         game.player.isMoving = 0;
     };
 
-    //Down
     down.press = function () {
         game.player.isMoving = +1;
     };
     down.release = function () {
         game.player.isMoving = 0;
+    };
+
+    u.press = function () {
+        game.itemFactory.pickupItem();
     };
 
     shift.press = function () {
