@@ -74,11 +74,27 @@ const game = {
         id: -1,
         city: {
             canBuild: {
+
                 CAN_BUILD_HOUSE: CAN_BUILD,
+
                 CAN_BUILD_LASER_RESEARCH: CAN_BUILD,
                 CAN_BUILD_TURRET_RESEARCH: CAN_BUILD,
+                CAN_BUILD_BOMB_RESEARCH: CANT_BUILD,
+                CAN_BUILD_MEDKIT_RESEARCH: CANT_BUILD,
+                CAN_BUILD_MINE_RESEARCH: CANT_BUILD,
+                CAN_BUILD_ORB_RESEARCH: CANT_BUILD,
+                CAN_BUILD_COUGAR_RESEARCH: CANT_BUILD,
+
                 CAN_BUILD_LASER_FACTORY: CANT_BUILD,
-                CAN_BUILD_TURRET_FACTORY: CANT_BUILD
+                CAN_BUILD_TURRET_FACTORY: CANT_BUILD,
+                CAN_BUILD_BOMB_FACTORY: CANT_BUILD,
+                CAN_BUILD_MEDKIT_FACTORY: CANT_BUILD,
+                CAN_BUILD_MINE_FACTORY: CANT_BUILD,
+                CAN_BUILD_ORB_FACTORY: CANT_BUILD,
+                CAN_BUILD_COUGAR_FACTORY: CANT_BUILD,
+
+
+
             }
         },
         health: MAX_HEALTH,
