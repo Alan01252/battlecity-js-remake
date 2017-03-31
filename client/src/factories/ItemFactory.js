@@ -7,6 +7,7 @@ class ItemFactory {
     constructor(game) {
         this.game = game;
         this.itemListHead = null;
+        this.calculateTick = 0;
 
         this.validIcons = [
             ITEM_TYPE_TURRET,
@@ -17,6 +18,51 @@ class ItemFactory {
     }
 
     cycle() {
+
+        if (this.game.tick > this.calculateTick) {
+            console.log("drawing");
+            this.calculateTick = this.game.tick + 200;
+
+            var item = this.getHead();
+            while (item) {
+                this.targetNearestPlayer(item);
+                item = item.next;
+            }
+        }
+    }
+
+    targetNearestPlayer(item) {
+        // loop through all players here at the moment we'll just make it target outselves
+
+        var x = this.game.player.offset.x;
+        var y = this.game.player.offset.y;
+        var xDistanceFromPlayer = ((x - item.x) * (x - item.x));
+        var yDistanceFromPlayer = ((y - item.y) * (y - item.y));
+        console.log(xDistanceFromPlayer);
+
+        var playerDistance = Math.sqrt(xDistanceFromPlayer + (yDistanceFromPlayer));
+        console.log(playerDistance);
+        var target = this.game.player;
+
+        var positionX = x / 48;
+        var positionY = y / 48;
+        var itemPositionX = item.x / 48;
+        var itemPositionY = item.y / 48;
+
+        var atan = Math.atan2(positionX - itemPositionX, positionY - itemPositionY);
+
+        if (target != null) {
+            item.angle = atan;
+            item.angle = (item.angle * 180 / 3.14);
+
+            // We always need to have a positive angle in degrees to get the right image from the texture
+            if (positionX > itemPositionX) {
+                item.angle = 180 - item.angle
+            }
+            else if (positionX < itemPositionX) {
+                item.angle = item.angle * -1 + 180
+            }
+        }
     }
 
     newItem(owner, x, y, type) {
@@ -29,6 +75,7 @@ class ItemFactory {
             "owner": owner,
             "x": x,
             "y": y,
+            "target": null,
             "type": type,
             "next": null,
             "previous": null

@@ -188,6 +188,9 @@ function setup() {
     setupBuildingMenu(game);
 
     game.forceDraw = true;
+
+
+
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
     drawIcons(game, iconTiles);
@@ -196,7 +199,9 @@ function setup() {
     drawPanelInterface(game, panelContainer);
 
 
+
     game.forceDraw = false;
+
 
 
     gameLoop();
@@ -214,6 +219,7 @@ function gameLoop() {
 
     game.bulletFactory.cycle();
     game.socketListener.cycle();
+    game.itemFactory.cycle();
 
     setupBuildingMenu(game);
     drawGround(game, groundTiles);

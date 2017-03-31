@@ -1,4 +1,7 @@
 import {ITEM_TYPE_TURRET} from "../constants";
+
+var drawTick = 0;
+
 var getItemsWithingRange = function (itemFactory, player) {
 
     var item = itemFactory.getHead();
@@ -28,9 +31,12 @@ var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
     );
     itemTiles.addFrame(tmpText, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
 
+    var orientation = Math.floor((item.angle / 22.5));
+    console.log("orientation" + orientation);
+
     var tmpText = new PIXI.Texture(
         game.textures['imageTurretHead'].baseTexture,
-        new PIXI.Rectangle((item.type - 9) * 48, 0, 48, 48)
+        new PIXI.Rectangle(orientation * 48, (item.type - 9) * 48, 48, 48)
     );
     itemTiles.addFrame(tmpText, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
 };
@@ -41,8 +47,9 @@ export const drawItems = (game, itemTiles) => {
     var offTileX = Math.floor(game.player.offset.x % 48);
     var offTileY = Math.floor(game.player.offset.y % 48);
 
+    if (game.tick > drawTick) {
 
-    if (game.forceDraw) {
+        drawTick = game.tick + 200;
         itemTiles.clear();
 
         var foundItems = getItemsWithingRange(game.itemFactory, game.player);
@@ -57,8 +64,9 @@ export const drawItems = (game, itemTiles) => {
         });
 
         itemTiles.position.set(game.player.defaultOffset.x + game.player.offset.x - offTileX, game.player.defaultOffset.y + game.player.offset.y - offTileY);
+
+        //console.log("Moving item tiles");
     }
 
-    //console.log("Moving item tiles");
     itemTiles.pivot.set(game.player.offset.x, game.player.offset.y);
 };
