@@ -7,8 +7,7 @@ export const setupMouseInputs = (game) => {
     game.stage.buttonMode = true;
 
     game.stage.on('mousedown', (event) => {
-        console.log("mouse click");
-        console.log(event.data.global.x);
+        console.log("Got mouse down event");
         game.showBuildMenu = !game.showBuildMenu;
         game.forceDraw = true;
         console.log(game.showBuildMenu);

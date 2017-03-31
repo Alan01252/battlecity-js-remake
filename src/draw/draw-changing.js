@@ -63,37 +63,6 @@ var drawBullets = (game, stage) => {
 };
 
 
-var drawPanel = (game, stage) => {
-
-    var interfaceTop = new PIXI.Sprite(game.textures["interfaceTop"]);
-    interfaceTop.x = game.maxMapX;
-    interfaceTop.y = 0;
-    stage.addChild(interfaceTop);
-
-    var interfaceBottom = new PIXI.Sprite(game.textures["interfaceBottom"]);
-    interfaceBottom.x = game.maxMapX;
-    interfaceBottom.y = 430;
-    stage.addChild(interfaceBottom);
-};
-
-var drawHealth = (game, stage) => {
-
-    var percent = game.player.health / MAX_HEALTH;
-
-    var tmpText = new PIXI.Texture(
-        game.textures['health'].baseTexture,
-        new PIXI.Rectangle(0, 0, 38, percent * 87)
-    );
-
-    var health = new PIXI.Sprite(tmpText);
-    health.anchor = {x: 1, y: 1};
-    health.x = game.maxMapX + (137 + 38);
-    health.y = 160 + 87;
-
-
-    stage.addChild(health);
-};
-
 
 export const drawChanging = (game) => {
 
@@ -103,7 +72,4 @@ export const drawChanging = (game) => {
     drawPlayer(game, game.objectContainer);
     drawOtherPlayers(game, game.objectContainer);
     drawBullets(game, game.objectContainer);
-
-    drawPanel(game, game.objectContainer);
-    drawHealth(game, game.objectContainer);
 };

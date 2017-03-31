@@ -1,4 +1,3 @@
-import {BUILDING_HOUSE} from "../constants";
 import {MAP_SQUARE_BUILDING} from "../constants";
 import {LABELS} from "../constants";
 import {CAN_BUILD_HOUSE} from "../constants";
@@ -9,7 +8,6 @@ import _ from '../../node_modules/underscore/underscore-min'
 import {DEPENDENCY_TREE} from "../constants";
 
 var menuContainer = new PIXI.Container();
-var canBuild = [];
 
 var unflatten = function (array, parent, tree) {
 

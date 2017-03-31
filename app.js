@@ -13,15 +13,19 @@ import {drawChanging} from "./src/draw/draw-changing"
 
 import BuildingFactory from "./src/factories/BuildingFactory";
 import BulletFactory from "./src/factories/BulletFactory"
+import IconFactory from "./src/factories/IconFactory";
 import ItemFactory from "./src/factories/ItemFactory";
-
 
 import SocketListener from "./src/SocketListener"
 import {setupBuildingMenu} from "./src/draw/draw-building-interface";
 import {drawBuilding} from "./src/draw/draw-building-interface";
+import {drawItems} from "./src/draw/draw-items";
+import {drawIcons} from "./src/draw/draw-icons";
+import {drawPanelInterface} from "./src/draw/draw-panel-interface";
+
+
 import {CAN_BUILD} from "./src/constants";
 import {CANT_BUILD} from "./src/constants";
-import {drawItems} from "./src/draw/draw-items";
 import {ITEM_TYPE_TURRET} from "./src/constants";
 
 
@@ -41,8 +45,10 @@ stats.showPanel(0);
 document.getElementById("game").appendChild(stats.dom);
 
 var objectContainer = new PIXI.Container();
+var panelContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
+var iconTiles = null;
 var itemTiles = null;
 
 var menuContainer = null;
@@ -96,6 +102,7 @@ const game = {
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
+game.iconFactory = new IconFactory(game);
 game.itemFactory = new ItemFactory(game);
 
 PIXI.loader
@@ -110,8 +117,10 @@ PIXI.loader
         "data/imgHealth.png",
         "data/imgBuildings.png",
         "data/imgBuildIcons.png",
-        "data/imgIcons.png",
-        "data/imgitems.png",
+        "data/imgItems.png",
+        "data/imgInventorySelection.png",
+        "data/imgTurretBase.png",
+        "data/imgTurretHead.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -142,8 +151,11 @@ function setup() {
     game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
     game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
     game.textures['buildingIcons'] = PIXI.utils.TextureCache["data/imgBuildIcons.png"];
-    game.textures['imageIcons'] = PIXI.utils.TextureCache["data/imgIcons.png"];
-    game.textures['imageItems'] = PIXI.utils.TextureCache["data/imgitems.png"];
+    game.textures['imageIcons'] = PIXI.utils.TextureCache["data/imgItems.png"];
+    game.textures['imageItems'] = PIXI.utils.TextureCache["data/imgItems.png"];
+    game.textures['imageInventorySelection'] = PIXI.utils.TextureCache["data/imgInventorySelection.png"];
+    game.textures['imageTurretBase'] = PIXI.utils.TextureCache["data/imgTurretBase.png"];
+    game.textures['imageTurretHead'] = PIXI.utils.TextureCache["data/imgTurretHead.png"];
 
 
     setupKeyboardInputs(game);
@@ -158,26 +170,38 @@ function setup() {
 
     groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
     backgroundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
-    itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['imageItems'], true);
+    iconTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['imageItems'], true);
+    itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
 
 
     app.stage.addChild(groundTiles);
     app.stage.addChild(backgroundTiles);
     app.stage.addChild(itemTiles);
+    app.stage.addChild(iconTiles);
     app.stage.addChild(objectContainer);
+    app.stage.addChild(panelContainer);
 
 
-    game.itemFactory.newItem(null, 1600, 1800, ITEM_TYPE_TURRET);
+    game.iconFactory.newIcon(null, 1600, 1800, ITEM_TYPE_TURRET);
+    game.itemFactory.newItem(null, 1500, 1800, ITEM_TYPE_TURRET);
 
     setupBuildingMenu(game);
 
     game.forceDraw = true;
+
+
+
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
+    drawIcons(game, iconTiles);
     drawItems(game, itemTiles);
+
+    drawPanelInterface(game, panelContainer);
+
 
 
     game.forceDraw = false;
+
 
 
     gameLoop();
@@ -195,13 +219,16 @@ function gameLoop() {
 
     game.bulletFactory.cycle();
     game.socketListener.cycle();
+    game.itemFactory.cycle();
 
     setupBuildingMenu(game);
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
+    drawIcons(game, iconTiles);
     drawItems(game, itemTiles);
     drawChanging(game);
     drawBuilding(game);
+    drawPanelInterface(game, panelContainer);
     play(game);
 
 
