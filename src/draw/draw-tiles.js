@@ -41,7 +41,7 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
         new PIXI.Rectangle(0, baseType * 144, 144, 144, 144)
     );
 
-    backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+    backgroundTiles.addFrame(tmpText, i * 48, j * 48, 1, 0);
 
     var tmpText = new PIXI.Texture(
         game.textures['imageItems'].baseTexture,

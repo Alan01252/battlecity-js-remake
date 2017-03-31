@@ -4624,7 +4624,7 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
         new PIXI.Rectangle(0, baseType * 144, 144, 144, 144)
     );
 
-    backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+    backgroundTiles.addFrame(tmpText, i * 48, j * 48, 1, 0);
 
     var tmpText = new PIXI.Texture(
         game.textures['imageItems'].baseTexture,
@@ -5714,7 +5714,6 @@ const game = {
                 CAN_BUILD_COUGAR_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
 
 
-
             }
         },
         health: __WEBPACK_IMPORTED_MODULE_2__src_constants__["e" /* MAX_HEALTH */],
@@ -5744,19 +5743,19 @@ game.itemFactory = new __WEBPACK_IMPORTED_MODULE_11__src_factories_ItemFactory__
 PIXI.loader
     .add([
         "data/imgTanks.png",
-        "data/imgGround.png",
-        "data/imgLava.png",
-        "data/imgRocks.png",
-        "data/imgbullets.png",
-        "data/imgInterface.png",
-        "data/imgInterfaceBottom.png",
-        "data/imgHealth.png",
-        "data/imgBuildings.png",
+        "data/skins/BattleCityDX/imgGround.png",
+        "data/skins/BattleCityDX/imgLava.png",
+        "data/skins/BattleCityDX/imgRocks.png",
+        "data/skins/BattleCityDX/imgBullets.png",
+        "data/skins/BattleCityDX/imgInterface.png",
+        "data/skins/BattleCityDX/imgInterfaceBottom.png",
+        "data/skins/BattleCityDX/imgHealth.png",
+        "data/skins/BattleCityDX/imgBuildings.png",
         "data/imgBuildIcons.png",
         "data/imgItems.png",
         "data/imgInventorySelection.png",
-        "data/imgTurretBase.png",
-        "data/imgTurretHead.png",
+        "data/skins/BattleCityDX/imgTurretBase.png",
+        "data/skins/BattleCityDX/imgTurretHead.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -5777,21 +5776,21 @@ function setup() {
     var mapData = PIXI.loader.resources["data/map.dat"].data;
     __WEBPACK_IMPORTED_MODULE_0__src_mapBuilder__["a" /* build */](game, mapData);
 
-    game.textures['groundTexture'] = PIXI.utils.TextureCache["data/imgGround.png"];
+    game.textures['groundTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgGround.png"];
     game.textures['tankTexture'] = PIXI.utils.TextureCache["data/imgTanks.png"];
-    game.textures['rockTexture'] = PIXI.utils.TextureCache["data/imgRocks.png"];
-    game.textures['lavaTexture'] = PIXI.utils.TextureCache["data/imgLava.png"];
-    game.textures['bulletTexture'] = PIXI.utils.TextureCache["data/imgbullets.png"];
-    game.textures['interfaceTop'] = PIXI.utils.TextureCache["data/imgInterface.png"];
-    game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/imgInterfaceBottom.png"];
-    game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
-    game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
+    game.textures['rockTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgRocks.png"];
+    game.textures['lavaTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgLava.png"];
+    game.textures['bulletTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgBullets.png"];
+    game.textures['interfaceTop'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgInterface.png"];
+    game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgInterfaceBottom.png"];
+    game.textures['health'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgHealth.png"];
+    game.textures['buildings'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgBuildings.png"];
     game.textures['buildingIcons'] = PIXI.utils.TextureCache["data/imgBuildIcons.png"];
     game.textures['imageIcons'] = PIXI.utils.TextureCache["data/imgItems.png"];
     game.textures['imageItems'] = PIXI.utils.TextureCache["data/imgItems.png"];
     game.textures['imageInventorySelection'] = PIXI.utils.TextureCache["data/imgInventorySelection.png"];
-    game.textures['imageTurretBase'] = PIXI.utils.TextureCache["data/imgTurretBase.png"];
-    game.textures['imageTurretHead'] = PIXI.utils.TextureCache["data/imgTurretHead.png"];
+    game.textures['imageTurretBase'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgTurretBase.png"];
+    game.textures['imageTurretHead'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgTurretHead.png"];
 
 
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_3__src_input_input_keyboard__["a" /* setupKeyboardInputs */])(game);
@@ -5834,14 +5833,15 @@ function setup() {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_16__src_draw_draw_panel_interface__["a" /* drawPanelInterface */])(game, panelContainer);
 
 
-
     game.forceDraw = false;
-
 
 
     gameLoop();
 }
 
+
+var tileAnim = 0;
+var tileAnimationTick = 0;
 
 function gameLoop() {
 
@@ -5867,11 +5867,24 @@ function gameLoop() {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__src_play__["a" /* play */])(game);
 
 
+    app.renderer.plugins.tilemap.tileAnim[0] = tileAnim * 144;
+
     game.forceDraw = false;
 
 
     stats.end();
     requestAnimationFrame(gameLoop);
+
+    if (game.tick > tileAnimationTick) {
+        console.log("Updating animation");
+        tileAnimationTick = game.tick + 300;
+
+        tileAnim = tileAnim + 1;
+        if (tileAnim >= 3) {
+
+            tileAnim = 0;
+        }
+    }
 
 }
 
