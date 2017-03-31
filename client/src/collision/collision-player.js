@@ -19,7 +19,7 @@ var checkBuildings = (game, playerRect) => {
             h: 144,
         };
 
-        if (building.type < BUILDING_HAS_BAY) {
+        if (building.type == 0 || parseInt(building.type / 100) == 1) {
             buildingRect.h = buildingRect.h - 48;
         }
 
@@ -33,7 +33,6 @@ var checkBuildings = (game, playerRect) => {
 
     return false;
 };
-
 
 
 export const checkPlayerCollision = (game) => {
