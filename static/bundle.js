@@ -164,17 +164,49 @@ const HAS_BUILT = 2;
 const CAN_BUILD_HOUSE = 300;
 /* harmony export (immutable) */ __webpack_exports__["p"] = CAN_BUILD_HOUSE;
 
+
 const CAN_BUILD_LASER_RESEARCH = 412;
 /* unused harmony export CAN_BUILD_LASER_RESEARCH */
 
 const CAN_BUILD_TURRET_RESEARCH = 409;
 /* unused harmony export CAN_BUILD_TURRET_RESEARCH */
 
+const CAN_BUILD_BOMB_RESEARCH = 403;
+/* unused harmony export CAN_BUILD_BOMB_RESEARCH */
+
+const CAN_BUILD_MEDKIT_RESEARCH = 402;
+/* unused harmony export CAN_BUILD_MEDKIT_RESEARCH */
+
+const CAN_BUILD_MINE_RESEARCH = 404;
+/* unused harmony export CAN_BUILD_MINE_RESEARCH */
+
+const CAN_BUILD_ORB_RESEARCH = 405;
+/* unused harmony export CAN_BUILD_ORB_RESEARCH */
+
+const CAN_BUILD_COUGAR_RESEARCH = 401;
+/* unused harmony export CAN_BUILD_COUGAR_RESEARCH */
+
+
 const CAN_BUILD_LASER_FACTORY = 112;
 /* unused harmony export CAN_BUILD_LASER_FACTORY */
 
 const CAN_BUILD_TURRET_FACTORY = 109;
 /* unused harmony export CAN_BUILD_TURRET_FACTORY */
+
+const CAN_BUILD_BOMB_FACTORY = 103;
+/* unused harmony export CAN_BUILD_BOMB_FACTORY */
+
+const CAN_BUILD_MEDKIT_FACTORY = 102;
+/* unused harmony export CAN_BUILD_MEDKIT_FACTORY */
+
+const CAN_BUILD_MINE_FACTORY = 104;
+/* unused harmony export CAN_BUILD_MINE_FACTORY */
+
+const CAN_BUILD_ORB_FACTORY = 105;
+/* unused harmony export CAN_BUILD_ORB_FACTORY */
+
+const CAN_BUILD_COUGAR_FACTORY = 105;
+/* unused harmony export CAN_BUILD_COUGAR_FACTORY */
 
 
 const ITEM_TYPE_CLOAK = 0;
@@ -216,10 +248,22 @@ const ITEM_TYPE_PLASMA = 11;
 
 const DEPENDENCY_TREE = [
     {'id': CAN_BUILD_HOUSE, 'parentid': 0},
+
     {'id': CAN_BUILD_LASER_RESEARCH, 'parentid': CAN_BUILD_HOUSE},
     {'id': CAN_BUILD_TURRET_RESEARCH, 'parentid': CAN_BUILD_HOUSE},
+    {'id': CAN_BUILD_BOMB_RESEARCH, 'parentid': CAN_BUILD_LASER_RESEARCH},
+    {'id': CAN_BUILD_MEDKIT_RESEARCH, 'parentid': CAN_BUILD_TURRET_RESEARCH},
+    {'id': CAN_BUILD_MINE_RESEARCH, 'parentid': CAN_BUILD_BOMB_RESEARCH},
+    {'id': CAN_BUILD_ORB_RESEARCH, 'parentid': CAN_BUILD_MINE_RESEARCH},
+    {'id': CAN_BUILD_COUGAR_RESEARCH, 'parentid': CAN_BUILD_MEDKIT_RESEARCH},
+
     {'id': CAN_BUILD_LASER_FACTORY, 'parentid': CAN_BUILD_LASER_RESEARCH},
     {'id': CAN_BUILD_TURRET_FACTORY, 'parentid': CAN_BUILD_TURRET_RESEARCH},
+    {'id': CAN_BUILD_BOMB_FACTORY, 'parentid': CAN_BUILD_BOMB_RESEARCH},
+    {'id': CAN_BUILD_MEDKIT_FACTORY, 'parentid': CAN_BUILD_MEDKIT_RESEARCH},
+    {'id': CAN_BUILD_MINE_FACTORY, 'parentid': CAN_BUILD_MINE_RESEARCH},
+    {'id': CAN_BUILD_ORB_FACTORY, 'parentid': CAN_BUILD_ORB_RESEARCH},
+    {'id': CAN_BUILD_COUGAR_FACTORY, 'parentid': CAN_BUILD_COUGAR_RESEARCH},
 ];
 /* harmony export (immutable) */ __webpack_exports__["m"] = DEPENDENCY_TREE;
 
@@ -239,11 +283,42 @@ const LABELS = {
         LABEL: "Laser Research",
     },
     CAN_BUILD_TURRET_RESEARCH: {
-        ICON: 2,
+        ICON: 10,
         TYPE: CAN_BUILD_TURRET_RESEARCH,
         IMAGE: BUILDING_RESEARCH,
         LABEL: "Turret Research",
     },
+    CAN_BUILD_BOMB_RESEARCH: {
+        ICON: 4,
+        TYPE: CAN_BUILD_BOMB_RESEARCH,
+        IMAGE: BUILDING_RESEARCH,
+        LABEL: "Bomb Research",
+    },
+    CAN_BUILD_MEDKIT_RESEARCH: {
+        ICON: 3,
+        TYPE: CAN_BUILD_MEDKIT_RESEARCH,
+        IMAGE: BUILDING_RESEARCH,
+        LABEL: "Medkit Research",
+    },
+    CAN_BUILD_MINE_RESEARCH: {
+        ICON: 5,
+        TYPE: CAN_BUILD_MINE_RESEARCH,
+        IMAGE: BUILDING_RESEARCH,
+        LABEL: "Mine Research",
+    },
+    CAN_BUILD_ORB_RESEARCH: {
+        ICON: 6,
+        TYPE: CAN_BUILD_ORB_RESEARCH,
+        IMAGE: BUILDING_RESEARCH,
+        LABEL: "Orb Research",
+    },
+    CAN_BUILD_COUGAR_RESEARCH: {
+        ICON: 2,
+        TYPE: CAN_BUILD_COUGAR_RESEARCH,
+        IMAGE: BUILDING_RESEARCH,
+        LABEL: "Cougar Research",
+    },
+
     CAN_BUILD_LASER_FACTORY: {
         ICON: 1,
         TYPE: CAN_BUILD_LASER_FACTORY,
@@ -251,11 +326,42 @@ const LABELS = {
         LABEL: "Laser Factory",
     },
     CAN_BUILD_TURRET_FACTORY: {
-        ICON: 2,
+        ICON: 10,
         TYPE: CAN_BUILD_TURRET_FACTORY,
         IMAGE: BUILDING_FACTORY,
         LABEL: "Turret Factory",
-    }
+    },
+    CAN_BUILD_BOMB_FACTORY: {
+        ICON: 4,
+        TYPE: CAN_BUILD_BOMB_FACTORY,
+        IMAGE: BUILDING_FACTORY,
+        LABEL: "Bomb Factory",
+    },
+    CAN_BUILD_MEDKIT_FACTORY: {
+        ICON: 3,
+        TYPE: CAN_BUILD_MEDKIT_FACTORY,
+        IMAGE: BUILDING_FACTORY,
+        LABEL: "Medkit Factory",
+    },
+    CAN_BUILD_MINE_FACTORY: {
+        ICON: 3,
+        TYPE: CAN_BUILD_MINE_FACTORY,
+        IMAGE: BUILDING_FACTORY,
+        LABEL: "Mine Factory",
+    },
+    CAN_BUILD_ORB_FACTORY: {
+        ICON: 6,
+        TYPE: CAN_BUILD_ORB_FACTORY,
+        IMAGE: BUILDING_FACTORY,
+        LABEL: "Orb Factory",
+    },
+    CAN_BUILD_COUGAR_FACTORY: {
+        ICON: 2,
+        TYPE: CAN_BUILD_COUGAR_FACTORY,
+        IMAGE: BUILDING_FACTORY,
+        LABEL: "Cougar Factory",
+    },
+
 
 };
 /* harmony export (immutable) */ __webpack_exports__["n"] = LABELS;
@@ -5588,11 +5694,27 @@ const game = {
         id: -1,
         city: {
             canBuild: {
+
                 CAN_BUILD_HOUSE: __WEBPACK_IMPORTED_MODULE_2__src_constants__["c" /* CAN_BUILD */],
+
                 CAN_BUILD_LASER_RESEARCH: __WEBPACK_IMPORTED_MODULE_2__src_constants__["c" /* CAN_BUILD */],
                 CAN_BUILD_TURRET_RESEARCH: __WEBPACK_IMPORTED_MODULE_2__src_constants__["c" /* CAN_BUILD */],
+                CAN_BUILD_BOMB_RESEARCH: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_MEDKIT_RESEARCH: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_MINE_RESEARCH: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_ORB_RESEARCH: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_COUGAR_RESEARCH: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+
                 CAN_BUILD_LASER_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
-                CAN_BUILD_TURRET_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */]
+                CAN_BUILD_TURRET_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_BOMB_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_MEDKIT_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_MINE_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_ORB_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+                CAN_BUILD_COUGAR_FACTORY: __WEBPACK_IMPORTED_MODULE_2__src_constants__["d" /* CANT_BUILD */],
+
+
+
             }
         },
         health: __WEBPACK_IMPORTED_MODULE_2__src_constants__["e" /* MAX_HEALTH */],
