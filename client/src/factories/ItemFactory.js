@@ -44,22 +44,18 @@ class ItemFactory {
         console.log(playerDistance);
         var target = this.game.player;
 
-        var positionX = x / 48;
-        var positionY = y / 48;
-        var itemPositionX = item.x / 48;
-        var itemPositionY = item.y / 48;
 
-        var atan = Math.atan2(positionX - itemPositionX, positionY - itemPositionY);
+        var atan = Math.atan2(x - item.x, y - item.y);
 
         if (target != null) {
             item.angle = atan;
             item.angle = (item.angle * 180 / 3.14);
 
             // We always need to have a positive angle in degrees to get the right image from the texture
-            if (positionX > itemPositionX) {
+            if (x > item.x) {
                 item.angle = 180 - item.angle
             }
-            else if (positionX < itemPositionX) {
+            else if (x < item.x) {
                 item.angle = item.angle * -1 + 180
             }
         }
