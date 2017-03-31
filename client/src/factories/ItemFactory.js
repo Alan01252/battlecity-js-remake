@@ -2,6 +2,7 @@ import {ITEM_TYPE_TURRET} from "../constants";
 import {ITEM_TYPE_PLASMA} from "../constants";
 import {ITEM_TYPE_WALL} from "../constants";
 import {ITEM_TYPE_SLEEPER} from "../constants";
+
 class ItemFactory {
 
     constructor(game) {
@@ -15,47 +16,69 @@ class ItemFactory {
             ITEM_TYPE_SLEEPER,
             ITEM_TYPE_WALL
         ];
+
+        this.validShooters = [
+            ITEM_TYPE_TURRET,
+            ITEM_TYPE_PLASMA,
+            ITEM_TYPE_SLEEPER,
+        ];
     }
 
     cycle() {
 
         if (this.game.tick > this.calculateTick) {
-            console.log("drawing");
             this.calculateTick = this.game.tick + 200;
-
             var item = this.getHead();
             while (item) {
                 this.targetNearestPlayer(item);
+                this.fireBullet(item);
                 item = item.next;
             }
         }
     }
 
-    targetNearestPlayer(item) {
-        // loop through all players here at the moment we'll just make it target outselves
+    fireBullet(item) {
+        if (this.validShooters.includes(item.type)) {
 
-        var x = this.game.player.offset.x;
-        var y = this.game.player.offset.y;
+            if (this.game.tick > item.lastFired && item.target) {
+                item.lastFired = this.game.tick + 250;
+                var angle = (item.angle * 3.14) / 180;
+                var direction = -((32 / 6) * angle);
+
+
+                var x = Math.sin(angle);
+                var y = Math.cos(angle);
+
+                var x2 = ((item.x) - 16);
+                var y2 = ((item.y) - 16);
+
+                this.game.bulletFactory.newBullet(this.game.player.id, x2, y2, 0, direction);
+            }
+        }
+    }
+
+    targetNearestPlayer(item) {
+        // loop through all players here at the moment we'll just make it target our selves
+
+        var x = this.game.player.offset.x - 8;
+        var y = this.game.player.offset.y - 8;
         var xDistanceFromPlayer = ((x - item.x) * (x - item.x));
         var yDistanceFromPlayer = ((y - item.y) * (y - item.y));
-        console.log(xDistanceFromPlayer);
 
         var playerDistance = Math.sqrt(xDistanceFromPlayer + (yDistanceFromPlayer));
-        console.log(playerDistance);
-        var target = this.game.player;
+        item.target = this.game.player;
 
 
-        var atan = Math.atan2(x - item.x, y - item.y);
-
-        if (target != null) {
-            item.angle = atan;
-            item.angle = (item.angle * 180 / 3.14);
+        if (item.target != null) {
+            item.angle =  Math.atan2(x - item.x, y - item.y);
+            item.angle = Math.ceil((item.angle * 180 / 3.14));
 
             // We always need to have a positive angle in degrees to get the right image from the texture
-            if (x > item.x) {
+            if (x >= item.x) {
                 item.angle = 180 - item.angle
             }
-            else if (x < item.x) {
+            else if (x <= item.x) {
+                item.angle = item.angle + 16;
                 item.angle = item.angle * -1 + 180
             }
         }
@@ -73,6 +96,7 @@ class ItemFactory {
             "y": y,
             "target": null,
             "type": type,
+            "lastFired": 0,
             "next": null,
             "previous": null
 

@@ -19,8 +19,6 @@ var getItemsWithingRange = function (itemFactory, player) {
         item = item.next;
     }
 
-    console.log(foundItems);
-
     return foundItems
 };
 
@@ -31,9 +29,11 @@ var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
     );
     itemTiles.addFrame(tmpText, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
 
-    var orientation = Math.floor((item.angle / 22.5));
-    console.log("orientation" + orientation);
-
+    var orientation = parseInt((item.angle / 22.5) + 1);
+    if (orientation == 16) {
+        orientation = 0;
+    }
+    console.log("ortientation" + orientation);
     var tmpText = new PIXI.Texture(
         game.textures['imageTurretHead'].baseTexture,
         new PIXI.Rectangle(orientation * 48, (item.type - 9) * 48, 48, 48)
