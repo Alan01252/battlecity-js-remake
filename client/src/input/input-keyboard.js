@@ -15,6 +15,7 @@ var keyboard = (keyCode) => {
     key.release = undefined;
     //The `downHandler`
     key.downHandler = function (event) {
+        console.log(event.keyCode);
         if (event.keyCode === key.code) {
             if (key.isUp && key.press) key.press();
             key.isDown = true;
@@ -51,7 +52,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         down = keyboard(40),
         shift = keyboard(16),
         u = keyboard(85),
-        o = keyboard(79)
+        o = keyboard(79),
+        d = keyboard(68);
 
 
     left.press = function () {
@@ -85,6 +87,28 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
 
     u.press = function () {
         game.iconFactory.pickupIcon();
+    };
+
+    d.press = function () {
+
+        var icon = game.iconFactory.dropSelectedIcon();
+
+
+        var angle = -game.player.direction;
+        var x = (Math.sin((angle / 16) * 3.14) * -1);
+        var y = (Math.cos((angle / 16) * 3.14) * -1);
+
+        var x2 = ((game.player.offset.x)) + (x * 20);
+        var y2 = ((game.player.offset.y) + 20) + (y * 20);
+
+        if (icon) {
+            var item = game.itemFactory.newItem(icon, x2, y2, icon.type);
+            // It's not been converted to an item and so is able to be picked up again
+            if (!item) {
+                game.iconFactory.newIcon(game.player.id, x2, y2, icon.type)
+            }
+        }
+
     };
 
     shift.press = function () {

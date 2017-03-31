@@ -1,8 +1,8 @@
-var getItemsWithingRange = function (iconFactory, player) {
+var getIconsWithinRange = function (iconFactory, player) {
 
     var icon = iconFactory.getHead();
     var range = 40 * 48;
-    var foundItems = [];
+    var foundIcons = [];
     while (icon) {
 
         //no one is holding it
@@ -12,15 +12,16 @@ var getItemsWithingRange = function (iconFactory, player) {
                 && icon.y > (player.offset.y - range)
                 && icon.y < (player.offset.y + range)
             ) {
-                foundItems.push(icon)
+                foundIcons.push(icon)
             }
         }
         icon = icon.next;
     }
-    return foundItems
+
+    return foundIcons
 };
 
-export const drawItems = (game, iconTiles) => {
+export const drawIcons = (game, iconTiles) => {
 
 
     var offTileX = Math.floor(game.player.offset.x % 32);
@@ -30,7 +31,7 @@ export const drawItems = (game, iconTiles) => {
     if (game.forceDraw) {
         iconTiles.clear();
 
-        var foundItems = getItemsWithingRange(game.iconFactory, game.player);
+        var foundItems = getIconsWithinRange(game.iconFactory, game.player);
         foundItems.forEach((icon, index) => {
             console.log(game.player.offset.x - icon.x);
             var tmpText = new PIXI.Texture(

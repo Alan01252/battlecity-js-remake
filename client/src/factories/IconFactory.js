@@ -22,7 +22,7 @@ class IconFactory {
 
 
         if (this.iconListHead) {
-            this.iconListHead.previous = building;
+            this.iconListHead.previous = icon;
             icon.next = this.iconListHead
         }
 
@@ -38,6 +38,20 @@ class IconFactory {
             icon.owner = this.game.player.id;
             this.game.forceDraw = true;
         }
+    }
+
+    dropSelectedIcon() {
+        var icon = this.getHead();
+        var selectedIcon = null;
+        while (icon) {
+            if (icon.owner == this.game.player.id && icon.selected) {
+                this.game.forceDraw = true;
+                selectedIcon = icon;
+                this.deleteIcon(icon);
+            }
+            icon = icon.next;
+        }
+        return selectedIcon;
     }
 
     /**
