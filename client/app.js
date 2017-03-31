@@ -133,7 +133,7 @@ PIXI.loader
         "data/skins/BattleCityDX/imgBuildings.png",
         "data/imgBuildIcons.png",
         "data/imgItems.png",
-        "data/skins/BattleCityDX/imgInventorySelection.png",
+        "data/imgInventorySelection.png",
         "data/skins/BattleCityDX/imgTurretBase.png",
         "data/skins/BattleCityDX/imgTurretHead.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
@@ -168,7 +168,7 @@ function setup() {
     game.textures['buildingIcons'] = PIXI.utils.TextureCache["data/imgBuildIcons.png"];
     game.textures['imageIcons'] = PIXI.utils.TextureCache["data/imgItems.png"];
     game.textures['imageItems'] = PIXI.utils.TextureCache["data/imgItems.png"];
-    game.textures['imageInventorySelection'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgInventorySelection.png"];
+    game.textures['imageInventorySelection'] = PIXI.utils.TextureCache["data/imgInventorySelection.png"];
     game.textures['imageTurretBase'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgTurretBase.png"];
     game.textures['imageTurretHead'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgTurretHead.png"];
 
