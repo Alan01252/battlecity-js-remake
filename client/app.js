@@ -13,7 +13,7 @@ import {drawChanging} from "./src/draw/draw-changing"
 
 import BuildingFactory from "./src/factories/BuildingFactory";
 import BulletFactory from "./src/factories/BulletFactory"
-import ItemFactory from "./src/factories/ItemFactory";
+import IconFactory from "./src/factories/IconFactory";
 
 
 import SocketListener from "./src/SocketListener"
@@ -21,7 +21,7 @@ import {setupBuildingMenu} from "./src/draw/draw-building-interface";
 import {drawBuilding} from "./src/draw/draw-building-interface";
 import {CAN_BUILD} from "./src/constants";
 import {CANT_BUILD} from "./src/constants";
-import {drawItems} from "./src/draw/draw-items";
+import {drawItems} from "./src/draw/draw-icons";
 import {ITEM_TYPE_TURRET} from "./src/constants";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 
@@ -45,7 +45,7 @@ var objectContainer = new PIXI.Container();
 var panelContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
-var itemTiles = null;
+var iconTiles = null;
 
 var menuContainer = null;
 
@@ -98,7 +98,7 @@ const game = {
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
-game.itemFactory = new ItemFactory(game);
+game.iconFactory = new IconFactory(game);
 
 PIXI.loader
     .add([
@@ -112,8 +112,8 @@ PIXI.loader
         "data/imgHealth.png",
         "data/imgBuildings.png",
         "data/imgBuildIcons.png",
-        "data/imgIcons.png",
-        "data/imgitems.png",
+        "data/imgItems.png",
+        "data/imgInventorySelection.png",
         {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
     ])
     .on("progress", loadProgressHandler)
@@ -144,8 +144,9 @@ function setup() {
     game.textures['health'] = PIXI.utils.TextureCache["data/imgHealth.png"];
     game.textures['buildings'] = PIXI.utils.TextureCache["data/imgBuildings.png"];
     game.textures['buildingIcons'] = PIXI.utils.TextureCache["data/imgBuildIcons.png"];
-    game.textures['imageIcons'] = PIXI.utils.TextureCache["data/imgIcons.png"];
-    game.textures['imageItems'] = PIXI.utils.TextureCache["data/imgitems.png"];
+    game.textures['imageIcons'] = PIXI.utils.TextureCache["data/imgItems.png"];
+    game.textures['imageItems'] = PIXI.utils.TextureCache["data/imgItems.png"];
+    game.textures['imageInventorySelection'] = PIXI.utils.TextureCache["data/imgInventorySelection.png"];
 
 
     setupKeyboardInputs(game);
@@ -160,24 +161,24 @@ function setup() {
 
     groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
     backgroundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
-    itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['imageItems'], true);
+    iconTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['imageItems'], true);
 
 
     app.stage.addChild(groundTiles);
     app.stage.addChild(backgroundTiles);
-    app.stage.addChild(itemTiles);
+    app.stage.addChild(iconTiles);
     app.stage.addChild(objectContainer);
     app.stage.addChild(panelContainer);
 
 
-    game.itemFactory.newItem(null, 1600, 1800, ITEM_TYPE_TURRET);
+    game.iconFactory.newIcon(null, 1600, 1800, ITEM_TYPE_TURRET);
 
     setupBuildingMenu(game);
 
     game.forceDraw = true;
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
-    drawItems(game, itemTiles);
+    drawItems(game, iconTiles);
     drawPanelInterface(game, panelContainer);
 
 
@@ -203,7 +204,7 @@ function gameLoop() {
     setupBuildingMenu(game);
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
-    drawItems(game, itemTiles);
+    drawItems(game, iconTiles);
     drawChanging(game);
     drawBuilding(game);
     drawPanelInterface(game, panelContainer);

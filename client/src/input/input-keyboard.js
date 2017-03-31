@@ -84,7 +84,7 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
     };
 
     u.press = function () {
-        game.itemFactory.pickupItem();
+        game.iconFactory.pickupIcon();
     };
 
     shift.press = function () {

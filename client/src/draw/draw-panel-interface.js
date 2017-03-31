@@ -15,31 +15,54 @@ var drawPanel = (game, stage) => {
 };
 
 var drawItems = (game, stage) => {
-    var item = game.itemFactory.getHead();
+    var icon = game.iconFactory.getHead();
 
 
-    while (item) {
-        if (item.owner == game.player.id) {
+    var x = 0;
+    var y = 0;
+    while (icon) {
+
+        if (icon.owner == game.player.id) {
 
 
             var tmpText = new PIXI.Texture(
                 game.textures['imageItems'].baseTexture,
-                new PIXI.Rectangle(item.type * 32, 0, 32, 32)
+                new PIXI.Rectangle(icon.type * 32, 0, 32, 32)
             );
 
-            console.log("item type" + item.type);
-            var icon = new PIXI.Sprite(tmpText);
+            var iconSprite = new PIXI.Sprite(tmpText);
 
-            switch (item.type) {
+
+            switch (icon.type) {
                 case 9:
-                    icon.x = (game.maxMapX + 7);
-                    icon.y = 372;
+                    x = game.maxMapX + 7;
+                    y = 372;
                     break;
             }
-            stage.addChild(icon);
+
+            if (icon.selected) {
+                var selected = new PIXI.Sprite(game.textures['imageInventorySelection']);
+                selected.x = x;
+                selected.y = y;
+                stage.addChild(selected);
+            }
+
+            iconSprite.x = x;
+            iconSprite.y = y;
+
+            iconSprite.interactive = true;
+
+            const iconClosure = icon;
+            iconSprite.on('mousedown', (event) => {
+                event.stopPropagation();
+                console.log("selecting item")
+                game.iconFactory.toggleSelected(iconClosure);
+                game.forceDraw = true;
+            });
+            stage.addChild(iconSprite);
 
         }
-        item = item.next;
+        icon = icon.next;
     }
 };
 
