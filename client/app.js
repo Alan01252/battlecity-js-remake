@@ -190,6 +190,8 @@ function setup() {
     game.forceDraw = true;
 
 
+    game.bulletFactory.newBullet(-1, game.player.offset.x, game.player.offset.y, 0, 1);
+
 
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);

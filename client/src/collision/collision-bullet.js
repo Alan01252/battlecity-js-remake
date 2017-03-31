@@ -38,7 +38,29 @@ export const collidedWithAnotherPlayer = (game, bullet) => {
 };
 
 export const collidedWithCurrentPlayer = (game, bullet) => {
+
     return collided(getPlayerRect(game.player), bullet);
+};
+
+export const collidedWithItem = (game, bullet) => {
+    var item = game.itemFactory.getHead();
+
+    while (item) {
+
+        var itemRect = {
+            x: item.x,
+            y: item.y,
+            w: 48,
+            h: 48,
+        };
+
+        if (collided(itemRect, bullet)) {
+            return true;
+        }
+
+        item = item.next;
+    }
+    return false;
 };
 
 export const collidedWithBuilding = (game, bullet) => {
@@ -63,4 +85,4 @@ export const collidedWithBuilding = (game, bullet) => {
         building = building.next;
     }
     return false;
-}
+};

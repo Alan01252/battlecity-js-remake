@@ -4,6 +4,7 @@ import {rectangleCollision} from "./collision-helpers";
 import {BUILDING_HAS_BAY} from "../constants";
 import {checkTiles} from "./collision-helpers";
 import {checkEdges} from "./collision-helpers";
+import {checkItems} from "./collision-helpers";
 
 
 var checkBuildings = (game, playerRect) => {
@@ -33,6 +34,8 @@ var checkBuildings = (game, playerRect) => {
     return false;
 };
 
+
+
 export const checkPlayerCollision = (game) => {
 
     var playerRect = getPlayerRect(game.player);
@@ -42,6 +45,10 @@ export const checkPlayerCollision = (game) => {
     }
     if (!collision) {
         collision = checkBuildings(game, playerRect);
+    }
+
+    if (!collision) {
+        collision = checkItems(game, playerRect);
     }
 
 

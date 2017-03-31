@@ -50,8 +50,8 @@ class ItemFactory {
                 var x = (Math.sin((item.angle * 3.14)/180));
                 var y = (Math.cos((item.angle * 3.14)/180) * -1);
 
-                var x2 = ((item.x) - 16) + (x * 23);
-                var y2 = ((item.y) - 24) + (y * 23);
+                var x2 = ((item.x) + 20) + (x * 23);
+                var y2 = ((item.y) + 24) + (y * 23);
 
                 this.game.bulletFactory.newBullet(this.game.player.id, x2, y2, 0, direction);
             }

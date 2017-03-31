@@ -46,9 +46,8 @@ var drawBullets = (game, stage) => {
         tmpText.frame = bulletRect;
 
         var sprite = new PIXI.Sprite(tmpText);
-        sprite.x = ((bullet.x + 48) + (game.player.defaultOffset.x - (game.player.offset.x)));
-        sprite.y = ((bullet.y + 48) + (game.player.defaultOffset.y - game.player.offset.y));
-        sprite.anchor = {x: 1, y: 1};
+        sprite.x = ((bullet.x) + (game.player.defaultOffset.x - (game.player.offset.x)));
+        sprite.y = ((bullet.y) + (game.player.defaultOffset.y - game.player.offset.y));
 
 
         bullet.animation++;
@@ -61,7 +60,6 @@ var drawBullets = (game, stage) => {
         bullet = bullet.next;
     }
 };
-
 
 
 export const drawChanging = (game) => {

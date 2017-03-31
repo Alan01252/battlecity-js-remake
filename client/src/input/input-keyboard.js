@@ -115,19 +115,17 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         if (game.tick > lastShot) {
             lastShot = game.tick + TIMER_SHOOT_LASER;
 
-            console.log("Player fired shot ");
+            var angle = game.player.direction;
+            var angleInDegrees = (angle / 32) * 360;
 
+            var x = (Math.sin((angleInDegrees * 3.14)/180));
+            var y = (Math.cos((angleInDegrees * 3.14)/180) * -1);
 
-            var angle = -game.player.direction;
+            var x2 = ((game.player.offset.x) + 24) + (x * 30);
+            var y2 = ((game.player.offset.y) + 24) + (y * 30);
 
-            var x = (Math.sin((angle / 16) * 3.14) * -1);
-            var y = (Math.cos((angle / 16) * 3.14) * -1);
-
-            var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
-            var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
-
-            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, angle);
-            game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: angle});
+            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, -angle);
+            game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: -angle});
 
         }
 
