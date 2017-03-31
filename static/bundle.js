@@ -4273,7 +4273,6 @@ var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
     if (orientation == 16) {
         orientation = 0;
     }
-    console.log("ortientation" + orientation);
     var tmpText = new PIXI.Texture(
         game.textures['imageTurretHead'].baseTexture,
         new PIXI.Rectangle(orientation * 48, (item.type - 9) * 48, 48, 48)
@@ -4943,15 +4942,16 @@ class ItemFactory {
 
             if (this.game.tick > item.lastFired && item.target) {
                 item.lastFired = this.game.tick + 250;
-                var angle = (item.angle * 3.14) / 180;
+
+                var angle = ((item.angle) * 3.14) / 180;
                 var direction = -((32 / 6) * angle);
 
 
-                var x = Math.sin(angle);
-                var y = Math.cos(angle);
+                var x = (Math.sin((item.angle * 3.14)/180));
+                var y = (Math.cos((item.angle * 3.14)/180) * -1);
 
-                var x2 = ((item.x) - 16);
-                var y2 = ((item.y) - 16);
+                var x2 = ((item.x) - 16) + (x * 23);
+                var y2 = ((item.y) - 24) + (y * 23);
 
                 this.game.bulletFactory.newBullet(this.game.player.id, x2, y2, 0, direction);
             }
@@ -4961,8 +4961,8 @@ class ItemFactory {
     targetNearestPlayer(item) {
         // loop through all players here at the moment we'll just make it target our selves
 
-        var x = this.game.player.offset.x - 8;
-        var y = this.game.player.offset.y - 8;
+        var x = this.game.player.offset.x;
+        var y = this.game.player.offset.y;
         var xDistanceFromPlayer = ((x - item.x) * (x - item.x));
         var yDistanceFromPlayer = ((y - item.y) * (y - item.y));
 
@@ -4971,7 +4971,7 @@ class ItemFactory {
 
 
         if (item.target != null) {
-            item.angle =  Math.atan2(x - item.x, y - item.y);
+            item.angle = Math.atan2(x - item.x, y - item.y);
             item.angle = Math.ceil((item.angle * 180 / 3.14));
 
             // We always need to have a positive angle in degrees to get the right image from the texture
@@ -4979,8 +4979,7 @@ class ItemFactory {
                 item.angle = 180 - item.angle
             }
             else if (x <= item.x) {
-                item.angle = item.angle + 16;
-                item.angle = item.angle * -1 + 180
+                item.angle = item.angle * -1 + 170
             }
         }
     }

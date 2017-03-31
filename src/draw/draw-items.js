@@ -33,7 +33,6 @@ var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
     if (orientation == 16) {
         orientation = 0;
     }
-    console.log("ortientation" + orientation);
     var tmpText = new PIXI.Texture(
         game.textures['imageTurretHead'].baseTexture,
         new PIXI.Rectangle(orientation * 48, (item.type - 9) * 48, 48, 48)
