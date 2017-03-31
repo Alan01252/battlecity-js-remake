@@ -30,7 +30,7 @@ export const BUILDING_REPAIR = 2;
 export const BUILDING_HOUSE = 3;
 export const BUILDING_RESEARCH = 4;
 
-export const BUILDING_HAS_BAY = 3;
+export const BUILDING_HAS_BAY = 2;
 
 export const CANT_BUILD = 0;
 export const CAN_BUILD = 1;

@@ -2,6 +2,7 @@ import {rectangleCollision} from "./collision-helpers";
 import {checkTiles} from "./collision-helpers";
 import {checkEdges} from "./collision-helpers";
 import {getPlayerRect} from "./collision-helpers";
+import {checkItems} from "./collision-helpers";
 
 
 var checkPlayers = (game, buildingRect) => {
@@ -62,9 +63,20 @@ export const checkBuildingCollision = (game, building) => {
         return collision;
     }
 
-    if (collision = checkBuildings(game, buildingRect)) {
+
+    collision = checkBuildings(game, buildingRect);
+    if (collision) {
         console.log("Collided with buildings");
+        return collision;
     }
+
+    collision = checkPlayers(game, buildingRect);
+    if (collision) {
+        console.log("Collided with buildings");
+        return collision;
+    }
+
+    collision = checkItems(game, buildingRect);
 
 
     return collision

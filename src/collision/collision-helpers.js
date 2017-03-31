@@ -42,6 +42,32 @@ export const checkEdges = (rect) => {
     return false;
 };
 
+
+export const checkItems = (game, rect) => {
+    var item = game.itemFactory.getHead();
+
+    while (item) {
+
+        console.log("Checking item collision");
+        var itemRect = {
+            x: item.x,
+            y: item.y,
+            w: 48,
+            h: 48,
+        };
+
+        console.log(itemRect);
+
+        if (rectangleCollision(rect, itemRect)) {
+            return COLLISION_BLOCKING;
+        }
+
+        item = item.next;
+    }
+
+    return false;
+};
+
 export const checkTiles = (game, rect) => {
 
     var map = game["map"];
@@ -52,18 +78,18 @@ export const checkTiles = (game, rect) => {
     var bottom = Math.floor((rect.y + rect.h) / 48);
 
     /*
-    console.log("left, top ", left + "," + top );
-    console.log("right, top ", right + "," + top );
+     console.log("left, top ", left + "," + top );
+     console.log("right, top ", right + "," + top );
 
 
-    console.log("left, bottom ", left + "," + bottom );
-    console.log("right, bottm ", right + "," + bottom );
+     console.log("left, bottom ", left + "," + bottom );
+     console.log("right, bottm ", right + "," + bottom );
 
-    console.log(map[left][top]);
-    console.log(map[right][top]);
-    console.log(map[left][bottom]);
-    console.log(map[right][bottom]);
-    */
+     console.log(map[left][top]);
+     console.log(map[right][top]);
+     console.log(map[left][bottom]);
+     console.log(map[right][bottom]);
+     */
 
     if (left && right && top && bottom) {
         //Map Terrain (lava, rocks)

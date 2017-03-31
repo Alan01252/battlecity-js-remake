@@ -7,6 +7,7 @@ import {collidedWithRock} from "../collision/collision-bullet";
 import {collidedWithCurrentPlayer} from "../collision/collision-bullet";
 import {collidedWithAnotherPlayer} from "../collision/collision-bullet";
 import {collidedWithBuilding} from "../collision/collision-bullet";
+import {collidedWithItem} from "../collision/collision-bullet";
 
 class BulletFactory {
 
@@ -38,20 +39,25 @@ class BulletFactory {
                 bullet.life = BULLET_DEAD;
             }
 
+            if (collidedWithItem(this.game, bullet)) {
+                console.log("Bullet collided with item");
+                bullet.life = BULLET_DEAD;
+            }
+
             if (collidedWithBuilding(this.game, bullet)) {
                 bullet.life = BULLET_DEAD;
             }
 
             if (collidedWithAnotherPlayer(this.game, bullet)) {
-                console.log("Bullet collided with me");
+                console.log("Bullet collided with someone else");
                 bullet.life = BULLET_DEAD;
             }
 
-            if (bullet.shooter !== this.game.player.id) {
 
-                if (collidedWithCurrentPlayer(this.game, bullet)) {
-                    console.log("Bullet collided with me");
-                    bullet.life = BULLET_DEAD;
+            if (collidedWithCurrentPlayer(this.game, bullet)) {
+                console.log("Bullet collided with me");
+                bullet.life = BULLET_DEAD;
+                if (bullet.shooter !== this.game.player.id) {
                     if (this.game.player.health > 0) {
                         this.game.player.health -= bullet.damage;
                     }

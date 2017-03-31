@@ -172,38 +172,38 @@ export const drawBuilding = (game) => {
             if (game.buildingFactory.newBuilding(null, x, y, game.isBuilding)) {
                 game.map[x][y] = MAP_SQUARE_BUILDING;
                 game.tiles[x][y] = game.isBuilding;
-            }
 
 
-            Object.keys(game.player.city.canBuild).forEach((id) => {
+                Object.keys(game.player.city.canBuild).forEach((id) => {
 
-                var tempId = LABELS[id].TYPE;
-                console.log(tempId + " " + game.isBuilding);
-                if (parseInt(tempId) == game.isBuilding) {
+                    var tempId = LABELS[id].TYPE;
+                    console.log(tempId + " " + game.isBuilding);
+                    if (parseInt(tempId) == game.isBuilding) {
 
-                    if (tempId != CAN_BUILD_HOUSE) {
-                        game.player.city.canBuild[id] = HAS_BUILT;
-                    }
+                        if (tempId != CAN_BUILD_HOUSE) {
+                            game.player.city.canBuild[id] = HAS_BUILT;
+                        }
 
-                    var node = searchTree(dependencyTree[0], tempId);
-                    if (node && node.children) {
-                        node.children.forEach((item) => {
-                            Object.keys(game.player.city.canBuild).forEach((id) => {
+                        var node = searchTree(dependencyTree[0], tempId);
+                        if (node && node.children) {
+                            node.children.forEach((item) => {
+                                Object.keys(game.player.city.canBuild).forEach((id) => {
 
 
-                                if (game.player.city.canBuild[id] !== HAS_BUILT) {
-                                    var tempId = LABELS[id].TYPE;
-                                    console.log("finding children" + tempId + " " + item.id)
-                                    if (parseInt(tempId) == item.id) {
-                                        game.player.city.canBuild[id] = CAN_BUILD;
+                                    if (game.player.city.canBuild[id] !== HAS_BUILT) {
+                                        var tempId = LABELS[id].TYPE;
+                                        console.log("finding children" + tempId + " " + item.id)
+                                        if (parseInt(tempId) == item.id) {
+                                            game.player.city.canBuild[id] = CAN_BUILD;
+                                        }
                                     }
-                                }
-                            });
-                        })
+                                });
+                            })
+                        }
                     }
-                }
-            });
+                });
 
+            }
 
             this.data = null;
             game.isBuilding = false;

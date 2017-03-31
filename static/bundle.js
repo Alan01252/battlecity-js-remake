@@ -83,7 +83,7 @@ const MOVEMENT_SPEED_PLAYER = 0.50;
 /* harmony export (immutable) */ __webpack_exports__["g"] = MOVEMENT_SPEED_PLAYER;
 
 const MOVEMENT_SPEED_BULLET = 0.80;
-/* harmony export (immutable) */ __webpack_exports__["B"] = MOVEMENT_SPEED_BULLET;
+/* harmony export (immutable) */ __webpack_exports__["A"] = MOVEMENT_SPEED_BULLET;
 
 
 const COLLISION_BLOCKING = 2;
@@ -104,17 +104,17 @@ const COLLISION_MAP_EDGE_BOTTOM = 203;
 
 
 const BULLET_ALIVE = 1;
-/* harmony export (immutable) */ __webpack_exports__["D"] = BULLET_ALIVE;
+/* harmony export (immutable) */ __webpack_exports__["C"] = BULLET_ALIVE;
 
 const BULLET_DEAD = -1;
-/* harmony export (immutable) */ __webpack_exports__["C"] = BULLET_DEAD;
+/* harmony export (immutable) */ __webpack_exports__["B"] = BULLET_DEAD;
 
 const TIMER_SHOOT_LASER = 650;
-/* harmony export (immutable) */ __webpack_exports__["w"] = TIMER_SHOOT_LASER;
+/* harmony export (immutable) */ __webpack_exports__["v"] = TIMER_SHOOT_LASER;
 
 
 const DAMAGE_LASER = 5;
-/* harmony export (immutable) */ __webpack_exports__["E"] = DAMAGE_LASER;
+/* harmony export (immutable) */ __webpack_exports__["D"] = DAMAGE_LASER;
 
 
 const MAX_HEALTH = 40;
@@ -122,20 +122,20 @@ const MAX_HEALTH = 40;
 
 
 const MAP_SQUARE_LAVA = 1;
-/* harmony export (immutable) */ __webpack_exports__["u"] = MAP_SQUARE_LAVA;
+/* harmony export (immutable) */ __webpack_exports__["t"] = MAP_SQUARE_LAVA;
 
 const MAP_SQUARE_ROCK = 2;
-/* harmony export (immutable) */ __webpack_exports__["v"] = MAP_SQUARE_ROCK;
+/* harmony export (immutable) */ __webpack_exports__["u"] = MAP_SQUARE_ROCK;
 
 const MAP_SQUARE_BUILDING = 3;
-/* harmony export (immutable) */ __webpack_exports__["p"] = MAP_SQUARE_BUILDING;
+/* harmony export (immutable) */ __webpack_exports__["o"] = MAP_SQUARE_BUILDING;
 
 
 const BUILDING_COMMAND_CENTER = 0;
-/* harmony export (immutable) */ __webpack_exports__["x"] = BUILDING_COMMAND_CENTER;
+/* harmony export (immutable) */ __webpack_exports__["w"] = BUILDING_COMMAND_CENTER;
 
 const BUILDING_FACTORY = 1;
-/* harmony export (immutable) */ __webpack_exports__["t"] = BUILDING_FACTORY;
+/* harmony export (immutable) */ __webpack_exports__["s"] = BUILDING_FACTORY;
 
 const BUILDING_REPAIR = 2;
 /* unused harmony export BUILDING_REPAIR */
@@ -144,11 +144,11 @@ const BUILDING_HOUSE = 3;
 /* unused harmony export BUILDING_HOUSE */
 
 const BUILDING_RESEARCH = 4;
-/* harmony export (immutable) */ __webpack_exports__["s"] = BUILDING_RESEARCH;
+/* harmony export (immutable) */ __webpack_exports__["r"] = BUILDING_RESEARCH;
 
 
-const BUILDING_HAS_BAY = 3;
-/* harmony export (immutable) */ __webpack_exports__["m"] = BUILDING_HAS_BAY;
+const BUILDING_HAS_BAY = 2;
+/* harmony export (immutable) */ __webpack_exports__["E"] = BUILDING_HAS_BAY;
 
 
 const CANT_BUILD = 0;
@@ -158,11 +158,11 @@ const CAN_BUILD = 1;
 /* harmony export (immutable) */ __webpack_exports__["c"] = CAN_BUILD;
 
 const HAS_BUILT = 2;
-/* harmony export (immutable) */ __webpack_exports__["r"] = HAS_BUILT;
+/* harmony export (immutable) */ __webpack_exports__["q"] = HAS_BUILT;
 
 
 const CAN_BUILD_HOUSE = 300;
-/* harmony export (immutable) */ __webpack_exports__["q"] = CAN_BUILD_HOUSE;
+/* harmony export (immutable) */ __webpack_exports__["p"] = CAN_BUILD_HOUSE;
 
 const CAN_BUILD_LASER_RESEARCH = 412;
 /* unused harmony export CAN_BUILD_LASER_RESEARCH */
@@ -202,16 +202,16 @@ const ITEM_TYPE_DFG = 7;
 /* unused harmony export ITEM_TYPE_DFG */
 
 const ITEM_TYPE_WALL = 8;
-/* harmony export (immutable) */ __webpack_exports__["A"] = ITEM_TYPE_WALL;
+/* harmony export (immutable) */ __webpack_exports__["z"] = ITEM_TYPE_WALL;
 
 const ITEM_TYPE_TURRET = 9;
 /* harmony export (immutable) */ __webpack_exports__["f"] = ITEM_TYPE_TURRET;
 
 const ITEM_TYPE_SLEEPER = 10;
-/* harmony export (immutable) */ __webpack_exports__["z"] = ITEM_TYPE_SLEEPER;
+/* harmony export (immutable) */ __webpack_exports__["y"] = ITEM_TYPE_SLEEPER;
 
 const ITEM_TYPE_PLASMA = 11;
-/* harmony export (immutable) */ __webpack_exports__["y"] = ITEM_TYPE_PLASMA;
+/* harmony export (immutable) */ __webpack_exports__["x"] = ITEM_TYPE_PLASMA;
 
 
 const DEPENDENCY_TREE = [
@@ -221,7 +221,7 @@ const DEPENDENCY_TREE = [
     {'id': CAN_BUILD_LASER_FACTORY, 'parentid': CAN_BUILD_LASER_RESEARCH},
     {'id': CAN_BUILD_TURRET_FACTORY, 'parentid': CAN_BUILD_TURRET_RESEARCH},
 ];
-/* harmony export (immutable) */ __webpack_exports__["n"] = DEPENDENCY_TREE;
+/* harmony export (immutable) */ __webpack_exports__["m"] = DEPENDENCY_TREE;
 
 
 
@@ -258,7 +258,7 @@ const LABELS = {
     }
 
 };
-/* harmony export (immutable) */ __webpack_exports__["o"] = LABELS;
+/* harmony export (immutable) */ __webpack_exports__["n"] = LABELS;
 
 
 
@@ -343,6 +343,34 @@ const checkEdges = (rect) => {
 /* harmony export (immutable) */ __webpack_exports__["c"] = checkEdges;
 
 
+
+const checkItems = (game, rect) => {
+    var item = game.itemFactory.getHead();
+
+    while (item) {
+
+        console.log("Checking item collision");
+        var itemRect = {
+            x: item.x,
+            y: item.y,
+            w: 48,
+            h: 48,
+        };
+
+        console.log(itemRect);
+
+        if (rectangleCollision(rect, itemRect)) {
+            return __WEBPACK_IMPORTED_MODULE_0__constants__["j" /* COLLISION_BLOCKING */];
+        }
+
+        item = item.next;
+    }
+
+    return false;
+};
+/* harmony export (immutable) */ __webpack_exports__["e"] = checkItems;
+
+
 const checkTiles = (game, rect) => {
 
     var map = game["map"];
@@ -353,18 +381,18 @@ const checkTiles = (game, rect) => {
     var bottom = Math.floor((rect.y + rect.h) / 48);
 
     /*
-    console.log("left, top ", left + "," + top );
-    console.log("right, top ", right + "," + top );
+     console.log("left, top ", left + "," + top );
+     console.log("right, top ", right + "," + top );
 
 
-    console.log("left, bottom ", left + "," + bottom );
-    console.log("right, bottm ", right + "," + bottom );
+     console.log("left, bottom ", left + "," + bottom );
+     console.log("right, bottm ", right + "," + bottom );
 
-    console.log(map[left][top]);
-    console.log(map[right][top]);
-    console.log(map[left][bottom]);
-    console.log(map[right][bottom]);
-    */
+     console.log(map[left][top]);
+     console.log(map[right][top]);
+     console.log(map[left][bottom]);
+     console.log(map[right][bottom]);
+     */
 
     if (left && right && top && bottom) {
         //Map Terrain (lava, rocks)
@@ -1368,18 +1396,6 @@ Emitter.prototype.hasListeners = function(event){
 
 /***/ }),
 /* 6 */
-/***/ (function(module, exports) {
-
-
-module.exports = function(a, b){
-  var fn = function(){};
-  fn.prototype = b.prototype;
-  a.prototype = new fn;
-  a.prototype.constructor = a;
-};
-
-/***/ }),
-/* 7 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1412,7 +1428,7 @@ const collidedWithRock = (game, bullet) => {
 
 
     if (tileX > 0 && tileY > 0 && tileX < 512 & tileY < 512) {
-        return game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_1__constants__["v" /* MAP_SQUARE_ROCK */];
+        return game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_1__constants__["u" /* MAP_SQUARE_ROCK */];
     }
     return false;
 };
@@ -1425,13 +1441,37 @@ const collidedWithAnotherPlayer = (game, bullet) => {
         return collided(__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__collision_helpers__["b" /* getPlayerRect */])(game.otherPlayers[id]), bullet)
     });
 };
-/* harmony export (immutable) */ __webpack_exports__["c"] = collidedWithAnotherPlayer;
+/* harmony export (immutable) */ __webpack_exports__["d"] = collidedWithAnotherPlayer;
 
 
 const collidedWithCurrentPlayer = (game, bullet) => {
+
     return collided(__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__collision_helpers__["b" /* getPlayerRect */])(game.player), bullet);
 };
-/* harmony export (immutable) */ __webpack_exports__["d"] = collidedWithCurrentPlayer;
+/* harmony export (immutable) */ __webpack_exports__["e"] = collidedWithCurrentPlayer;
+
+
+const collidedWithItem = (game, bullet) => {
+    var item = game.itemFactory.getHead();
+
+    while (item) {
+
+        var itemRect = {
+            x: item.x,
+            y: item.y,
+            w: 48,
+            h: 48,
+        };
+
+        if (collided(itemRect, bullet)) {
+            return true;
+        }
+
+        item = item.next;
+    }
+    return false;
+};
+/* harmony export (immutable) */ __webpack_exports__["b"] = collidedWithItem;
 
 
 const collidedWithBuilding = (game, bullet) => {
@@ -1446,7 +1486,7 @@ const collidedWithBuilding = (game, bullet) => {
             h: 96,
         };
 
-        if (building.type < __WEBPACK_IMPORTED_MODULE_1__constants__["m" /* BUILDING_HAS_BAY */]) {
+        if (building.type < __WEBPACK_IMPORTED_MODULE_1__constants__["E" /* BUILDING_HAS_BAY */]) {
             buildingRect.h = buildingRect.h - 48;
         }
         if (collided(buildingRect, bullet)) {
@@ -1456,9 +1496,21 @@ const collidedWithBuilding = (game, bullet) => {
         building = building.next;
     }
     return false;
-}
-/* harmony export (immutable) */ __webpack_exports__["b"] = collidedWithBuilding;
+};
+/* harmony export (immutable) */ __webpack_exports__["c"] = collidedWithBuilding;
 
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports) {
+
+
+module.exports = function(a, b){
+  var fn = function(){};
+  fn.prototype = b.prototype;
+  a.prototype = new fn;
+  a.prototype.constructor = a;
+};
 
 /***/ }),
 /* 8 */
@@ -1517,7 +1569,7 @@ function searchTree(element, matchingId) {
 }
 
 
-var dependencyTree = unflatten(__WEBPACK_IMPORTED_MODULE_0__constants__["n" /* DEPENDENCY_TREE */]);
+var dependencyTree = unflatten(__WEBPACK_IMPORTED_MODULE_0__constants__["m" /* DEPENDENCY_TREE */]);
 
 const setupBuildingMenu = (game) => {
 
@@ -1552,7 +1604,7 @@ const setupBuildingMenu = (game) => {
         canBuildList.forEach((id, index) => {
 
             if (canBuild[id] == __WEBPACK_IMPORTED_MODULE_0__constants__["c" /* CAN_BUILD */]) {
-                var buildingType = __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* LABELS */][id].TYPE;
+                var buildingType = __WEBPACK_IMPORTED_MODULE_0__constants__["n" /* LABELS */][id].TYPE;
 
 
                 var click = () => {
@@ -1561,18 +1613,18 @@ const setupBuildingMenu = (game) => {
 
                 var tmpText = new PIXI.Texture(
                     game.textures['buildingIcons'].baseTexture,
-                    new PIXI.Rectangle(__WEBPACK_IMPORTED_MODULE_0__constants__["o" /* LABELS */][id].ICON * 16, 0, 16, 16)
+                    new PIXI.Rectangle(__WEBPACK_IMPORTED_MODULE_0__constants__["n" /* LABELS */][id].ICON * 16, 0, 16, 16)
                 );
 
                 var buildIcon = new PIXI.Sprite(tmpText);
                 buildIcon.x = game.buildMenuOffset.x - 16;
                 buildIcon.y = game.buildMenuOffset.y + (y * 16);
                 buildIcon.interactive = true;
-                buildIcon.iconType = __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* LABELS */][id].IMAGE;
+                buildIcon.iconType = __WEBPACK_IMPORTED_MODULE_0__constants__["n" /* LABELS */][id].IMAGE;
                 buildIcon.on('mousedown', click);
 
 
-                var basicText = new PIXI.Text(__WEBPACK_IMPORTED_MODULE_0__constants__["o" /* LABELS */][id].LABEL, {fontSize: 12, fill: 0xFFFFFF});
+                var basicText = new PIXI.Text(__WEBPACK_IMPORTED_MODULE_0__constants__["n" /* LABELS */][id].LABEL, {fontSize: 12, fill: 0xFFFFFF});
                 basicText.x = game.buildMenuOffset.x;
                 basicText.y = game.buildMenuOffset.y + (y * 16);
                 basicText.interactive = true;
@@ -1642,40 +1694,40 @@ const drawBuilding = (game) => {
             var y = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + event.data.global.y) / 48);
 
             if (game.buildingFactory.newBuilding(null, x, y, game.isBuilding)) {
-                game.map[x][y] = __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* MAP_SQUARE_BUILDING */];
+                game.map[x][y] = __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* MAP_SQUARE_BUILDING */];
                 game.tiles[x][y] = game.isBuilding;
-            }
 
 
-            Object.keys(game.player.city.canBuild).forEach((id) => {
+                Object.keys(game.player.city.canBuild).forEach((id) => {
 
-                var tempId = __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* LABELS */][id].TYPE;
-                console.log(tempId + " " + game.isBuilding);
-                if (parseInt(tempId) == game.isBuilding) {
+                    var tempId = __WEBPACK_IMPORTED_MODULE_0__constants__["n" /* LABELS */][id].TYPE;
+                    console.log(tempId + " " + game.isBuilding);
+                    if (parseInt(tempId) == game.isBuilding) {
 
-                    if (tempId != __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* CAN_BUILD_HOUSE */]) {
-                        game.player.city.canBuild[id] = __WEBPACK_IMPORTED_MODULE_0__constants__["r" /* HAS_BUILT */];
-                    }
+                        if (tempId != __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* CAN_BUILD_HOUSE */]) {
+                            game.player.city.canBuild[id] = __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* HAS_BUILT */];
+                        }
 
-                    var node = searchTree(dependencyTree[0], tempId);
-                    if (node && node.children) {
-                        node.children.forEach((item) => {
-                            Object.keys(game.player.city.canBuild).forEach((id) => {
+                        var node = searchTree(dependencyTree[0], tempId);
+                        if (node && node.children) {
+                            node.children.forEach((item) => {
+                                Object.keys(game.player.city.canBuild).forEach((id) => {
 
 
-                                if (game.player.city.canBuild[id] !== __WEBPACK_IMPORTED_MODULE_0__constants__["r" /* HAS_BUILT */]) {
-                                    var tempId = __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* LABELS */][id].TYPE;
-                                    console.log("finding children" + tempId + " " + item.id)
-                                    if (parseInt(tempId) == item.id) {
-                                        game.player.city.canBuild[id] = __WEBPACK_IMPORTED_MODULE_0__constants__["c" /* CAN_BUILD */];
+                                    if (game.player.city.canBuild[id] !== __WEBPACK_IMPORTED_MODULE_0__constants__["q" /* HAS_BUILT */]) {
+                                        var tempId = __WEBPACK_IMPORTED_MODULE_0__constants__["n" /* LABELS */][id].TYPE;
+                                        console.log("finding children" + tempId + " " + item.id)
+                                        if (parseInt(tempId) == item.id) {
+                                            game.player.city.canBuild[id] = __WEBPACK_IMPORTED_MODULE_0__constants__["c" /* CAN_BUILD */];
+                                        }
                                     }
-                                }
-                            });
-                        })
+                                });
+                            })
+                        }
                     }
-                }
-            });
+                });
 
+            }
 
             this.data = null;
             game.isBuilding = false;
@@ -3484,7 +3536,7 @@ function polling (opts) {
 var Transport = __webpack_require__(9);
 var parseqs = __webpack_require__(11);
 var parser = __webpack_require__(4);
-var inherit = __webpack_require__(6);
+var inherit = __webpack_require__(7);
 var yeast = __webpack_require__(19);
 var debug = __webpack_require__(3)('engine.io-client:polling');
 
@@ -4103,9 +4155,8 @@ var drawBullets = (game, stage) => {
         tmpText.frame = bulletRect;
 
         var sprite = new PIXI.Sprite(tmpText);
-        sprite.x = ((bullet.x + 48) + (game.player.defaultOffset.x - (game.player.offset.x)));
-        sprite.y = ((bullet.y + 48) + (game.player.defaultOffset.y - game.player.offset.y));
-        sprite.anchor = {x: 1, y: 1};
+        sprite.x = ((bullet.x) + (game.player.defaultOffset.x - (game.player.offset.x)));
+        sprite.y = ((bullet.y) + (game.player.defaultOffset.y - game.player.offset.y));
 
 
         bullet.animation++;
@@ -4118,7 +4169,6 @@ var drawBullets = (game, stage) => {
         bullet = bullet.next;
     }
 };
-
 
 
 const drawChanging = (game) => {
@@ -4481,10 +4531,10 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
     console.log("j == " + j * 48);
 
     switch (baseType) {
-        case __WEBPACK_IMPORTED_MODULE_0__constants__["s" /* BUILDING_RESEARCH */]:
+        case __WEBPACK_IMPORTED_MODULE_0__constants__["r" /* BUILDING_RESEARCH */]:
             backgroundTiles.addFrame(tmpText, (i * 48) + 14, (j * 48) + 100);
             break;
-        case __WEBPACK_IMPORTED_MODULE_0__constants__["t" /* BUILDING_FACTORY */]:
+        case __WEBPACK_IMPORTED_MODULE_0__constants__["s" /* BUILDING_FACTORY */]:
             backgroundTiles.addFrame(tmpText, (i * 48) + 56, (j * 48) + 52);
             break;
     }
@@ -4541,15 +4591,15 @@ const drawTiles = (game, backgroundTiles) => {
 
                 if (tileX >= 0 && tileY >= 0 && tileX < 512 && tileY < 512) {
 
-                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["u" /* MAP_SQUARE_LAVA */]) {
+                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["t" /* MAP_SQUARE_LAVA */]) {
                         drawLava(game, backgroundTiles, i, j, tileX, tileY);
                     }
 
-                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["v" /* MAP_SQUARE_ROCK */]) {
+                    if (game.map[tileX][tileY] == __WEBPACK_IMPORTED_MODULE_0__constants__["u" /* MAP_SQUARE_ROCK */]) {
                         drawRocks(game, backgroundTiles, i, j, tileX, tileY);
                     }
 
-                    if (game.map[tileX][tileY] >= __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* MAP_SQUARE_BUILDING */]) {
+                    if (game.map[tileX][tileY] >= __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* MAP_SQUARE_BUILDING */]) {
                         drawBuilding(game, backgroundTiles, i, j, tileX, tileY);
                     }
                 }
@@ -4646,7 +4696,8 @@ class BulletFactory {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__constants__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__ = __webpack_require__(6);
+
 
 
 
@@ -4671,43 +4722,48 @@ class BulletFactory {
             var fDir = bullet.angle;
 
 
-            var x = (Math.sin((fDir / 16) * 3.14) * -1 ) * this.game.timePassed * __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* MOVEMENT_SPEED_BULLET */];
-            var y = (Math.cos((fDir / 16) * 3.14) * -1) * this.game.timePassed * __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* MOVEMENT_SPEED_BULLET */];
+            var x = (Math.sin((fDir / 16) * 3.14) * -1 ) * this.game.timePassed * __WEBPACK_IMPORTED_MODULE_0__constants__["A" /* MOVEMENT_SPEED_BULLET */];
+            var y = (Math.cos((fDir / 16) * 3.14) * -1) * this.game.timePassed * __WEBPACK_IMPORTED_MODULE_0__constants__["A" /* MOVEMENT_SPEED_BULLET */];
 
             bullet.x += x;
             bullet.y += y;
 
             // Offscreen
             if (bullet.x < 0 || bullet.x > 24576 || bullet.y < 0 || bullet.y > 24576) {
-                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["C" /* BULLET_DEAD */];
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* BULLET_DEAD */];
             }
 
             if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["a" /* collidedWithRock */])(this.game, bullet)) {
                 console.log("Bullet collided with rock");
-                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["C" /* BULLET_DEAD */];
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* BULLET_DEAD */];
             }
 
-            if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["b" /* collidedWithBuilding */])(this.game, bullet)) {
-                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["C" /* BULLET_DEAD */];
+            if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["b" /* collidedWithItem */])(this.game, bullet)) {
+                console.log("Bullet collided with item");
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* BULLET_DEAD */];
             }
 
-            if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["c" /* collidedWithAnotherPlayer */])(this.game, bullet)) {
+            if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["c" /* collidedWithBuilding */])(this.game, bullet)) {
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* BULLET_DEAD */];
+            }
+
+            if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["d" /* collidedWithAnotherPlayer */])(this.game, bullet)) {
+                console.log("Bullet collided with someone else");
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* BULLET_DEAD */];
+            }
+
+
+            if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["e" /* collidedWithCurrentPlayer */])(this.game, bullet)) {
                 console.log("Bullet collided with me");
-                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["C" /* BULLET_DEAD */];
-            }
-
-            if (bullet.shooter !== this.game.player.id) {
-
-                if (__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_collision_bullet__["d" /* collidedWithCurrentPlayer */])(this.game, bullet)) {
-                    console.log("Bullet collided with me");
-                    bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["C" /* BULLET_DEAD */];
+                bullet.life = __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* BULLET_DEAD */];
+                if (bullet.shooter !== this.game.player.id) {
                     if (this.game.player.health > 0) {
                         this.game.player.health -= bullet.damage;
                     }
                 }
             }
 
-            if (bullet.life == __WEBPACK_IMPORTED_MODULE_0__constants__["C" /* BULLET_DEAD */]) {
+            if (bullet.life == __WEBPACK_IMPORTED_MODULE_0__constants__["B" /* BULLET_DEAD */]) {
                 bullet = this.deleteBullet(bullet)
             }
             else {
@@ -4738,8 +4794,8 @@ class BulletFactory {
             "shooter": shooter,
             "x": x,
             "y": y,
-            "life": __WEBPACK_IMPORTED_MODULE_0__constants__["D" /* BULLET_ALIVE */],
-            "damage": __WEBPACK_IMPORTED_MODULE_0__constants__["E" /* DAMAGE_LASER */],
+            "life": __WEBPACK_IMPORTED_MODULE_0__constants__["C" /* BULLET_ALIVE */],
+            "damage": __WEBPACK_IMPORTED_MODULE_0__constants__["D" /* DAMAGE_LASER */],
             "animation": 0,
             "type": type,
             "angle": angle,
@@ -4912,15 +4968,15 @@ class ItemFactory {
 
         this.validIcons = [
             __WEBPACK_IMPORTED_MODULE_0__constants__["f" /* ITEM_TYPE_TURRET */],
-            __WEBPACK_IMPORTED_MODULE_0__constants__["y" /* ITEM_TYPE_PLASMA */],
-            __WEBPACK_IMPORTED_MODULE_0__constants__["z" /* ITEM_TYPE_SLEEPER */],
-            __WEBPACK_IMPORTED_MODULE_0__constants__["A" /* ITEM_TYPE_WALL */]
+            __WEBPACK_IMPORTED_MODULE_0__constants__["x" /* ITEM_TYPE_PLASMA */],
+            __WEBPACK_IMPORTED_MODULE_0__constants__["y" /* ITEM_TYPE_SLEEPER */],
+            __WEBPACK_IMPORTED_MODULE_0__constants__["z" /* ITEM_TYPE_WALL */]
         ];
 
         this.validShooters = [
             __WEBPACK_IMPORTED_MODULE_0__constants__["f" /* ITEM_TYPE_TURRET */],
-            __WEBPACK_IMPORTED_MODULE_0__constants__["y" /* ITEM_TYPE_PLASMA */],
-            __WEBPACK_IMPORTED_MODULE_0__constants__["z" /* ITEM_TYPE_SLEEPER */],
+            __WEBPACK_IMPORTED_MODULE_0__constants__["x" /* ITEM_TYPE_PLASMA */],
+            __WEBPACK_IMPORTED_MODULE_0__constants__["y" /* ITEM_TYPE_SLEEPER */],
         ];
     }
 
@@ -4950,8 +5006,8 @@ class ItemFactory {
                 var x = (Math.sin((item.angle * 3.14)/180));
                 var y = (Math.cos((item.angle * 3.14)/180) * -1);
 
-                var x2 = ((item.x) - 16) + (x * 23);
-                var y2 = ((item.y) - 24) + (y * 23);
+                var x2 = ((item.x) + 20) + (x * 23);
+                var y2 = ((item.y) + 24) + (y * 23);
 
                 this.game.bulletFactory.newBullet(this.game.player.id, x2, y2, 0, direction);
             }
@@ -5154,6 +5210,10 @@ const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow keys
 
         if (icon) {
             var item = game.itemFactory.newItem(icon, x2, y2, icon.type);
+            if (item) {
+                game.player.offset.x += 20;
+                game.player.offset.x += 20;
+            }
             // It's not been converted to an item and so is able to be picked up again
             if (!item) {
                 game.iconFactory.newIcon(game.player.id, x2, y2, icon.type)
@@ -5165,21 +5225,19 @@ const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow keys
     shift.press = function () {
         console.log("shift key pressed");
         if (game.tick > lastShot) {
-            lastShot = game.tick + __WEBPACK_IMPORTED_MODULE_0__constants__["w" /* TIMER_SHOOT_LASER */];
+            lastShot = game.tick + __WEBPACK_IMPORTED_MODULE_0__constants__["v" /* TIMER_SHOOT_LASER */];
 
-            console.log("Player fired shot ");
+            var angle = game.player.direction;
+            var angleInDegrees = (angle / 32) * 360;
 
+            var x = (Math.sin((angleInDegrees * 3.14)/180));
+            var y = (Math.cos((angleInDegrees * 3.14)/180) * -1);
 
-            var angle = -game.player.direction;
+            var x2 = ((game.player.offset.x) + 24) + (x * 30);
+            var y2 = ((game.player.offset.y) + 24) + (y * 30);
 
-            var x = (Math.sin((angle / 16) * 3.14) * -1);
-            var y = (Math.cos((angle / 16) * 3.14) * -1);
-
-            var x2 = ((game.player.offset.x) - 20 ) + (x * 20);
-            var y2 = ((game.player.offset.y) - 20 ) + (y * 20);
-
-            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, angle);
-            game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: angle});
+            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, -angle);
+            game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: -angle});
 
         }
 
@@ -5281,14 +5339,14 @@ function populateTiles(game, mapData) {
         // j === x axis
         for (var i = 0; i < game.map.length; i++) {
 
-            if ((game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["p" /* MAP_SQUARE_BUILDING */])) {
-                game.buildingFactory.newBuilding(null, i, j, __WEBPACK_IMPORTED_MODULE_0__constants__["x" /* BUILDING_COMMAND_CENTER */]);
-                game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["x" /* BUILDING_COMMAND_CENTER */];
+            if ((game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["o" /* MAP_SQUARE_BUILDING */])) {
+                game.buildingFactory.newBuilding(null, i, j, __WEBPACK_IMPORTED_MODULE_0__constants__["w" /* BUILDING_COMMAND_CENTER */]);
+                game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["w" /* BUILDING_COMMAND_CENTER */];
             }
-            else if ((game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["u" /* MAP_SQUARE_LAVA */]) || (game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["v" /* MAP_SQUARE_ROCK */])) {
+            else if ((game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["t" /* MAP_SQUARE_LAVA */]) || (game.map[i][j] == __WEBPACK_IMPORTED_MODULE_0__constants__["u" /* MAP_SQUARE_ROCK */])) {
 
                 var currentTile = game.map[i][j];
-                if (currentTile == __WEBPACK_IMPORTED_MODULE_0__constants__["u" /* MAP_SQUARE_LAVA */] || currentTile == __WEBPACK_IMPORTED_MODULE_0__constants__["v" /* MAP_SQUARE_ROCK */]) {
+                if (currentTile == __WEBPACK_IMPORTED_MODULE_0__constants__["t" /* MAP_SQUARE_LAVA */] || currentTile == __WEBPACK_IMPORTED_MODULE_0__constants__["u" /* MAP_SQUARE_ROCK */]) {
 
                     var isLeft = (i == 0 || game.map[i - 1][j] != currentTile) | 0;
                     var isRight = ((i == 511 || game.map[i + 1][j] != currentTile)) | 0;
@@ -5644,7 +5702,6 @@ function setup() {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_13__src_draw_draw_building_interface__["a" /* setupBuildingMenu */])(game);
 
     game.forceDraw = true;
-
 
 
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__src_draw_draw_ground__["a" /* drawGround */])(game, groundTiles);
@@ -7903,7 +7960,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
  */
 
 var Polling = __webpack_require__(18);
-var inherit = __webpack_require__(6);
+var inherit = __webpack_require__(7);
 
 /**
  * Module exports.
@@ -8142,7 +8199,7 @@ JSONPPolling.prototype.doWrite = function (data, fn) {
 var XMLHttpRequest = __webpack_require__(10);
 var Polling = __webpack_require__(18);
 var Emitter = __webpack_require__(5);
-var inherit = __webpack_require__(6);
+var inherit = __webpack_require__(7);
 var debug = __webpack_require__(3)('engine.io-client:polling-xhr');
 
 /**
@@ -8573,7 +8630,7 @@ function unloadHandler () {
 var Transport = __webpack_require__(9);
 var parser = __webpack_require__(4);
 var parseqs = __webpack_require__(11);
-var inherit = __webpack_require__(6);
+var inherit = __webpack_require__(7);
 var yeast = __webpack_require__(19);
 var debug = __webpack_require__(3)('engine.io-client:websocket');
 var BrowserWebSocket = global.WebSocket || global.MozWebSocket;
@@ -11408,6 +11465,7 @@ process.umask = function() { return 0; };
 
 
 
+
 var checkPlayers = (game, buildingRect) => {
 
 
@@ -11466,9 +11524,20 @@ const checkBuildingCollision = (game, building) => {
         return collision;
     }
 
-    if (collision = checkBuildings(game, buildingRect)) {
+
+    collision = checkBuildings(game, buildingRect);
+    if (collision) {
         console.log("Collided with buildings");
+        return collision;
     }
+
+    collision = checkPlayers(game, buildingRect);
+    if (collision) {
+        console.log("Collided with buildings");
+        return collision;
+    }
+
+    collision = __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__collision_helpers__["e" /* checkItems */])(game, buildingRect);
 
 
     return collision
@@ -11492,6 +11561,7 @@ const checkBuildingCollision = (game, building) => {
 
 
 
+
 var checkBuildings = (game, playerRect) => {
     var building = game.buildingFactory.getHead();
 
@@ -11504,7 +11574,7 @@ var checkBuildings = (game, playerRect) => {
             h: 144,
         };
 
-        if (building.type < __WEBPACK_IMPORTED_MODULE_0__constants__["m" /* BUILDING_HAS_BAY */]) {
+        if (building.type == 0 || parseInt(building.type / 100) == 1) {
             buildingRect.h = buildingRect.h - 48;
         }
 
@@ -11519,6 +11589,7 @@ var checkBuildings = (game, playerRect) => {
     return false;
 };
 
+
 const checkPlayerCollision = (game) => {
 
     var playerRect = __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_helpers__["b" /* getPlayerRect */])(game.player);
@@ -11528,6 +11599,10 @@ const checkPlayerCollision = (game) => {
     }
     if (!collision) {
         collision = checkBuildings(game, playerRect);
+    }
+
+    if (!collision) {
+        collision = __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__collision_helpers__["e" /* checkItems */])(game, playerRect);
     }
 
 

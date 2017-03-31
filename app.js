@@ -190,7 +190,6 @@ function setup() {
     game.forceDraw = true;
 
 
-
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
     drawIcons(game, iconTiles);
