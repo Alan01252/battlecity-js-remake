@@ -61,8 +61,8 @@ class ItemFactory {
     targetNearestPlayer(item) {
         // loop through all players here at the moment we'll just make it target our selves
 
-        var x = this.game.player.offset.x - 8;
-        var y = this.game.player.offset.y - 8;
+        var x = this.game.player.offset.x;
+        var y = this.game.player.offset.y;
         var xDistanceFromPlayer = ((x - item.x) * (x - item.x));
         var yDistanceFromPlayer = ((y - item.y) * (y - item.y));
 
@@ -79,8 +79,7 @@ class ItemFactory {
                 item.angle = 180 - item.angle
             }
             else if (x <= item.x) {
-                item.angle = item.angle + 16;
-                item.angle = item.angle * -1 + 180
+                item.angle = item.angle * -1 + 170
             }
         }
     }
