@@ -94,7 +94,6 @@ const game = {
                 CAN_BUILD_COUGAR_FACTORY: CANT_BUILD,
 
 
-
             }
         },
         health: MAX_HEALTH,
@@ -214,14 +213,15 @@ function setup() {
     drawPanelInterface(game, panelContainer);
 
 
-
     game.forceDraw = false;
-
 
 
     gameLoop();
 }
 
+
+var tileAnim = 0;
+var tileAnimationTick = 0;
 
 function gameLoop() {
 
@@ -247,11 +247,24 @@ function gameLoop() {
     play(game);
 
 
+    app.renderer.plugins.tilemap.tileAnim[0] = tileAnim * 144;
+
     game.forceDraw = false;
 
 
     stats.end();
     requestAnimationFrame(gameLoop);
+
+    if (game.tick > tileAnimationTick) {
+        console.log("Updating animation");
+        tileAnimationTick = game.tick + 300;
+
+        tileAnim = tileAnim + 1;
+        if (tileAnim >= 3) {
+
+            tileAnim = 0;
+        }
+    }
 
 }
 
