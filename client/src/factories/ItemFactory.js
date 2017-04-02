@@ -47,13 +47,13 @@ class ItemFactory {
                 var direction = -((32 / 6) * angle);
 
 
-                var x = (Math.sin((item.angle * 3.14)/180));
-                var y = (Math.cos((item.angle * 3.14)/180) * -1);
+                    var x = (Math.sin((item.angle * 3.14) / 180));
+                    var y = (Math.cos((item.angle * 3.14) / 180) * -1);
 
-                var x2 = ((item.x) + 20) + (x * 23);
-                var y2 = ((item.y) + 24) + (y * 23);
+                    var x2 = ((item.x) + 20) + (x * 23);
+                    var y2 = ((item.y) + 24) + (y * 23);
 
-                this.game.bulletFactory.newBullet(this.game.player.id, x2, y2, 0, direction);
+                    this.game.bulletFactory.newBullet(this.game.player.id, x2, y2, 0, direction);
             }
         }
     }
@@ -67,20 +67,24 @@ class ItemFactory {
         var yDistanceFromPlayer = ((y - item.y) * (y - item.y));
 
         var playerDistance = Math.sqrt(xDistanceFromPlayer + (yDistanceFromPlayer));
-        item.target = this.game.player;
+        if (playerDistance <= 400) {
+            item.target = this.game.player.id;
 
 
-        if (item.target != null) {
-            item.angle = Math.atan2(x - item.x, y - item.y);
-            item.angle = Math.ceil((item.angle * 180 / 3.14));
+            if (item.target != null) {
+                item.angle = Math.atan2(x - item.x, y - item.y);
+                item.angle = Math.ceil((item.angle * 180 / 3.14));
 
-            // We always need to have a positive angle in degrees to get the right image from the texture
-            if (x >= item.x) {
-                item.angle = 180 - item.angle
+                // We always need to have a positive angle in degrees to get the right image from the texture
+                if (x >= item.x) {
+                    item.angle = 180 - item.angle
+                }
+                else if (x <= item.x) {
+                    item.angle = item.angle * -1 + 170
+                }
             }
-            else if (x <= item.x) {
-                item.angle = item.angle * -1 + 170
-            }
+        } else {
+            item.target = null;
         }
     }
 
