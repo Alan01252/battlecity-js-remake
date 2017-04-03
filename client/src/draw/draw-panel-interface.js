@@ -1,5 +1,10 @@
 import {MAX_HEALTH} from "../constants";
 import {ITEM_TYPE_TURRET} from "../constants";
+import {ITEM_TYPE_LASER} from "../constants";
+import {ITEM_TYPE_MINE} from "../constants";
+import {ITEM_TYPE_MEDKIT} from "../constants";
+import {ITEM_TYPE_ROCKET} from "../constants";
+import {ITEM_TYPE_BOMB} from "../constants";
 
 var drawPanel = (game, stage) => {
 
@@ -34,9 +39,29 @@ var drawItems = (game, stage) => {
 
 
             switch (icon.type) {
-                case 9:
+                case ITEM_TYPE_TURRET:
                     x = game.maxMapX + 7;
                     y = 372;
+                    break;
+                case ITEM_TYPE_LASER:
+                    x = game.maxMapX + 7;
+                    y = 267;
+                    break;
+                case ITEM_TYPE_ROCKET:
+                    x = game.maxMapX + 42;
+                    y = 267;
+                    break;
+                case ITEM_TYPE_MEDKIT:
+                    x = game.maxMapX + 77;
+                    y = 267;
+                    break;
+                case ITEM_TYPE_BOMB:
+                    x = game.maxMapX + 7;
+                    y = 302;
+                    break;
+                case ITEM_TYPE_MINE:
+                    x = game.maxMapX + 42;
+                    y = 302;
                     break;
             }
 

@@ -108,7 +108,7 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             }
             // It's not been converted to an item and so is able to be picked up again
             if (!item) {
-                game.iconFactory.newIcon(game.player.id, x2, y2, icon.type)
+                game.iconFactory.newIcon(null, parseInt(x2), parseInt(y2), icon.type)
             }
         }
 
@@ -122,8 +122,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             var angle = game.player.direction;
             var angleInDegrees = (angle / 32) * 360;
 
-            var x = (Math.sin((angleInDegrees * 3.14)/180));
-            var y = (Math.cos((angleInDegrees * 3.14)/180) * -1);
+            var x = (Math.sin((angleInDegrees * 3.14) / 180));
+            var y = (Math.cos((angleInDegrees * 3.14) / 180) * -1);
 
             var x2 = ((game.player.offset.x) + 24) + (x * 30);
             var y2 = ((game.player.offset.y) + 24) + (y * 30);
