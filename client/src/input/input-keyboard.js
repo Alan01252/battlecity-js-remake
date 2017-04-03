@@ -103,8 +103,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         if (icon) {
             var item = game.itemFactory.newItem(icon, x2, y2, icon.type);
             if (item) {
-                game.player.offset.x += 20;
-                game.player.offset.x += 20;
+                game.player.offset.x += 30;
+                game.player.offset.x += 30;
             }
             // It's not been converted to an item and so is able to be picked up again
             if (!item) {

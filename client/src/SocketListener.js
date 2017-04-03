@@ -32,9 +32,19 @@ class SocketListener extends EventEmitter {
         this.io.on("bullet_shot", (bullet) => {
             var bullet = JSON.parse(bullet);
             this.game.bulletFactory.newBullet(bullet.shooter, bullet.x, bullet.y, bullet.type, bullet.angle)
-        })
+        });
+
+        this.io.on("new_icon", (icon) => {
+            var icon = JSON.parse(icon);
+            this.game.iconFactory.newIcon(null, icon.x, icon.y, icon.type)
+        });
     }
 
+    sendNewBuilding(building, callback) {
+        if (this.io) {
+            this.io.emit("new_building", JSON.stringify(building));
+        }
+    }
 
     sendBulletShot(bullet) {
         this.io.emit("bullet_shot", JSON.stringify(bullet));

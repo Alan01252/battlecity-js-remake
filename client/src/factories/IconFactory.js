@@ -20,6 +20,9 @@ class IconFactory {
 
         };
 
+        console.log("creating icon");
+        console.log(icon);
+        this.game.forceDraw = true;
 
         if (this.iconListHead) {
             this.iconListHead.previous = icon;

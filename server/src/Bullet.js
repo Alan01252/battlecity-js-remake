@@ -1,6 +1,5 @@
-/**
- * Created by alan on 28/03/17.
- */
+/*jslint node: true */
+"use strict";
 
 class Bullet {
 

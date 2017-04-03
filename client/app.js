@@ -197,8 +197,8 @@ function setup() {
     app.stage.addChild(panelContainer);
 
 
-    game.iconFactory.newIcon(null, 1600, 1800, ITEM_TYPE_TURRET);
-    game.itemFactory.newItem(null, 1500, 1800, ITEM_TYPE_TURRET);
+    game.iconFactory.newIcon(null, 1304, 1540, 12);
+    game.itemFactory.newItem(null, 1500, 1800, 12);
 
     setupBuildingMenu(game);
 
@@ -239,10 +239,10 @@ function gameLoop() {
     setupBuildingMenu(game);
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
-    drawIcons(game, iconTiles);
     drawItems(game, itemTiles);
     drawChanging(game);
     drawBuilding(game);
+    drawIcons(game, iconTiles);
     drawPanelInterface(game, panelContainer);
     play(game);
 
@@ -256,7 +256,6 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 
     if (game.tick > tileAnimationTick) {
-        console.log("Updating animation");
         tileAnimationTick = game.tick + 300;
 
         tileAnim = tileAnim + 1;

@@ -18,6 +18,8 @@ var getIconsWithinRange = function (iconFactory, player) {
         icon = icon.next;
     }
 
+    console.log(foundIcons);
+
     return foundIcons
 };
 

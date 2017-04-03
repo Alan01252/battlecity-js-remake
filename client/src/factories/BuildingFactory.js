@@ -29,6 +29,12 @@ class BulletFactory {
         }
 
 
+        this.game.socketListener.sendNewBuilding(building, (result) => {
+            if (!result) {
+                // Remove the building?
+            }
+        })
+
         if (this.buildingListHead) {
             this.buildingListHead.previous = building;
             building.next = this.buildingListHead
