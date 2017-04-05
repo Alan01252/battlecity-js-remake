@@ -1,4 +1,6 @@
 import * as mapBuilder from "./src/mapBuilder";
+import * as cityBuilder from "./src/cityBuilder";
+
 import {play} from './src/play';
 import {RESOLUTION_X} from "./src/constants";
 import {RESOLUTION_Y} from "./src/constants";
@@ -24,9 +26,6 @@ import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 
 
-import {CAN_BUILD} from "./src/constants";
-import {CANT_BUILD} from "./src/constants";
-import {ITEM_TYPE_TURRET} from "./src/constants";
 
 
 var type = "WebGL";
@@ -63,6 +62,7 @@ const game = {
     textures: [],
     maxMapX: RESOLUTION_X - 200,
     maxMapY: RESOLUTION_Y,
+    maxCities: 0,
     otherPlayers: {},
     showBuildMenu: false,
     buildMenuOffset: {
@@ -70,32 +70,10 @@ const game = {
         y: (RESOLUTION_Y / 2)
     },
     buildings: {},
+    cities: [],
     player: {
         id: -1,
-        city: {
-            canBuild: {
-
-                CAN_BUILD_HOUSE: CAN_BUILD,
-
-                CAN_BUILD_LASER_RESEARCH: CAN_BUILD,
-                CAN_BUILD_TURRET_RESEARCH: CAN_BUILD,
-                CAN_BUILD_BOMB_RESEARCH: CANT_BUILD,
-                CAN_BUILD_MEDKIT_RESEARCH: CANT_BUILD,
-                CAN_BUILD_MINE_RESEARCH: CANT_BUILD,
-                CAN_BUILD_ORB_RESEARCH: CANT_BUILD,
-                CAN_BUILD_COUGAR_RESEARCH: CANT_BUILD,
-
-                CAN_BUILD_LASER_FACTORY: CANT_BUILD,
-                CAN_BUILD_TURRET_FACTORY: CANT_BUILD,
-                CAN_BUILD_BOMB_FACTORY: CANT_BUILD,
-                CAN_BUILD_MEDKIT_FACTORY: CANT_BUILD,
-                CAN_BUILD_MINE_FACTORY: CANT_BUILD,
-                CAN_BUILD_ORB_FACTORY: CANT_BUILD,
-                CAN_BUILD_COUGAR_FACTORY: CANT_BUILD,
-
-
-            }
-        },
+        city: 0,
         health: MAX_HEALTH,
         isTurning: 0,
         timeTurn: 0,
@@ -105,8 +83,8 @@ const game = {
             y: (RESOLUTION_Y / 2)
         },
         offset: {
-            x: 1600,
-            y: 1800,
+            x: 0,
+            y: 0,
             vx: 0,
             vy: 0
         }
@@ -155,6 +133,10 @@ function setup() {
 
     var mapData = PIXI.loader.resources["data/map.dat"].data;
     mapBuilder.build(game, mapData);
+    cityBuilder.build(game);
+
+    game.player.offset.x = game.cities[0].x + 48;
+    game.player.offset.y = game.cities[0].y + 100;
 
     game.textures['groundTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgGround.png"];
     game.textures['tankTexture'] = PIXI.utils.TextureCache["data/imgTanks.png"];

@@ -85,9 +85,6 @@ var movePlayer = (game) => {
             break;
     }
 
-    //console.log("moved player to x " + game.player.offset.x);
-    //console.log("moved player to y " + game.player.offset.y);
-
 };
 
 var killPlayer = (game) => {
