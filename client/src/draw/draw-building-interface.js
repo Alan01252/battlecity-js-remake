@@ -152,19 +152,20 @@ function addBuilding(game) {
         var x = Math.floor((game.player.offset.x - game.player.defaultOffset.x + offTileX + event.data.global.x) / 48);
         var y = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + event.data.global.y) / 48);
 
-        game.buildingFactory.newBuilding(null, x, y, game.isBuilding);
-        game.map[x][y] = MAP_SQUARE_BUILDING;
-        game.tiles[x][y] = game.isBuilding;
+        if (game.buildingFactory.newBuilding(null, x, y, game.isBuilding)) {
+            game.map[x][y] = MAP_SQUARE_BUILDING;
+            game.tiles[x][y] = game.isBuilding;
 
 
-        this.data = null;
-        game.isBuilding = false;
-        game.isDragging = false;
-        game.forceDraw = true;
-        game.showBuildMenu = false;
-        this.dragging = false;
-        building.dragging = false;
-        building.destroy();
+            this.data = null;
+            game.isBuilding = false;
+            game.isDragging = false;
+            game.forceDraw = true;
+            game.showBuildMenu = false;
+            this.dragging = false;
+            building.dragging = false;
+            building.destroy();
+        }
     }
 
     function onDragMove() {
