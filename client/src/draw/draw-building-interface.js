@@ -1,5 +1,6 @@
 import {LABELS} from "../constants";
 import {CAN_BUILD} from "../constants";
+import {MAP_SQUARE_BUILDING} from "../constants";
 
 
 var menuContainer = new PIXI.Container();
@@ -152,6 +153,8 @@ function addBuilding(game) {
         var y = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + event.data.global.y) / 48);
 
         game.buildingFactory.newBuilding(null, x, y, game.isBuilding);
+        game.map[x][y] = MAP_SQUARE_BUILDING;
+        game.tiles[x][y] = game.isBuilding;
 
 
         this.data = null;

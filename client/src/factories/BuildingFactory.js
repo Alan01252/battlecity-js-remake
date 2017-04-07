@@ -113,9 +113,9 @@ class BuildingFactory {
                 console.log(buildingNode.x + " " + buildingNode.y);
 
                 if (x >= buildingNode.x &&
-                    x <= buildingNode.x + 3 &&
+                    x <= buildingNode.x + 2 &&
                     y >= buildingNode.y &&
-                    y <= buildingNode.y + 3
+                    y <= buildingNode.y + 2
                 ) {
                     this.game.forceDraw = true;
                     this.deleteBuilding(buildingNode)
@@ -130,6 +130,20 @@ class BuildingFactory {
 
         this.game.map[building.x][building.y] = 0;
         this.game.tiles[building.x][building.y] = 0;
+
+
+        Object.keys(this.game.cities[this.game.player.city].canBuild).forEach((id) => {
+
+            var tempId = LABELS[id].TYPE;
+            console.log(tempId + " " + this.game.isBuilding);
+            if (parseInt(tempId) == building.type) {
+
+                if (tempId != CAN_BUILD_HOUSE) {
+                    this.game.cities[this.game.player.city].canBuild[id] = CAN_BUILD;
+                }
+            }
+        });
+
 
         var returnBuilding = building.next;
 
@@ -165,10 +179,6 @@ class BuildingFactory {
         if (building.type == BUILDING_COMMAND_CENTER) {
             return;
         }
-
-        this.game.map[building.x][building.y] = MAP_SQUARE_BUILDING;
-        this.game.tiles[building.x][building.y] = this.game.isBuilding;
-
 
         Object.keys(this.game.cities[this.game.player.city].canBuild).forEach((id) => {
 
