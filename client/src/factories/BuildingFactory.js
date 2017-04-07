@@ -69,7 +69,7 @@ class BuildingFactory {
             if (!result) {
                 // Remove the building?
             }
-        })
+        });
 
         if (this.buildingListHead) {
             this.buildingListHead.previous = building;
