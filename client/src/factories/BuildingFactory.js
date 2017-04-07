@@ -1,5 +1,41 @@
 import {checkBuildingCollision} from "../collision/collision-building";
-class BulletFactory {
+import {LABELS} from "../constants";
+import {CAN_BUILD_HOUSE} from "../constants";
+import {HAS_BUILT} from "../constants";
+import {MAP_SQUARE_BUILDING} from "../constants";
+import {CAN_BUILD} from "../constants";
+import {DEPENDENCY_TREE} from "../constants";
+import {DEPENDENCY_TREE} from "../constants";
+import _ from '../../node_modules/underscore/underscore-min'
+import {BUILDING_COMMAND_CENTER} from "../constants";
+
+var unflatten = function (array, parent, tree) {
+
+    tree = typeof tree !== 'undefined' ? tree : [];
+    parent = typeof parent !== 'undefined' ? parent : {id: 0};
+
+    var children = _.filter(array, function (child) {
+        return child.parentid == parent.id;
+    });
+
+    if (!_.isEmpty(children)) {
+        if (parent.id == 0) {
+            tree = children;
+        } else {
+            parent['children'] = children;
+        }
+        _.each(children, function (child) {
+            unflatten(array, child)
+        });
+    }
+
+    return tree;
+};
+
+
+var dependencyTree = unflatten(DEPENDENCY_TREE);
+
+class BuildingFactory {
 
     constructor(game) {
         this.game = game
@@ -40,6 +76,7 @@ class BulletFactory {
             building.next = this.buildingListHead
         }
 
+        this.adjustAllowedBuilds(building)
         console.log("Created building");
         console.log(building);
 
@@ -109,6 +146,60 @@ class BulletFactory {
         return returnBuilding;
     }
 
+    searchTree(element, matchingId) {
+        if (element.id == matchingId) {
+            return element;
+        } else if (element.children != null) {
+            var i;
+            var result = null;
+            for (i = 0; result == null && i < element.children.length; i++) {
+                result = this.searchTree(element.children[i], matchingId);
+            }
+            return result;
+        }
+        return null;
+    }
+
+    adjustAllowedBuilds(building) {
+
+        if (building.type == BUILDING_COMMAND_CENTER) {
+            return;
+        }
+
+        this.game.map[building.x][building.y] = MAP_SQUARE_BUILDING;
+        this.game.tiles[building.x][building.y] = this.game.isBuilding;
+
+
+        Object.keys(this.game.cities[this.game.player.city].canBuild).forEach((id) => {
+
+            var tempId = LABELS[id].TYPE;
+            console.log(tempId + " " + this.game.isBuilding);
+            if (parseInt(tempId) == this.game.isBuilding) {
+
+                if (tempId != CAN_BUILD_HOUSE) {
+                    this.game.cities[this.game.player.city].canBuild[id] = HAS_BUILT;
+                }
+
+                var node = this.searchTree(dependencyTree[0], tempId);
+                if (node && node.children) {
+                    node.children.forEach((item) => {
+                        Object.keys(this.game.cities[this.game.player.city].canBuild).forEach((id) => {
+
+
+                            if (this.game.cities[this.game.player.city].canBuild[id] !== HAS_BUILT) {
+                                var tempId = LABELS[id].TYPE;
+                                console.log("finding children" + tempId + " " + item.id);
+                                if (parseInt(tempId) == item.id) {
+                                    this.game.cities[this.game.player.city].canBuild[id] = CAN_BUILD;
+                                }
+                            }
+                        });
+                    })
+                }
+            }
+        });
+    }
+
 
     getHead() {
         return this.buildingListHead;
@@ -116,4 +207,4 @@ class BulletFactory {
 }
 
 
-export default BulletFactory;
+export default BuildingFactory;

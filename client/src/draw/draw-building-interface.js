@@ -1,50 +1,8 @@
-import {MAP_SQUARE_BUILDING} from "../constants";
 import {LABELS} from "../constants";
-import {CAN_BUILD_HOUSE} from "../constants";
-import {HAS_BUILT} from "../constants";
 import {CAN_BUILD} from "../constants";
 
-import _ from '../../node_modules/underscore/underscore-min'
-import {DEPENDENCY_TREE} from "../constants";
 
 var menuContainer = new PIXI.Container();
-
-var unflatten = function (array, parent, tree) {
-
-    tree = typeof tree !== 'undefined' ? tree : [];
-    parent = typeof parent !== 'undefined' ? parent : {id: 0};
-
-    var children = _.filter(array, function (child) {
-        return child.parentid == parent.id;
-    });
-
-    if (!_.isEmpty(children)) {
-        if (parent.id == 0) {
-            tree = children;
-        } else {
-            parent['children'] = children;
-        }
-        _.each(children, function (child) {
-            unflatten(array, child)
-        });
-    }
-
-    return tree;
-};
-
-function searchTree(element, matchingId) {
-    if (element.id == matchingId) {
-        return element;
-    } else if (element.children != null) {
-        var i;
-        var result = null;
-        for (i = 0; result == null && i < element.children.length; i++) {
-            result = searchTree(element.children[i], matchingId);
-        }
-        return result;
-    }
-    return null;
-}
 
 
 function buildDemolishMenuItem(game) {
@@ -78,7 +36,6 @@ function buildDemolishMenuItem(game) {
     menuContainer.addChild(basicText);
 }
 
-var dependencyTree = unflatten(DEPENDENCY_TREE);
 
 export const setupBuildingMenu = (game) => {
 
@@ -194,41 +151,8 @@ function addBuilding(game) {
         var x = Math.floor((game.player.offset.x - game.player.defaultOffset.x + offTileX + event.data.global.x) / 48);
         var y = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + event.data.global.y) / 48);
 
-        if (game.buildingFactory.newBuilding(null, x, y, game.isBuilding)) {
-            game.map[x][y] = MAP_SQUARE_BUILDING;
-            game.tiles[x][y] = game.isBuilding;
+        game.buildingFactory.newBuilding(null, x, y, game.isBuilding);
 
-
-            Object.keys(game.cities[game.player.city].canBuild).forEach((id) => {
-
-                var tempId = LABELS[id].TYPE;
-                console.log(tempId + " " + game.isBuilding);
-                if (parseInt(tempId) == game.isBuilding) {
-
-                    if (tempId != CAN_BUILD_HOUSE) {
-                        game.cities[game.player.city].canBuild[id] = HAS_BUILT;
-                    }
-
-                    var node = searchTree(dependencyTree[0], tempId);
-                    if (node && node.children) {
-                        node.children.forEach((item) => {
-                            Object.keys(game.cities[game.player.city].canBuild).forEach((id) => {
-
-
-                                if (game.cities[game.player.city].canBuild[id] !== HAS_BUILT) {
-                                    var tempId = LABELS[id].TYPE;
-                                    console.log("finding children" + tempId + " " + item.id)
-                                    if (parseInt(tempId) == item.id) {
-                                        game.cities[game.player.city].canBuild[id] = CAN_BUILD;
-                                    }
-                                }
-                            });
-                        })
-                    }
-                }
-            });
-
-        }
 
         this.data = null;
         game.isBuilding = false;
