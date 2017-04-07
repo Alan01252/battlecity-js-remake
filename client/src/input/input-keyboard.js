@@ -52,7 +52,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         shift = keyboard(16),
         u = keyboard(85),
         o = keyboard(79),
-        d = keyboard(68);
+        d = keyboard(68),
+        s = keyboard(83);
 
 
     left.press = function () {
@@ -86,6 +87,11 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
 
     u.press = function () {
         game.iconFactory.pickupIcon();
+    };
+
+    s.press = function () {
+        console.log("Generating building output");
+        game.buildingFactory.outputBuildings();
     };
 
     d.press = function () {

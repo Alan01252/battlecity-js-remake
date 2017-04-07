@@ -47,8 +47,53 @@ class BulletFactory {
         return building;
     }
 
+    outputBuildings() {
+        console.log("here");
+        var buildingNode = this.getHead();
+
+        while (buildingNode) {
+
+            if (buildingNode.type !== 0) {
+                console.log(buildingNode.type + "," + buildingNode.x + "," + buildingNode.y);
+            }
+
+            buildingNode = buildingNode.next;
+        }
+
+        return false;
+    }
+
+    demolishBuilding(x, y) {
+
+        console.log("Trying to demolish building at " + x + " " + y);
+
+        var buildingNode = this.getHead();
+
+        while (buildingNode) {
+
+            if (buildingNode.type !== 0) {
+
+                console.log(buildingNode.x + " " + buildingNode.y);
+
+                if (x >= buildingNode.x &&
+                    x <= buildingNode.x + 3 &&
+                    y >= buildingNode.y &&
+                    y <= buildingNode.y + 3
+                ) {
+                    this.game.forceDraw = true;
+                    this.deleteBuilding(buildingNode)
+                }
+            }
+            buildingNode = buildingNode.next;
+        }
+    }
 
     deleteBuilding(building) {
+
+
+        this.game.map[building.x][building.y] = 0;
+        this.game.tiles[building.x][building.y] = 0;
+
         var returnBuilding = building.next;
 
         if (building.next) {
@@ -58,7 +103,7 @@ class BulletFactory {
         if (building.previous) {
             building.previous.next = building.next
         } else {
-            this.bulletListHead = building.next;
+            this.buildingListHead = building.next;
         }
 
         return returnBuilding;

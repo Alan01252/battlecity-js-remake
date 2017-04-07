@@ -36,6 +36,7 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
     var baseType = parseInt(type / 100);
 
 
+
     var tmpText = new PIXI.Texture(
         game.textures['buildings'].baseTexture,
         new PIXI.Rectangle(0, baseType * 144, 144, 144, 144)
@@ -43,10 +44,12 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
 
     backgroundTiles.addFrame(tmpText, i * 48, j * 48, 1, 0);
 
-    var tmpText = new PIXI.Texture(
-        game.textures['imageItems'].baseTexture,
-        new PIXI.Rectangle(subType * 32, 0, 32, 32)
-    );
+    try {
+        var tmpText = new PIXI.Texture(
+            game.textures['imageItems'].baseTexture,
+            new PIXI.Rectangle(subType * 32, 0, 32, 32)
+        );
+    }catch (ex) {}
 
     console.log(i);
     console.log(j);

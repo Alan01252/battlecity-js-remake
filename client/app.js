@@ -26,8 +26,6 @@ import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 
 
-
-
 var type = "WebGL";
 
 if (!PIXI.utils.isWebGLSupported()) {
@@ -36,6 +34,11 @@ if (!PIXI.utils.isWebGLSupported()) {
 
 
 var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
+
+app.renderer.plugins.interaction.cursorStyles = {
+    'demolish': 'url(data/imgDemolish.png), auto',
+    'cursor': 'url(data/imgCursor.png), auto',
+};
 
 document.getElementById("game").appendChild(app.view);
 
@@ -49,8 +52,6 @@ var groundTiles = null;
 var backgroundTiles = null;
 var iconTiles = null;
 var itemTiles = null;
-
-var menuContainer = null;
 
 const game = {
     map: [],
@@ -89,6 +90,7 @@ const game = {
             vy: 0
         }
     },
+    app: app,
     stage: app.stage,
     objectContainer: objectContainer
 };
@@ -114,7 +116,8 @@ PIXI.loader
         "data/imgInventorySelection.png",
         "data/skins/BattleCityDX/imgTurretBase.png",
         "data/skins/BattleCityDX/imgTurretHead.png",
-        {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
+        {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"},
+        {url: "data/cities/Balkh/demo.city", loadType: 1, xhrType: "text"}
     ])
     .on("progress", loadProgressHandler)
     .load(setup);
@@ -135,8 +138,8 @@ function setup() {
     mapBuilder.build(game, mapData);
     cityBuilder.build(game);
 
-    game.player.offset.x = game.cities[0].x + 48;
-    game.player.offset.y = game.cities[0].y + 100;
+    game.player.offset.x = game.cities[game.player.city].x + 48;
+    game.player.offset.y = game.cities[game.player.city].y + 100;
 
     game.textures['groundTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgGround.png"];
     game.textures['tankTexture'] = PIXI.utils.TextureCache["data/imgTanks.png"];
@@ -171,34 +174,34 @@ function setup() {
     itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
 
 
-    app.stage.addChild(groundTiles);
-    app.stage.addChild(backgroundTiles);
-    app.stage.addChild(itemTiles);
-    app.stage.addChild(iconTiles);
-    app.stage.addChild(objectContainer);
-    app.stage.addChild(panelContainer);
+     app.stage.addChild(groundTiles);
+     app.stage.addChild(backgroundTiles);
+     app.stage.addChild(itemTiles);
+     app.stage.addChild(iconTiles);
+     app.stage.addChild(objectContainer);
+     app.stage.addChild(panelContainer);
 
 
-    game.iconFactory.newIcon(null, 1304, 1540, 12);
-    game.itemFactory.newItem(null, 1500, 1800, 12);
+     game.iconFactory.newIcon(null, 1304, 1540, 12);
+     game.itemFactory.newItem(null, 1500, 1800, 12);
 
-    setupBuildingMenu(game);
+     setupBuildingMenu(game);
 
-    game.forceDraw = true;
-
-
-    drawGround(game, groundTiles);
-    drawTiles(game, backgroundTiles);
-    drawIcons(game, iconTiles);
-    drawItems(game, itemTiles);
-
-    drawPanelInterface(game, panelContainer);
+     game.forceDraw = true;
 
 
-    game.forceDraw = false;
+     drawGround(game, groundTiles);
+     drawTiles(game, backgroundTiles);
+     drawIcons(game, iconTiles);
+     drawItems(game, itemTiles);
+
+     drawPanelInterface(game, panelContainer);
 
 
-    gameLoop();
+     game.forceDraw = false;
+
+
+     gameLoop();
 }
 
 
