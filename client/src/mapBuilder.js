@@ -52,7 +52,6 @@ function populateTiles(game, mapData) {
         }
     }
 
-    var buildings = 0;
     // i == y axis
     for (var j = 0; j < game.map.length; j++) {
         // j === x axis

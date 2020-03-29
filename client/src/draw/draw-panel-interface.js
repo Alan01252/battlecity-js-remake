@@ -79,9 +79,11 @@ var drawItems = (game, stage) => {
             iconSprite.y = y;
 
             iconSprite.interactive = true;
+            iconSprite.buttonMode = true;
 
             const iconClosure = icon;
             iconSprite.on('mousedown', (event) => {
+                console.log("selecting item")
                 event.stopPropagation();
                 console.log("selecting item")
                 game.iconFactory.toggleSelected(iconClosure);

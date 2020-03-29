@@ -1,11 +1,13 @@
 export const setupMouseInputs = (game) => {
 
-    game.stage.hitArea = new PIXI.Rectangle(0, 0, game.maxMapX, game.maxMapY);
+    let gameArea = new PIXI.Container();
+    gameArea.hitArea = new PIXI.Rectangle(0, 0, game.maxMapX, game.maxMapY);
 
-    game.stage.interactive = true;
-    game.stage.cursor = 'cursor';
+    gameArea.interactive = true;
+    gameArea.cursor = 'cursor';
+    game.stage.addChild(gameArea);
 
-    game.stage.on('mousedown', (event) => {
+    gameArea.on('mousedown', (event) => {
         console.log("Got mouse down event");
         if (!game.isDemolishing) {
             game.showBuildMenu = !game.showBuildMenu;
