@@ -11,3 +11,15 @@ https://alanhollis.com/battlecity-js-remake/
 Arrow Keys move, Shift to shoot
 
 Multiplayer will not run without a server running and js changed
+
+# Development
+
+## Client
+
+- cd ./client
+- npm run serve
+
+## Server
+
+- cd ./server
+- node app.js
