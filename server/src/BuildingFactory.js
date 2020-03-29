@@ -14,7 +14,6 @@ class BuildingFactory {
     }
 
     cycle() {
-        console.log("In building cycle");
         this.buildings.forEach((building) => {
             building.cycle();
         });

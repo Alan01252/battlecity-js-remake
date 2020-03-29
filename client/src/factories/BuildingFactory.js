@@ -2,9 +2,7 @@ import {checkBuildingCollision} from "../collision/collision-building";
 import {LABELS} from "../constants";
 import {CAN_BUILD_HOUSE} from "../constants";
 import {HAS_BUILT} from "../constants";
-import {MAP_SQUARE_BUILDING} from "../constants";
 import {CAN_BUILD} from "../constants";
-import {DEPENDENCY_TREE} from "../constants";
 import {DEPENDENCY_TREE} from "../constants";
 import _ from '../../node_modules/underscore/underscore-min'
 import {BUILDING_COMMAND_CENTER} from "../constants";

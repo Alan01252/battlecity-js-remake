@@ -11,13 +11,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "eventemitter2": "^4.0.0",
-    "pixi.js": "^4.4.3",
-    "socket.io": "^1.7.3",
-    "underscore": "^1.8.3"
+    "eventemitter2": "^6.0.0",
+    "pixi.js": "^5.1.6",
+    "socket.io": "^2.2.0",
+    "underscore": "^1.9.2"
   },
   "devDependencies": {
-    "webpack": "^2.3.2",
-    "webpack-dev-server": "^2.4.2"
+    "webpack": "^4.42.1",
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.10.3"
   }
 }

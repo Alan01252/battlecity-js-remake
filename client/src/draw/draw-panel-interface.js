@@ -8,6 +8,9 @@ import {ITEM_TYPE_BOMB} from "../constants";
 
 var drawPanel = (game, stage) => {
 
+    console.log("Drawing panel");
+    console.log(game.maxMapX);
+
     var interfaceTop = new PIXI.Sprite(game.textures["interfaceTop"]);
     interfaceTop.x = game.maxMapX;
     interfaceTop.y = 0;

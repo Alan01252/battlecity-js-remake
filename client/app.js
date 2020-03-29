@@ -33,7 +33,10 @@ if (!PIXI.utils.isWebGLSupported()) {
 }
 
 
-var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
+var app = new PIXI.Application({
+    width:RESOLUTION_X, 
+    height:RESOLUTION_Y
+});
 
 app.renderer.plugins.interaction.cursorStyles = {
     'demolish': 'url(data/imgDemolish.png), auto',
