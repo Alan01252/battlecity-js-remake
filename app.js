@@ -234,7 +234,6 @@ function gameLoop() {
     drawPanelInterface(game, panelContainer);
     play(game);
 
-
     app.renderer.plugins.tilemap.tileAnim[0] = tileAnim * 144;
 
     game.forceDraw = false;
