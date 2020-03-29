@@ -6,7 +6,7 @@
   "scripts": {
     "start": "webpack --config webpack.config.js",
     "serve": "webpack-dev-server",
-    "deploy-client": "webpack && gh-pages -d ./"
+    "deploy-client": "webpack && ./node_modules/.bin/gh-pages -d ./"
   },
   "author": "",
   "license": "ISC",
@@ -17,6 +17,7 @@
     "underscore": "^1.9.2"
   },
   "devDependencies": {
+    "gh-pages": "^2.2.0",
     "webpack": "^4.42.1",
     "webpack-cli": "^3.3.11",
     "webpack-dev-server": "^3.10.3"
