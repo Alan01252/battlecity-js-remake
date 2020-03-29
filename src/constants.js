@@ -66,6 +66,7 @@ export const ITEM_TYPE_WALL = 8;
 export const ITEM_TYPE_TURRET = 9;
 export const ITEM_TYPE_SLEEPER = 10;
 export const ITEM_TYPE_PLASMA = 11;
+export const ITEM_TYPE_LASER = 12;
 
 export const DEPENDENCY_TREE = [
     {'id': CAN_BUILD_HOUSE, 'parentid': 0},

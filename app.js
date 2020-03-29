@@ -1,4 +1,6 @@
 import * as mapBuilder from "./src/mapBuilder";
+import * as cityBuilder from "./src/cityBuilder";
+
 import {play} from './src/play';
 import {RESOLUTION_X} from "./src/constants";
 import {RESOLUTION_Y} from "./src/constants";
@@ -24,11 +26,6 @@ import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 
 
-import {CAN_BUILD} from "./src/constants";
-import {CANT_BUILD} from "./src/constants";
-import {ITEM_TYPE_TURRET} from "./src/constants";
-
-
 var type = "WebGL";
 
 if (!PIXI.utils.isWebGLSupported()) {
@@ -36,7 +33,15 @@ if (!PIXI.utils.isWebGLSupported()) {
 }
 
 
-var app = new PIXI.Application(RESOLUTION_X, RESOLUTION_Y);
+var app = new PIXI.Application({
+    width:RESOLUTION_X, 
+    height:RESOLUTION_Y
+});
+
+app.renderer.plugins.interaction.cursorStyles = {
+    'demolish': 'url(data/imgDemolish.png), auto',
+    'cursor': 'url(data/imgCursor.png), auto',
+};
 
 document.getElementById("game").appendChild(app.view);
 
@@ -51,8 +56,6 @@ var backgroundTiles = null;
 var iconTiles = null;
 var itemTiles = null;
 
-var menuContainer = null;
-
 const game = {
     map: [],
     tiles: [],
@@ -63,6 +66,7 @@ const game = {
     textures: [],
     maxMapX: RESOLUTION_X - 200,
     maxMapY: RESOLUTION_Y,
+    maxCities: 0,
     otherPlayers: {},
     showBuildMenu: false,
     buildMenuOffset: {
@@ -70,32 +74,10 @@ const game = {
         y: (RESOLUTION_Y / 2)
     },
     buildings: {},
+    cities: [],
     player: {
         id: -1,
-        city: {
-            canBuild: {
-
-                CAN_BUILD_HOUSE: CAN_BUILD,
-
-                CAN_BUILD_LASER_RESEARCH: CAN_BUILD,
-                CAN_BUILD_TURRET_RESEARCH: CAN_BUILD,
-                CAN_BUILD_BOMB_RESEARCH: CANT_BUILD,
-                CAN_BUILD_MEDKIT_RESEARCH: CANT_BUILD,
-                CAN_BUILD_MINE_RESEARCH: CANT_BUILD,
-                CAN_BUILD_ORB_RESEARCH: CANT_BUILD,
-                CAN_BUILD_COUGAR_RESEARCH: CANT_BUILD,
-
-                CAN_BUILD_LASER_FACTORY: CANT_BUILD,
-                CAN_BUILD_TURRET_FACTORY: CANT_BUILD,
-                CAN_BUILD_BOMB_FACTORY: CANT_BUILD,
-                CAN_BUILD_MEDKIT_FACTORY: CANT_BUILD,
-                CAN_BUILD_MINE_FACTORY: CANT_BUILD,
-                CAN_BUILD_ORB_FACTORY: CANT_BUILD,
-                CAN_BUILD_COUGAR_FACTORY: CANT_BUILD,
-
-
-            }
-        },
+        city: 0,
         health: MAX_HEALTH,
         isTurning: 0,
         timeTurn: 0,
@@ -105,12 +87,13 @@ const game = {
             y: (RESOLUTION_Y / 2)
         },
         offset: {
-            x: 1600,
-            y: 1800,
+            x: 0,
+            y: 0,
             vx: 0,
             vy: 0
         }
     },
+    app: app,
     stage: app.stage,
     objectContainer: objectContainer
 };
@@ -136,7 +119,8 @@ PIXI.loader
         "data/imgInventorySelection.png",
         "data/skins/BattleCityDX/imgTurretBase.png",
         "data/skins/BattleCityDX/imgTurretHead.png",
-        {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"}
+        {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"},
+        {url: "data/cities/Balkh/demo.city", loadType: 1, xhrType: "text"}
     ])
     .on("progress", loadProgressHandler)
     .load(setup);
@@ -155,6 +139,10 @@ function setup() {
 
     var mapData = PIXI.loader.resources["data/map.dat"].data;
     mapBuilder.build(game, mapData);
+    cityBuilder.build(game);
+
+    game.player.offset.x = game.cities[game.player.city].x + 48;
+    game.player.offset.y = game.cities[game.player.city].y + 100;
 
     game.textures['groundTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgGround.png"];
     game.textures['tankTexture'] = PIXI.utils.TextureCache["data/imgTanks.png"];
@@ -189,34 +177,34 @@ function setup() {
     itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
 
 
-    app.stage.addChild(groundTiles);
-    app.stage.addChild(backgroundTiles);
-    app.stage.addChild(itemTiles);
-    app.stage.addChild(iconTiles);
-    app.stage.addChild(objectContainer);
-    app.stage.addChild(panelContainer);
+     app.stage.addChild(groundTiles);
+     app.stage.addChild(backgroundTiles);
+     app.stage.addChild(itemTiles);
+     app.stage.addChild(iconTiles);
+     app.stage.addChild(objectContainer);
+     app.stage.addChild(panelContainer);
 
 
-    game.iconFactory.newIcon(null, 1600, 1800, ITEM_TYPE_TURRET);
-    game.itemFactory.newItem(null, 1500, 1800, ITEM_TYPE_TURRET);
+     game.iconFactory.newIcon(null, 1304, 1540, 12);
+     game.itemFactory.newItem(null, 1500, 1800, 12);
 
-    setupBuildingMenu(game);
+     setupBuildingMenu(game);
 
-    game.forceDraw = true;
-
-
-    drawGround(game, groundTiles);
-    drawTiles(game, backgroundTiles);
-    drawIcons(game, iconTiles);
-    drawItems(game, itemTiles);
-
-    drawPanelInterface(game, panelContainer);
+     game.forceDraw = true;
 
 
-    game.forceDraw = false;
+     drawGround(game, groundTiles);
+     drawTiles(game, backgroundTiles);
+     drawIcons(game, iconTiles);
+     drawItems(game, itemTiles);
+
+     drawPanelInterface(game, panelContainer);
 
 
-    gameLoop();
+     game.forceDraw = false;
+
+
+     gameLoop();
 }
 
 
@@ -239,10 +227,10 @@ function gameLoop() {
     setupBuildingMenu(game);
     drawGround(game, groundTiles);
     drawTiles(game, backgroundTiles);
-    drawIcons(game, iconTiles);
     drawItems(game, itemTiles);
     drawChanging(game);
     drawBuilding(game);
+    drawIcons(game, iconTiles);
     drawPanelInterface(game, panelContainer);
     play(game);
 
@@ -256,7 +244,6 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 
     if (game.tick > tileAnimationTick) {
-        console.log("Updating animation");
         tileAnimationTick = game.tick + 300;
 
         tileAnim = tileAnim + 1;

@@ -93,10 +93,14 @@ export const checkTiles = (game, rect) => {
 
     if (left && right && top && bottom) {
         //Map Terrain (lava, rocks)
-        if (map[left][top] != 0 && map[left][top] != 3) return COLLISION_BLOCKING;
-        if (map[left][bottom] != 0 && map[left][bottom] != 3) return COLLISION_BLOCKING;
-        if (map[right][top] != 0 && map[right][top] != 3) return COLLISION_BLOCKING;
-        if (map[right][bottom] != 0 && map[right][bottom] != 3) return COLLISION_BLOCKING;
+        try {
+            if (map[left][top] != 0 && map[left][top] != 3) return COLLISION_BLOCKING;
+            if (map[left][bottom] != 0 && map[left][bottom] != 3) return COLLISION_BLOCKING;
+            if (map[right][top] != 0 && map[right][top] != 3) return COLLISION_BLOCKING;
+            if (map[right][bottom] != 0 && map[right][bottom] != 3) return COLLISION_BLOCKING;
+        }catch (ex) {
+            console.error("Invalid map reference")
+        }
     }
 
     return false;

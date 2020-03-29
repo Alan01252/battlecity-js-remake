@@ -55,7 +55,6 @@ class BulletFactory {
 
 
             if (collidedWithCurrentPlayer(this.game, bullet)) {
-                console.log("Bullet collided with me");
                 bullet.life = BULLET_DEAD;
                 if (bullet.shooter !== this.game.player.id) {
                     if (this.game.player.health > 0) {

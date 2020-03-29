@@ -1,19 +1,31 @@
-
 export const setupMouseInputs = (game) => {
 
     game.stage.hitArea = new PIXI.Rectangle(0, 0, game.maxMapX, game.maxMapY);
 
     game.stage.interactive = true;
-    game.stage.buttonMode = true;
+    game.stage.cursor = 'cursor';
 
     game.stage.on('mousedown', (event) => {
         console.log("Got mouse down event");
-        game.showBuildMenu = !game.showBuildMenu;
-        game.forceDraw = true;
-        console.log(game.showBuildMenu);
-        game.buildMenuOffset = {
-            x: event.data.global.x,
-            y: event.data.global.y
+        if (!game.isDemolishing) {
+            game.showBuildMenu = !game.showBuildMenu;
+            game.forceDraw = true;
+            game.buildMenuOffset = {
+                x: event.data.global.x,
+                y: event.data.global.y
+            }
+        }
+        if (game.isDemolishing) {
+            console.log("Trying to demolish building");
+            var offTileX = Math.floor(game.player.offset.x % 48);
+            var offTileY = Math.floor(game.player.offset.y % 48);
+            var x = Math.floor((game.player.offset.x - game.player.defaultOffset.x + offTileX + event.data.global.x) / 48);
+            var y = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + event.data.global.y) / 48);
+
+            game.buildingFactory.demolishBuilding(x, y);
+
+            game.isDemolishing = false;
+            game.stage.cursor = 'cursor';
         }
     });
 };

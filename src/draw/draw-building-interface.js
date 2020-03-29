@@ -1,53 +1,42 @@
-import {MAP_SQUARE_BUILDING} from "../constants";
 import {LABELS} from "../constants";
-import {CAN_BUILD_HOUSE} from "../constants";
-import {HAS_BUILT} from "../constants";
 import {CAN_BUILD} from "../constants";
+import {MAP_SQUARE_BUILDING} from "../constants";
 
-import _ from '../../node_modules/underscore/underscore-min'
-import {DEPENDENCY_TREE} from "../constants";
 
 var menuContainer = new PIXI.Container();
 
-var unflatten = function (array, parent, tree) {
 
-    tree = typeof tree !== 'undefined' ? tree : [];
-    parent = typeof parent !== 'undefined' ? parent : {id: 0};
+function buildDemolishMenuItem(game) {
+    var click = (e) => {
+        e.stopPropagation();
+        console.log("Setting is demolishing to true");
+        game.isDemolishing = true;
+        game.stage.cursor = 'demolish';
+    };
 
-    var children = _.filter(array, function (child) {
-        return child.parentid == parent.id;
-    });
+    var tmpText = new PIXI.Texture(
+        game.textures['buildingIcons'].baseTexture,
+        new PIXI.Rectangle(13 * 16, 0, 16, 16)
+    );
 
-    if (!_.isEmpty(children)) {
-        if (parent.id == 0) {
-            tree = children;
-        } else {
-            parent['children'] = children;
-        }
-        _.each(children, function (child) {
-            unflatten(array, child)
-        });
-    }
+    var buildIcon = new PIXI.Sprite(tmpText);
+    buildIcon.x = game.buildMenuOffset.x - 16;
+    buildIcon.y = game.buildMenuOffset.y;
+    buildIcon.interactive = true;
+    buildIcon.iconType = 13;
+    buildIcon.on('mousedown', click);
 
-    return tree;
-};
 
-function searchTree(element, matchingId) {
-    if (element.id == matchingId) {
-        return element;
-    } else if (element.children != null) {
-        var i;
-        var result = null;
-        for (i = 0; result == null && i < element.children.length; i++) {
-            result = searchTree(element.children[i], matchingId);
-        }
-        return result;
-    }
-    return null;
+    var basicText = new PIXI.Text("Demolish building", {fontSize: 12, fill: 0xFFFFFF});
+    basicText.x = game.buildMenuOffset.x;
+    basicText.y = game.buildMenuOffset.y;
+    basicText.interactive = true;
+    basicText.on('mousedown', click);
+
+    menuContainer.addChild(buildIcon);
+    menuContainer.addChild(basicText);
 }
 
-
-var dependencyTree = unflatten(DEPENDENCY_TREE);
 
 export const setupBuildingMenu = (game) => {
 
@@ -57,14 +46,13 @@ export const setupBuildingMenu = (game) => {
         menuContainer.removeChildren();
 
 
-        var canBuild = game.player.city.canBuild;
+        var canBuild = game.cities[game.player.city].canBuild;
+        var canBuildList = Object.keys(canBuild);
 
 
-        var canBuildList = Object.keys(game.player.city.canBuild);
+        var y = 1;
 
-
-        var y = 0;
-        canBuildList.forEach((id, index) => {
+        canBuildList.forEach((id) => {
             if (canBuild[id] == CAN_BUILD) {
                 y++
             }
@@ -78,14 +66,17 @@ export const setupBuildingMenu = (game) => {
         graphics.endFill();
         menuContainer.addChild(graphics);
 
-        y = 0;
+        buildDemolishMenuItem(game);
+
+        y = 1;
         canBuildList.forEach((id, index) => {
 
             if (canBuild[id] == CAN_BUILD) {
                 var buildingType = LABELS[id].TYPE;
 
 
-                var click = () => {
+                var click = (e) => {
+                    e.stopPropagation();
                     game.isBuilding = buildingType;
                 };
 
@@ -124,86 +115,47 @@ export const setupBuildingMenu = (game) => {
     game.stage.addChild(menuContainer);
 };
 
-export const drawBuilding = (game) => {
+function addBuilding(game) {
 
+    game.isDragging = true;
+    var tmpText = new PIXI.Texture(
+        game.textures['buildings'].baseTexture,
+        new PIXI.Rectangle(0, parseInt(game.isBuilding / 100) * 144, 144, 144)
+    );
 
-    if (!game.isDragging) {
-        menuContainer.visible = game.showBuildMenu;
+    var building = new PIXI.Sprite(tmpText);
+    building.x = game.buildMenuOffset.x;
+    building.y = game.buildMenuOffset.y;
+    building.alpha = 0.5;
+    building.interactive = true;
+    building.buttonMode = true;
+
+    game.stage.addChild(building);
+
+    building
+        .on('pointerdown', onDragStart)
+        .on('pointerup', onDragEnd)
+        .on('pointerupoutside', onDragEnd)
+        .on('pointermove', onDragMove);
+
+    function onDragStart(event) {
+        this.data = event.data;
+        this.alpha = 0.5;
+        this.dragging = true;
     }
 
-    if (game.isBuilding && !game.isDragging) {
+    function onDragEnd(event) {
 
 
-        game.isDragging = true;
-        var tmpText = new PIXI.Texture(
-            game.textures['buildings'].baseTexture,
-            new PIXI.Rectangle(0, parseInt(game.isBuilding / 100) * 144, 144, 144)
-        );
+        var offTileX = Math.floor(game.player.offset.x % 48);
+        var offTileY = Math.floor(game.player.offset.y % 48);
+        var x = Math.floor((game.player.offset.x - game.player.defaultOffset.x + offTileX + event.data.global.x) / 48);
+        var y = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + event.data.global.y) / 48);
 
-        var building = new PIXI.Sprite(tmpText);
-        building.x = game.buildMenuOffset.x;
-        building.y = game.buildMenuOffset.y;
-        building.alpha = 0.5;
-        building.interactive = true;
-        building.buttonMode = true;
+        if (game.buildingFactory.newBuilding(null, x, y, game.isBuilding)) {
+            game.map[x][y] = MAP_SQUARE_BUILDING;
+            game.tiles[x][y] = game.isBuilding;
 
-        game.stage.addChild(building);
-
-        building
-            .on('pointerdown', onDragStart)
-            .on('pointerup', onDragEnd)
-            .on('pointerupoutside', onDragEnd)
-            .on('pointermove', onDragMove);
-
-        function onDragStart(event) {
-            this.data = event.data;
-            this.alpha = 0.5;
-            this.dragging = true;
-        }
-
-        function onDragEnd(event) {
-
-
-            var offTileX = Math.floor(game.player.offset.x % 48);
-            var offTileY = Math.floor(game.player.offset.y % 48);
-            var x = Math.floor((game.player.offset.x - game.player.defaultOffset.x + offTileX + event.data.global.x) / 48);
-            var y = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + event.data.global.y) / 48);
-
-            if (game.buildingFactory.newBuilding(null, x, y, game.isBuilding)) {
-                game.map[x][y] = MAP_SQUARE_BUILDING;
-                game.tiles[x][y] = game.isBuilding;
-
-
-                Object.keys(game.player.city.canBuild).forEach((id) => {
-
-                    var tempId = LABELS[id].TYPE;
-                    console.log(tempId + " " + game.isBuilding);
-                    if (parseInt(tempId) == game.isBuilding) {
-
-                        if (tempId != CAN_BUILD_HOUSE) {
-                            game.player.city.canBuild[id] = HAS_BUILT;
-                        }
-
-                        var node = searchTree(dependencyTree[0], tempId);
-                        if (node && node.children) {
-                            node.children.forEach((item) => {
-                                Object.keys(game.player.city.canBuild).forEach((id) => {
-
-
-                                    if (game.player.city.canBuild[id] !== HAS_BUILT) {
-                                        var tempId = LABELS[id].TYPE;
-                                        console.log("finding children" + tempId + " " + item.id)
-                                        if (parseInt(tempId) == item.id) {
-                                            game.player.city.canBuild[id] = CAN_BUILD;
-                                        }
-                                    }
-                                });
-                            })
-                        }
-                    }
-                });
-
-            }
 
             this.data = null;
             game.isBuilding = false;
@@ -214,16 +166,26 @@ export const drawBuilding = (game) => {
             building.dragging = false;
             building.destroy();
         }
-
-        function onDragMove() {
-            if (this.dragging) {
-                var newPosition = this.data.getLocalPosition(this.parent);
-                this.x = newPosition.x;
-                this.y = newPosition.y;
-            }
-        }
-
     }
 
+    function onDragMove() {
+        if (this.dragging) {
+            var newPosition = this.data.getLocalPosition(this.parent);
+            this.x = newPosition.x;
+            this.y = newPosition.y;
+        }
+    }
+}
+
+export const drawBuilding = (game) => {
+
+
+    if (!game.isDragging && !game.isDemolishing) {
+        menuContainer.visible = game.showBuildMenu;
+    }
+
+    if (game.isBuilding && !game.isDragging) {
+        addBuilding(game);
+    }
 
 };

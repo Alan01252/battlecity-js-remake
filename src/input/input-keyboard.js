@@ -52,7 +52,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         shift = keyboard(16),
         u = keyboard(85),
         o = keyboard(79),
-        d = keyboard(68);
+        d = keyboard(68),
+        s = keyboard(83);
 
 
     left.press = function () {
@@ -88,6 +89,11 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         game.iconFactory.pickupIcon();
     };
 
+    s.press = function () {
+        console.log("Generating building output");
+        game.buildingFactory.outputBuildings();
+    };
+
     d.press = function () {
 
         var icon = game.iconFactory.dropSelectedIcon();
@@ -103,12 +109,12 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         if (icon) {
             var item = game.itemFactory.newItem(icon, x2, y2, icon.type);
             if (item) {
-                game.player.offset.x += 20;
-                game.player.offset.x += 20;
+                game.player.offset.x += 30;
+                game.player.offset.x += 30;
             }
             // It's not been converted to an item and so is able to be picked up again
             if (!item) {
-                game.iconFactory.newIcon(game.player.id, x2, y2, icon.type)
+                game.iconFactory.newIcon(null, parseInt(x2), parseInt(y2), icon.type)
             }
         }
 
@@ -122,8 +128,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             var angle = game.player.direction;
             var angleInDegrees = (angle / 32) * 360;
 
-            var x = (Math.sin((angleInDegrees * 3.14)/180));
-            var y = (Math.cos((angleInDegrees * 3.14)/180) * -1);
+            var x = (Math.sin((angleInDegrees * 3.14) / 180));
+            var y = (Math.cos((angleInDegrees * 3.14) / 180) * -1);
 
             var x2 = ((game.player.offset.x) + 24) + (x * 30);
             var y2 = ((game.player.offset.y) + 24) + (y * 30);
