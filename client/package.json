@@ -14,7 +14,7 @@
     "eventemitter2": "^6.0.0",
     "pixi.js": "^5.1.6",
     "socket.io": "^2.2.0",
-    "underscore": "^1.9.2"
+    "underscore": "^1.12.1"
   },
   "devDependencies": {
     "gh-pages": "^2.2.0",
