@@ -13,7 +13,7 @@
   "dependencies": {
     "eventemitter2": "^6.0.0",
     "pixi.js": "^5.1.6",
-    "socket.io": "^2.2.0",
+    "socket.io": "^2.5.0",
     "underscore": "^1.9.2"
   },
   "devDependencies": {
