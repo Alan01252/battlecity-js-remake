@@ -1,15 +1,30 @@
 /*jslint node: true */
 "use strict";
 
-var app = require('express')();
-var server = require('http').Server(app);
-var io = require('socket.io')(server);
+var express = require('express');
+var http = require('http');
+var app = express();
+var server = http.createServer(app);
+var { Server } = require('socket.io');
+var io = new Server(server, {
+    cors: {
+        origin: "http://localhost:8020",
+        methods: ["GET", "POST"]
+    }
+});
 
 var PlayerFactory = require('./src/PlayerFactory');
-var BulletFactory = require('./src/PlayerFactory');
+var BulletFactory = require('./src/BulletFactory');
 var BuildingFactory = require('./src/BuildingFactory');
 
-server.listen(8081);
+app.get('/health', (_req, res) => {
+    res.json({ status: 'ok' });
+});
+
+var PORT = process.env.PORT || 8021;
+server.listen(PORT, () => {
+    console.log(`BattleCity server listening on port ${PORT}`);
+});
 
 var game = {
     tick: 0,
@@ -37,4 +52,3 @@ var loop = () => {
     }, 100)
 };
 loop();
-

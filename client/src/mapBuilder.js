@@ -58,7 +58,12 @@ function populateTiles(game, mapData) {
         for (var i = 0; i < game.map.length; i++) {
 
             if ((game.map[i][j] == MAP_SQUARE_BUILDING)) {
-                game.buildingFactory.newBuilding(null, i, j, BUILDING_COMMAND_CENTER);
+                game.buildingFactory.newBuilding(null, i, j, BUILDING_COMMAND_CENTER, {
+                    notifyServer: false,
+                    city: 0,
+                    updateCity: false,
+                    itemsLeft: 0,
+                });
             }
             else if ((game.map[i][j] == MAP_SQUARE_LAVA) || (game.map[i][j] == MAP_SQUARE_ROCK)) {
 

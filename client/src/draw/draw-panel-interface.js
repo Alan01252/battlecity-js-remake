@@ -1,3 +1,5 @@
+import PIXI from '../pixi';
+
 import {MAX_HEALTH} from "../constants";
 import {ITEM_TYPE_TURRET} from "../constants";
 import {ITEM_TYPE_LASER} from "../constants";
@@ -7,10 +9,6 @@ import {ITEM_TYPE_ROCKET} from "../constants";
 import {ITEM_TYPE_BOMB} from "../constants";
 
 var drawPanel = (game, stage) => {
-
-    console.log("Drawing panel");
-    console.log(game.maxMapX);
-
     var interfaceTop = new PIXI.Sprite(game.textures["interfaceTop"]);
     interfaceTop.x = game.maxMapX;
     interfaceTop.y = 0;
@@ -96,6 +94,44 @@ var drawItems = (game, stage) => {
     }
 };
 
+var drawMayorIndicator = (game, stage) => {
+    if (!game.player.isMayor) {
+        return;
+    }
+
+    const badgeContainer = new PIXI.Container();
+    const badge = new PIXI.Graphics();
+    badge.beginFill(0xF1C40F)
+        .lineStyle(2, 0x9C6400)
+        .drawCircle(0, 0, 18)
+        .endFill();
+    badgeContainer.addChild(badge);
+
+    const innerText = new PIXI.Text('M', {
+        fontFamily: 'Arial',
+        fontWeight: 'bold',
+        fontSize: 18,
+        fill: 0x1B2631,
+    });
+    innerText.anchor.set(0.5);
+    badgeContainer.addChild(innerText);
+
+    badgeContainer.x = game.maxMapX + 155;
+    badgeContainer.y = 80;
+    stage.addChild(badgeContainer);
+
+    const label = new PIXI.Text('Mayor', {
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fill: 0xFDFEFE,
+        fontWeight: 'bold',
+    });
+    label.anchor.set(0.5, 0);
+    label.x = badgeContainer.x;
+    label.y = badgeContainer.y + 20;
+    stage.addChild(label);
+};
+
 var drawHealth = (game, stage) => {
 
     var percent = game.player.health / MAX_HEALTH;
@@ -121,6 +157,7 @@ export const drawPanelInterface = (game, panelContainer) => {
         panelContainer.removeChildren();
         drawPanel(game, panelContainer);
         drawHealth(game, panelContainer);
-        drawItems(game, panelContainer)
+        drawItems(game, panelContainer);
+        drawMayorIndicator(game, panelContainer);
     }
 };

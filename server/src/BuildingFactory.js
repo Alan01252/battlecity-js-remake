@@ -1,46 +1,324 @@
-/*jslint node: true */
 "use strict";
 
-var Building = require("./Building");
-var FactoryBuilding = require("./FactoryBuilding");
+const debug = require('debug')('BattleCity:BuildingFactory');
 
-var debug = require('debug')('BattleCity:BuildingFactory');
+const Building = require('./Building');
+const FactoryBuilding = require('./FactoryBuilding');
+const {
+    isHouse,
+    isFactory,
+} = require('./constants');
 
 class BuildingFactory {
-
     constructor(game) {
         this.game = game;
-        this.buildings = [];
+        this.io = null;
+        this.buildings = new Map();
+        this.buildingsBySocket = new Map();
     }
 
-    cycle() {
-        this.buildings.forEach((building) => {
-            building.cycle();
-        });
+    serializeBuilding(building) {
+        const { FACTORY_ITEM_LIMITS } = require('./constants');
+        const limit = FACTORY_ITEM_LIMITS ? FACTORY_ITEM_LIMITS[building.type] : undefined;
+        const produced = building.itemsLeft || 0;
+        const itemsRemaining = limit !== undefined ? Math.max(0, limit - produced) : 0;
+        return {
+            id: building.id,
+            ownerId: building.ownerId,
+            type: building.type,
+            population: building.population,
+            attachedHouseId: building.attachedHouseId || null,
+            x: building.x,
+            y: building.y,
+            city: building.cityId ?? 0,
+            itemsLeft: produced,
+            itemsRemaining,
+            itemLimit: limit,
+            smokeActive: !!building.smokeActive,
+            smokeFrame: building.smokeFrame || 0,
+        };
+    }
+
+    sendSnapshot(socket) {
+        for (const building of this.buildings.values()) {
+            const snapshot = this.serializeBuilding(building);
+            socket.emit('new_building', JSON.stringify(snapshot));
+            socket.emit('population:update', snapshot);
+        }
     }
 
     listen(io) {
+        this.io = io;
 
-        io.on("connection", (socket) => {
-            socket.on('new_building', (building) => {
+        io.on('connection', (socket) => {
+            debug(`Client connected ${socket.id}`);
 
-                debug("Got new building");
-                debug(building);
-                var building = JSON.parse(building);
+            socket.on('new_building', (payload) => {
+                this.handleNewBuilding(socket, payload);
+            });
 
-                var newBuilding = new Building(null, building, socket);
-                debug(newBuilding);
+            socket.on('demolish_building', (payload) => {
+                this.handleDemolish(socket, payload);
+            });
 
-                if (parseInt(newBuilding.type / 100) === 1) {
-                    var factoryBuilding = new FactoryBuilding(this.game, newBuilding, socket);
-                    newBuilding.injectType(factoryBuilding);
-                }
+            socket.on('disconnect', () => {
+                this.removeBuildingsForSocket(socket.id);
+            });
 
-                this.buildings.push(newBuilding);
-
-                socket.broadcast.emit('new_building', building);
-            })
+            this.sendSnapshot(socket);
         });
+    }
+
+    handleNewBuilding(socket, payload) {
+        let buildingData = payload;
+        if (typeof payload === 'string') {
+            try {
+                buildingData = JSON.parse(payload);
+            } catch (error) {
+                debug('Failed to parse building payload', error);
+                return;
+            }
+        }
+
+        buildingData.id = buildingData.id || `${buildingData.x}_${buildingData.y}`;
+        buildingData.ownerId = socket.id;
+        buildingData.city = buildingData.city !== undefined ? buildingData.city : (this.game.players[socket.id]?.city ?? 0);
+        buildingData.itemsLeft = buildingData.itemsLeft || 0;
+
+        const newBuilding = new Building(socket.id, buildingData, socket);
+
+        if (isFactory(newBuilding.type)) {
+            const factory = new FactoryBuilding(this.game, newBuilding);
+            newBuilding.injectType(factory);
+        }
+
+        this.registerBuilding(socket.id, newBuilding);
+
+        if (isHouse(newBuilding.type)) {
+            this.backfillAttachmentsForHouse(newBuilding);
+        } else {
+            this.ensureAttachment(newBuilding);
+        }
+
+        const snapshot = this.serializeBuilding(newBuilding);
+        socket.broadcast.emit('new_building', JSON.stringify(snapshot));
+        this.emitPopulationUpdate(newBuilding);
+    }
+
+    handleDemolish(socket, payload) {
+        let data = payload;
+        if (typeof payload === 'string') {
+            try {
+                data = JSON.parse(payload);
+            } catch (error) {
+                debug('Failed to parse demolish payload', error);
+                return;
+            }
+        }
+
+        if (!data || !data.id) {
+            return;
+        }
+
+        const building = this.buildings.get(data.id);
+        if (!building) {
+            return;
+        }
+
+        if (building.ownerId !== socket.id) {
+            return;
+        }
+
+        this.removeBuilding(building.id);
+    }
+
+    registerBuilding(socketId, building) {
+        this.buildings.set(building.id, building);
+        if (!this.buildingsBySocket.has(socketId)) {
+            this.buildingsBySocket.set(socketId, new Set());
+        }
+        this.buildingsBySocket.get(socketId).add(building.id);
+    }
+
+    removeBuildingsForSocket(socketId) {
+        const ids = this.buildingsBySocket.get(socketId);
+        if (!ids) {
+            return;
+        }
+        this.buildingsBySocket.delete(socketId);
+        ids.forEach((id) => {
+            const building = this.buildings.get(id);
+            if (building) {
+                building.socket = null;
+            }
+        });
+    }
+
+    removeBuilding(id, broadcast = true) {
+        const building = this.buildings.get(id);
+        if (!building) {
+            return;
+        }
+
+        debug(`Removing building ${id}`);
+
+        if (!isHouse(building.type)) {
+            this.detachFromHouse(building);
+        } else {
+            building.attachments.forEach((slot) => {
+                const attached = this.buildings.get(slot.buildingId);
+                if (attached) {
+                    attached.attachedHouseId = null;
+                    attached.population = 0;
+                    this.emitPopulationUpdate(attached);
+                }
+            });
+        }
+
+        this.buildings.delete(id);
+
+        const socketSet = this.buildingsBySocket.get(building.ownerId);
+        if (socketSet) {
+            socketSet.delete(id);
+            if (socketSet.size === 0) {
+                this.buildingsBySocket.delete(building.ownerId);
+            }
+        }
+
+        building.population = 0;
+        this.emitPopulationUpdate(building, true);
+
+        if (broadcast && this.io) {
+            this.io.emit('demolish_building', JSON.stringify({ id }));
+        }
+    }
+
+    cycle() {
+        for (const building of this.buildings.values()) {
+            building.cycle(this.game, this);
+        }
+    }
+
+    ensureAttachment(building) {
+        if (isHouse(building.type)) {
+            return building;
+        }
+
+        if (building.attachedHouseId) {
+            const existingHouse = this.buildings.get(building.attachedHouseId);
+            if (existingHouse && existingHouse.attachments.some((slot) => slot.buildingId === building.id)) {
+                return existingHouse;
+            }
+            building.attachedHouseId = null;
+        }
+
+        const house = this.findAvailableHouse(building.ownerId, building.cityId);
+        if (!house) {
+            return null;
+        }
+
+        this.attachBuildingToHouse(house, building);
+        return house;
+    }
+
+    findAvailableHouse(ownerId, cityId) {
+        let bestHouse = null;
+        for (const candidate of this.buildings.values()) {
+            if (!isHouse(candidate.type)) {
+                continue;
+            }
+            const sameOwner = candidate.ownerId === ownerId;
+            const sameCity = candidate.cityId === cityId;
+            if (!sameCity && !sameOwner) {
+                continue;
+            }
+            if (candidate.attachments.length >= 2) {
+                continue;
+            }
+            if (!bestHouse || candidate.attachments.length < bestHouse.attachments.length) {
+                bestHouse = candidate;
+                if (bestHouse.attachments.length === 0) {
+                    break;
+                }
+            }
+        }
+        return bestHouse;
+    }
+
+    attachBuildingToHouse(house, building) {
+        house.attachments.push({ buildingId: building.id, population: building.population });
+        building.attachedHouseId = house.id;
+        building.cityId = house.cityId;
+        this.updateHousePopulation(house);
+        this.emitPopulationUpdate(building);
+        this.emitPopulationUpdate(house);
+    }
+
+    detachFromHouse(building) {
+        if (!building.attachedHouseId) {
+            return;
+        }
+
+        const house = this.buildings.get(building.attachedHouseId);
+        building.attachedHouseId = null;
+
+        if (!house) {
+            building.population = 0;
+            this.emitPopulationUpdate(building);
+            return;
+        }
+
+        house.attachments = house.attachments.filter((slot) => slot.buildingId !== building.id);
+        this.updateHousePopulation(house);
+        this.emitPopulationUpdate(house);
+
+        building.population = 0;
+        building.itemsLeft = 0;
+        this.emitPopulationUpdate(building);
+    }
+
+    updateHouseAttachment(house, building) {
+        if (!house) {
+            return;
+        }
+
+        const slot = house.attachments.find((item) => item.buildingId === building.id);
+        if (slot) {
+            slot.population = building.population;
+        } else {
+            house.attachments.push({ buildingId: building.id, population: building.population });
+        }
+        this.updateHousePopulation(house);
+        this.emitPopulationUpdate(house);
+    }
+
+    updateHousePopulation(house) {
+        house.population = house.attachments.reduce((total, slot) => total + slot.population, 0);
+    }
+
+    backfillAttachmentsForHouse(house) {
+        for (const building of this.buildings.values()) {
+            if (isHouse(building.type) || building.attachedHouseId) {
+                continue;
+            }
+            if (building.ownerId !== house.ownerId && building.cityId !== house.cityId) {
+                continue;
+            }
+            if (house.attachments.length >= 2) {
+                break;
+            }
+            this.attachBuildingToHouse(house, building);
+            this.emitPopulationUpdate(building);
+        }
+        this.emitPopulationUpdate(house);
+    }
+
+    emitPopulationUpdate(building, removed = false) {
+        if (!this.io) {
+            return;
+        }
+        const payload = { ...this.serializeBuilding(building), removed };
+        this.io.emit('population:update', payload);
     }
 }
 

@@ -1,3 +1,5 @@
+import PIXI from '../pixi';
+
 var getIconsWithinRange = function (iconFactory, player) {
 
     var icon = iconFactory.getHead();

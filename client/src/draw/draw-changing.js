@@ -1,15 +1,80 @@
-import {MAX_HEALTH} from "../constants";
+import PIXI from '../pixi';
 
+const MAYOR_BADGE_RADIUS = 9;
+
+const createMayorBadge = () => {
+    const container = new PIXI.Container();
+    const circle = new PIXI.Graphics();
+    circle.beginFill(0xF1C40F)
+        .lineStyle(2, 0x9C6400)
+        .drawCircle(0, 0, MAYOR_BADGE_RADIUS)
+        .endFill();
+    container.addChild(circle);
+
+    const label = new PIXI.Text('M', {
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'bold',
+        fill: 0x1B2631,
+    });
+    label.anchor.set(0.5);
+    container.addChild(label);
+
+    return container;
+};
+
+const maybeAddMayorBadge = (player, sprite) => {
+    if (!player || !player.isMayor) {
+        return;
+    }
+    const badge = createMayorBadge();
+    badge.x = sprite.width / 2;
+    badge.y = -MAYOR_BADGE_RADIUS - 4;
+    sprite.addChild(badge);
+};
+
+const getTankRow = (player, me) => {
+    if (!player) {
+        return 0;
+    }
+
+    const isMayor = !!player.isMayor;
+    const hasCustomTank = typeof player.tank === 'number';
+
+    if (hasCustomTank) {
+        return player.tank;
+    }
+
+    if (me && player.id === me.id) {
+        return isMayor ? 1 : 0;
+    }
+
+    const sameCity = me && player.city !== undefined ? player.city === me.city : true;
+
+    if (sameCity) {
+        return isMayor ? 1 : 0;
+    }
+
+    return isMayor ? 3 : 2;
+};
+
+const createTankSprite = (game, player, me) => {
+    const direction = player?.direction || 0;
+    const row = getTankRow(player, me);
+    const texture = new PIXI.Texture(
+        game.textures['tankTexture'].baseTexture,
+        new PIXI.Rectangle(Math.floor(direction / 2) * 48, row * 48, 48, 48)
+    );
+    return new PIXI.Sprite(texture);
+};
 
 var drawPlayer = (game, stage) => {
 
-    var tmpText = new PIXI.Texture(
-        game.textures['tankTexture'].baseTexture,
-        new PIXI.Rectangle(Math.floor(game.player.direction / 2) * 48, 0, 48, 48)
-    );
-    var playerTank = new PIXI.Sprite(tmpText);
+    var playerTank = createTankSprite(game, game.player, game.player);
     playerTank.x = game.player.defaultOffset.x;
     playerTank.y = game.player.defaultOffset.y;
+
+    maybeAddMayorBadge(game.player, playerTank);
 
     stage.addChild(playerTank);
 };
@@ -21,14 +86,14 @@ var drawOtherPlayers = (game, stage) => {
 
         var player = game.otherPlayers[id];
 
-        var tmpText = game.textures['tankTexture'].clone();
-        var tankRect = new PIXI.Rectangle(Math.floor((player.direction / 2)) * 48, 48 * 2, 48, 48);
-        tmpText.frame = tankRect;
-        var playerTank = new PIXI.Sprite(tmpText);
+        var playerTank = createTankSprite(game, player, game.player);
 
 
         playerTank.x = ((player.offset.x) + (game.player.defaultOffset.x - (game.player.offset.x / 48) * 48));
         playerTank.y = ((player.offset.y) + (game.player.defaultOffset.y - (game.player.offset.y / 48) * 48));
+
+
+        maybeAddMayorBadge(player, playerTank);
 
 
         stage.addChild(playerTank);

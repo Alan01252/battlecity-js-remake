@@ -1,0 +1,50 @@
+# Agent Guide: BattleCity JS Remake
+
+## Quick Facts
+- Project recreates Battle City using a browser Pixi.js client (`client/`) and a Socket.IO-backed Node server (`server/`).
+- Client now builds with Vite (config in `client/vite.config.js`), entry remains `client/app.js` which instantiates the main `game` state object and kicks off rendering + networking.
+- Pixel art assets, maps, and audio live under `client/data/`; `data/map.dat` is a 512×512 tilemap consumed as an `ArrayBuffer`.
+- Multiplayer and item drops require the local server on port 8021; without it the client runs in a mostly single-player sandbox.
+
+## Runbook
+- Install deps separately in `client/` and `server/` (`npm install`).
+- Client dev server: `npm run dev` from `client/` (Vite on `http://localhost:8020`).
+- Client production build: `npm run build` (emits to `client/dist`, `npm run preview` serves the build).
+- Server: `npm start` from `server/` (Express + Socket.IO on `http://localhost:8021`). Use `npm run dev` for auto-reload during development.
+- Run both processes to sync gameplay via Socket.IO.
+
+## Client Architecture
+- `client/app.js` sets up PIXI, registers loaders, builds `game` (rendering containers, factories, networking).
+- `client/src/play.js` advances player movement/rotation, enforces map-edge clamps, and handles death resets; relies on `checkPlayerCollision` and constants.
+- Input handling lives in `client/src/input/`, mapping keyboard/mouse to `game.player` flags and factory actions (shooting, item drop, build menu).
+- Rendering pipeline split into modules under `client/src/draw/` (`drawGround`, `drawTiles`, `drawChanging`, etc.) and executed each animation frame by `gameLoop()`.
+- Factories (`client/src/factories/`) maintain linked-list structures (`next`/`previous`) to manage dynamic entities (buildings, bullets, icons, items). They coordinate with collision helpers under `client/src/collision/`.
+- Networking via `client/src/SocketListener.js` wraps `socket.io-client`; emits local state (`player`, `bullet_shot`, `new_building`) and applies server broadcasts to `game.otherPlayers`, factories, etc.
+
+## Server Architecture
+- `server/app.js` boots Express/Socket.IO, instantiates factories for players, bullets, buildings, then spins a 100 ms tick for factory cycles (currently only building production uses it).
+- Player sync: `server/src/PlayerFactory.js` holds `game.players`, rebroadcasts player state to others.
+- Bullet sync: `server/src/BulletFactory.js` receives `bullet_shot` and rebroadcasts (TODO share physics with client for authoritative behavior).
+- Building management: `server/src/BuildingFactory.js` stores placed buildings, attaches `FactoryBuilding` subtype when appropriate to emit `new_icon` events.
+
+## Conventions & Tips
+- Client code now relies on ES module imports resolved through Vite; prefer package names/relative paths instead of reaching into `node_modules` manually.
+- Game world uses 48px tiles; map indexes (`game.map[i][j]`) often translate via `* 48` when converting to pixel space.
+- Many systems depend on mutating the shared `game` object; prefer extending it carefully instead of replacing references to avoid breaking factories.
+- Collision helpers expect rectangles shaped as `{x, y, w, h}` in pixel coordinates; reuse `getPlayerRect`/`rectangleCollision` utilities.
+- Linked-list factories require updating `next`/`previous` pointers when inserting/removing to keep iteration stable.
+
+## Known Gaps / TODOs
+- Socket.IO server CORS is pinned to the dev client URL (`http://localhost:8020`); adjust in `server/app.js` if the client origin changes.
+- No automated tests; any changes that touch movement/collision should be exercised manually in the running client.
+- Map/city generation is placeholder (`cityBuilder.createFakeCity` commented); expect additional logic or data integration work.
+- Bullet physics run client-side; server currently trusts client data, so authoritative validation is absent.
+
+## Useful Entry Points for Future Work
+- Player movement logic: `client/src/play.js`.
+- Spawning buildings & permissions: `client/src/factories/BuildingFactory.js` and `client/src/draw/draw-building-interface.js`.
+- Bullet lifecycle & collisions: `client/src/factories/BulletFactory.js` and `client/src/collision/collision-bullet.js`.
+- Server broadcasts of new items: `server/src/FactoryBuilding.js`.
+- Configuration constants: `client/src/constants.js` (movement speeds, build dependencies, item ids, etc.).
+
+Keep this file updated when adding systems (e.g., AI, new map loaders, authoritative physics) so future agents have a quick on-ramp.

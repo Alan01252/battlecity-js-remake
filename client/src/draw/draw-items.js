@@ -1,3 +1,5 @@
+import PIXI from '../pixi';
+
 import {ITEM_TYPE_TURRET} from "../constants";
 
 var drawTick = 0;

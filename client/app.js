@@ -1,3 +1,6 @@
+import PIXI from './src/pixi';
+import Stats from 'stats.js';
+
 import * as mapBuilder from "./src/mapBuilder";
 import * as cityBuilder from "./src/cityBuilder";
 
@@ -25,6 +28,55 @@ import {drawItems} from "./src/draw/draw-items";
 import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 
+const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
+const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
+const LOAD_TYPE = LoaderResource ? LoaderResource.LOAD_TYPE : {};
+const XHR_RESPONSE_TYPE = LoaderResource ? LoaderResource.XHR_RESPONSE_TYPE : {};
+const COLOR_KEY_MAGENTA = { r: 255, g: 0, b: 255 };
+
+const applyColorKey = (resource, color = COLOR_KEY_MAGENTA) => {
+    if (!resource || !resource.data || !resource.texture) {
+        return;
+    }
+
+    const source = resource.data;
+    const width = source.width;
+    const height = source.height;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+        return;
+    }
+
+    context.drawImage(source, 0, 0);
+    const imageData = context.getImageData(0, 0, width, height);
+    const data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+        if (data[i] === color.r && data[i + 1] === color.g && data[i + 2] === color.b) {
+            data[i + 3] = 0;
+        }
+    }
+
+    context.putImageData(imageData, 0, 0);
+
+    if (resource.texture) {
+        resource.texture.destroy(true);
+    }
+
+    const baseTexture = PIXI.BaseTexture.from(canvas);
+    baseTexture.alphaMode = PIXI.ALPHA_MODES.NO_PREMULTIPLIED_ALPHA;
+    baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
+
+    resource.data = canvas;
+    resource.texture = new PIXI.Texture(baseTexture);
+    resource.baseTexture = baseTexture;
+};
+
 
 var type = "WebGL";
 
@@ -39,8 +91,8 @@ var app = new PIXI.Application({
 });
 
 app.renderer.plugins.interaction.cursorStyles = {
-    'demolish': 'url(data/imgDemolish.png), auto',
-    'cursor': 'url(data/imgCursor.png), auto',
+    demolish: `url(${assetUrl('imgDemolish.png')}), auto`,
+    cursor: `url(${assetUrl('imgCursor.png')}), auto`,
 };
 
 document.getElementById("game").appendChild(app.view);
@@ -55,6 +107,7 @@ var groundTiles = null;
 var backgroundTiles = null;
 var iconTiles = null;
 var itemTiles = null;
+const loader = PIXI.Loader.shared;
 
 const game = {
     map: [],
@@ -78,6 +131,7 @@ const game = {
     player: {
         id: -1,
         city: 0,
+        isMayor: true,
         health: MAX_HEALTH,
         isTurning: 0,
         timeTurn: 0,
@@ -103,33 +157,50 @@ game.socketListener = new SocketListener(game);
 game.iconFactory = new IconFactory(game);
 game.itemFactory = new ItemFactory(game);
 
-PIXI.loader
-    .add([
-        "data/imgTanks.png",
-        "data/skins/BattleCityDX/imgGround.png",
-        "data/skins/BattleCityDX/imgLava.png",
-        "data/skins/BattleCityDX/imgRocks.png",
-        "data/skins/BattleCityDX/imgBullets.png",
-        "data/skins/BattleCityDX/imgInterface.png",
-        "data/skins/BattleCityDX/imgInterfaceBottom.png",
-        "data/skins/BattleCityDX/imgHealth.png",
-        "data/skins/BattleCityDX/imgBuildings.png",
-        "data/imgBuildIcons.png",
-        "data/imgItems.png",
-        "data/imgInventorySelection.png",
-        "data/skins/BattleCityDX/imgTurretBase.png",
-        "data/skins/BattleCityDX/imgTurretHead.png",
-        {url: "data/map.dat", loadType: 1, xhrType: "arraybuffer"},
-        {url: "data/cities/Balkh/demo.city", loadType: 1, xhrType: "text"}
-    ])
-    .on("progress", loadProgressHandler)
-    .load(setup);
+const resourcesToLoad = [
+    { name: 'imgTanks', url: assetUrl('imgTanks.png') },
+    { name: 'imgGround', url: assetUrl('skins/BattleCityDX/imgGround.png') },
+    { name: 'imgLava', url: assetUrl('skins/BattleCityDX/imgLava.png') },
+    { name: 'imgRocks', url: assetUrl('skins/BattleCityDX/imgRocks.png') },
+    { name: 'imgBullets', url: assetUrl('skins/BattleCityDX/imgBullets.png') },
+    { name: 'imgInterfaceTop', url: assetUrl('skins/BattleCityDX/imgInterface.png') },
+    { name: 'imgInterfaceBottom', url: assetUrl('skins/BattleCityDX/imgInterfaceBottom.png') },
+    { name: 'imgHealth', url: assetUrl('skins/BattleCityDX/imgHealth.png') },
+    { name: 'imgBuildings', url: assetUrl('skins/BattleCityDX/imgBuildings.png') },
+    { name: 'imgBuildIcons', url: assetUrl('imgBuildIcons.png') },
+    { name: 'imgItems', url: assetUrl('imgItems.png') },
+    { name: 'imgInventorySelection', url: assetUrl('imgInventorySelection.png') },
+    { name: 'imgPopulation', url: assetUrl('imgPopulation.png') },
+    { name: 'imgBlackNumbers', url: assetUrl('imgBlackNumbers.png') },
+    { name: 'imgTurretBase', url: assetUrl('skins/BattleCityDX/imgTurretBase.png') },
+    { name: 'imgTurretHead', url: assetUrl('skins/BattleCityDX/imgTurretHead.png') },
+    { name: 'imgSmoke', url: assetUrl('imgSmoke.png') },
+    {
+        name: 'mapData',
+        url: assetUrl('map.dat'),
+        loadType: LOAD_TYPE.XHR !== undefined ? LOAD_TYPE.XHR : 1,
+        xhrType: XHR_RESPONSE_TYPE.BUFFER || 'arraybuffer'
+    },
+    {
+        name: 'cityDemo',
+        url: assetUrl('cities/Balkh/demo.city'),
+        loadType: LOAD_TYPE.XHR !== undefined ? LOAD_TYPE.XHR : 1,
+        xhrType: XHR_RESPONSE_TYPE.TEXT || 'text'
+    }
+];
+
+loader.add(resourcesToLoad);
+
+loader.onProgress.add(loadProgressHandler);
+loader.load(setup);
 
 
-function loadProgressHandler(loader, resource) {
+function loadProgressHandler(targetLoader, resource) {
 
-    console.log("loading: " + resource.url);
-    console.log("progress: " + loader.progress + "%");
+    if (resource) {
+        console.log("loading: " + resource.url);
+    }
+    console.log("progress: " + targetLoader.progress + "%");
 }
 
 
@@ -137,28 +208,51 @@ function setup() {
     console.log("loaded");
 
 
-    var mapData = PIXI.loader.resources["data/map.dat"].data;
+    const resources = loader.resources;
+    var mapData = resources.mapData.data;
     mapBuilder.build(game, mapData);
     cityBuilder.build(game);
 
     game.player.offset.x = game.cities[game.player.city].x + 48;
     game.player.offset.y = game.cities[game.player.city].y + 100;
 
-    game.textures['groundTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgGround.png"];
-    game.textures['tankTexture'] = PIXI.utils.TextureCache["data/imgTanks.png"];
-    game.textures['rockTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgRocks.png"];
-    game.textures['lavaTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgLava.png"];
-    game.textures['bulletTexture'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgBullets.png"];
-    game.textures['interfaceTop'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgInterface.png"];
-    game.textures['interfaceBottom'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgInterfaceBottom.png"];
-    game.textures['health'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgHealth.png"];
-    game.textures['buildings'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgBuildings.png"];
-    game.textures['buildingIcons'] = PIXI.utils.TextureCache["data/imgBuildIcons.png"];
-    game.textures['imageIcons'] = PIXI.utils.TextureCache["data/imgItems.png"];
-    game.textures['imageItems'] = PIXI.utils.TextureCache["data/imgItems.png"];
-    game.textures['imageInventorySelection'] = PIXI.utils.TextureCache["data/imgInventorySelection.png"];
-    game.textures['imageTurretBase'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgTurretBase.png"];
-    game.textures['imageTurretHead'] = PIXI.utils.TextureCache["data/skins/BattleCityDX/imgTurretHead.png"];
+    const colorKeyTargets = [
+        resources.imgGround,
+        resources.imgLava,
+        resources.imgRocks,
+        resources.imgBuildings,
+        resources.imgBuildIcons,
+        resources.imgItems,
+        resources.imgInventorySelection,
+        resources.imgInterfaceTop,
+        resources.imgInterfaceBottom,
+        resources.imgTurretBase,
+        resources.imgTurretHead,
+        resources.imgPopulation,
+        resources.imgBlackNumbers,
+        resources.imgSmoke
+    ];
+
+    colorKeyTargets.forEach((resource) => applyColorKey(resource));
+
+    game.textures['groundTexture'] = resources.imgGround.texture;
+    game.textures['tankTexture'] = resources.imgTanks.texture;
+    game.textures['rockTexture'] = resources.imgRocks.texture;
+    game.textures['lavaTexture'] = resources.imgLava.texture;
+    game.textures['bulletTexture'] = resources.imgBullets.texture;
+    game.textures['interfaceTop'] = resources.imgInterfaceTop.texture;
+    game.textures['interfaceBottom'] = resources.imgInterfaceBottom.texture;
+    game.textures['health'] = resources.imgHealth.texture;
+    game.textures['buildings'] = resources.imgBuildings.texture;
+    game.textures['buildingIcons'] = resources.imgBuildIcons.texture;
+    game.textures['imageIcons'] = resources.imgItems.texture;
+    game.textures['imageItems'] = resources.imgItems.texture;
+    game.textures['imageInventorySelection'] = resources.imgInventorySelection.texture;
+    game.textures['imageTurretBase'] = resources.imgTurretBase.texture;
+    game.textures['imageTurretHead'] = resources.imgTurretHead.texture;
+    game.textures['population'] = resources.imgPopulation.texture;
+    game.textures['blackNumbers'] = resources.imgBlackNumbers.texture;
+    game.textures['smoke'] = resources.imgSmoke.texture;
 
 
     setupKeyboardInputs(game);
@@ -168,6 +262,24 @@ function setup() {
     game.socketListener.on("connected", () => {
         game.player.id = game.socketListener.enterGame();
         console.log("Connected starting game");
+    });
+    game.socketListener.on('population:update', (update) => {
+        game.buildingFactory.applyPopulationUpdate(update);
+    });
+    game.socketListener.on('building:new', (data) => {
+        if (!data) {
+            return;
+        }
+        game.buildingFactory.newBuilding(data.ownerId || null, data.x, data.y, data.type, {
+            notifyServer: false,
+            id: data.id,
+            population: data.population || 0,
+            attachedHouseId: data.attachedHouseId || null,
+            city: data.city ?? 0,
+            itemsLeft: data.itemsLeft || 0,
+            updateCity: false,
+        });
+        game.forceDraw = true;
     });
 
 
@@ -253,5 +365,3 @@ function gameLoop() {
     }
 
 }
-
-

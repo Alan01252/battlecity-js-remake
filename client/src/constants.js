@@ -32,6 +32,9 @@ export const BUILDING_RESEARCH = 4;
 
 export const BUILDING_HAS_BAY = 2;
 
+export const POPULATION_MAX_HOUSE = 160;
+export const POPULATION_MAX_NON_HOUSE = 80;
+
 export const CANT_BUILD = 0;
 export const CAN_BUILD = 1;
 export const HAS_BUILT = 2;

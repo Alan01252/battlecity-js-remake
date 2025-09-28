@@ -17,9 +17,12 @@ Multiplayer will not run without a server running and js changed
 ## Client
 
 - cd ./client
-- npm run serve
+- npm install
+- npm run dev  # starts Vite dev server on http://localhost:8020
+- npm run build  # optional production build to ./client/dist
 
 ## Server
 
 - cd ./server
-- node app.js
+- npm start  # Express + Socket.IO on http://localhost:8021
+- npm run dev  # optional: auto-restart with nodemon

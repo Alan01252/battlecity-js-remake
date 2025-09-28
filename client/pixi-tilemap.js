@@ -1,3 +1,5 @@
+import * as PIXI from 'pixi.js';
+
 var pixi_tilemap;
 (function (pixi_tilemap) {
     var CanvasTileRenderer = (function () {
@@ -841,10 +843,14 @@ var pixi_tilemap;
     }(PIXI.Container));
     pixi_tilemap.ZLayer = ZLayer;
 })(pixi_tilemap || (pixi_tilemap = {}));
-var pixi_tilemap;
-(function (pixi_tilemap) {
-    PIXI.tilemap = pixi_tilemap;
-})(pixi_tilemap || (pixi_tilemap = {}));
+export const installTilemap = (PIXIInstance) => {
+    if (PIXIInstance && Object.isExtensible(PIXIInstance) && !PIXIInstance.tilemap) {
+        PIXIInstance.tilemap = pixi_tilemap;
+    }
+    return pixi_tilemap;
+};
+
+export default pixi_tilemap;
 var pixi_tilemap;
 (function (pixi_tilemap) {
     var shaderGenerator;

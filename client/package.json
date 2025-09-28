@@ -4,22 +4,22 @@
   "description": "A remake of old battlecity game in js",
   "main": "index.js",
   "scripts": {
-    "start": "webpack --config webpack.config.js",
-    "serve": "webpack-dev-server",
-    "deploy-client": "webpack && ./node_modules/.bin/gh-pages -d ./"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy-client": "npm run build && ./node_modules/.bin/gh-pages -d dist"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "eventemitter2": "^6.0.0",
     "pixi.js": "^5.1.6",
-    "socket.io": "^2.2.0",
-    "underscore": "^1.9.2"
+    "underscore": "^1.9.2",
+    "stats.js": "^0.17.0",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "gh-pages": "^2.2.0",
-    "webpack": "^4.42.1",
-    "webpack-cli": "^3.3.11",
-    "webpack-dev-server": "^3.10.3"
+    "gh-pages": "^6.3.0",
+    "vite": "^7.1.7"
   }
 }

@@ -4,8 +4,9 @@ import {CAN_BUILD_HOUSE} from "../constants";
 import {HAS_BUILT} from "../constants";
 import {CAN_BUILD} from "../constants";
 import {DEPENDENCY_TREE} from "../constants";
-import _ from '../../node_modules/underscore/underscore-min'
+import _ from 'underscore';
 import {BUILDING_COMMAND_CENTER} from "../constants";
+import {MAP_SQUARE_BUILDING} from "../constants";
 
 var unflatten = function (array, parent, tree) {
 
@@ -38,22 +39,41 @@ class BuildingFactory {
     constructor(game) {
         this.game = game
         this.buildingListHead = null;
+        this.buildingsById = {};
+        this.buildingsByCoord = {};
     }
 
     cycle() {
     }
 
-    newBuilding(owner, x, y, type) {
+    newBuilding(owner, x, y, type, options = {}) {
+
+        const {
+            notifyServer = true,
+            id = `${x}_${y}`,
+            population = 0,
+            attachedHouseId = null,
+            updateCity,
+            itemsLeft = 0,
+            city = this.game.player?.city ?? 0,
+        } = options;
+
+        const coordKey = `${x}_${y}`;
 
         var building = {
-            "id": x + "_" + y,
+            "id": id,
             "owner": owner,
             "x": x,
             "y": y,
             "items": 1,
             "type": type,
+            "population": population,
+            "attachedHouseId": attachedHouseId,
             "next": null,
-            "previous": null
+            "previous": null,
+            "coordKey": coordKey,
+            "city": city,
+            "itemsLeft": itemsLeft
 
         };
 
@@ -62,23 +82,35 @@ class BuildingFactory {
             return false;
         }
 
+        if (!this.game.tiles[x]) {
+            this.game.tiles[x] = [];
+        }
+        this.game.tiles[x][y] = type;
+        if (this.game.map && this.game.map[x]) {
+            this.game.map[x][y] = MAP_SQUARE_BUILDING;
+        }
 
-        this.game.socketListener.sendNewBuilding(building, (result) => {
-            if (!result) {
-                // Remove the building?
-            }
-        });
+
+        if (notifyServer && this.game.socketListener && this.game.socketListener.sendNewBuilding) {
+            this.game.socketListener.sendNewBuilding(building);
+        }
 
         if (this.buildingListHead) {
             this.buildingListHead.previous = building;
             building.next = this.buildingListHead
         }
 
-        this.adjustAllowedBuilds(building)
+        const shouldUpdateCity = updateCity !== undefined ? updateCity : (!owner || owner === this.game.player.id);
+
+        if (shouldUpdateCity) {
+            this.adjustAllowedBuilds(building)
+        }
         console.log("Created building");
         console.log(building);
 
         this.buildingListHead = building;
+        this.buildingsById[building.id] = building;
+        this.buildingsByCoord[coordKey] = building;
         return building;
     }
 
@@ -123,25 +155,32 @@ class BuildingFactory {
         }
     }
 
-    deleteBuilding(building) {
+    deleteBuilding(building, notifyServer = true) {
 
 
         this.game.map[building.x][building.y] = 0;
         this.game.tiles[building.x][building.y] = 0;
 
 
-        Object.keys(this.game.cities[this.game.player.city].canBuild).forEach((id) => {
+        if (building.owner === null || building.owner === this.game.player.id) {
 
-            var tempId = LABELS[id].TYPE;
-            console.log(tempId + " " + this.game.isBuilding);
-            if (parseInt(tempId) == building.type) {
+            Object.keys(this.game.cities[this.game.player.city].canBuild).forEach((id) => {
 
-                if (tempId != CAN_BUILD_HOUSE) {
-                    this.game.cities[this.game.player.city].canBuild[id] = CAN_BUILD;
+                var tempId = LABELS[id].TYPE;
+                console.log(tempId + " " + this.game.isBuilding);
+                if (parseInt(tempId) == building.type) {
+
+                    if (tempId != CAN_BUILD_HOUSE) {
+                        this.game.cities[this.game.player.city].canBuild[id] = CAN_BUILD;
+                    }
                 }
-            }
-        });
+            });
+        }
 
+
+        if (notifyServer && this.game.socketListener && this.game.socketListener.sendDemolishBuilding) {
+            this.game.socketListener.sendDemolishBuilding(building.id);
+        }
 
         var returnBuilding = building.next;
 
@@ -155,7 +194,22 @@ class BuildingFactory {
             this.buildingListHead = building.next;
         }
 
+        delete this.buildingsById[building.id];
+        const coordKey = building.coordKey || `${building.x}_${building.y}`;
+        delete this.buildingsByCoord[coordKey];
+
         return returnBuilding;
+    }
+
+    removeBuildingById(id) {
+        let node = this.getHead();
+        while (node) {
+            if (node.id === id) {
+                this.deleteBuilding(node, false);
+                break;
+            }
+            node = node.next;
+        }
     }
 
     searchTree(element, matchingId) {
@@ -211,6 +265,70 @@ class BuildingFactory {
 
     getHead() {
         return this.buildingListHead;
+    }
+
+    getBuildingById(id) {
+        return this.buildingsById[id];
+    }
+
+    getBuildingByCoord(x, y) {
+        return this.buildingsByCoord[`${x}_${y}`];
+    }
+
+    applyPopulationUpdate(update) {
+        if (!update || !update.id) {
+            return;
+        }
+
+        if (update.removed) {
+            this.removeBuildingById(update.id);
+            this.game.forceDraw = true;
+            return;
+        }
+
+        let building = this.getBuildingById(update.id);
+        if (!building && update.x !== undefined && update.y !== undefined && update.type !== undefined) {
+            building = this.newBuilding(update.ownerId || null, update.x, update.y, update.type, {
+                notifyServer: false,
+                id: update.id,
+                population: update.population || 0,
+                attachedHouseId: update.attachedHouseId || null,
+                updateCity: false,
+                itemsLeft: update.itemsLeft || 0,
+                city: update.city ?? 0,
+            });
+        }
+        if (!building) {
+            return;
+        }
+
+        building.coordKey = building.coordKey || `${building.x}_${building.y}`;
+
+        if (typeof update.population === 'number') {
+            building.population = update.population;
+        }
+
+        if (update.attachedHouseId !== undefined) {
+            building.attachedHouseId = update.attachedHouseId;
+        }
+
+        if (update.city !== undefined) {
+            building.city = update.city;
+        }
+
+        if (update.smokeActive !== undefined) {
+            building.smokeActive = update.smokeActive;
+        }
+
+        if (update.smokeFrame !== undefined) {
+            building.smokeFrame = update.smokeFrame;
+        }
+
+        if (update.itemsLeft !== undefined) {
+            building.itemsLeft = update.itemsLeft;
+        }
+
+        this.game.forceDraw = true;
     }
 }
 

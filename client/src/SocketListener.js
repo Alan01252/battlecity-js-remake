@@ -1,7 +1,7 @@
-import io from "../node_modules/socket.io-client";
-import EventEmitter from "../node_modules/eventemitter2"
+import { io } from 'socket.io-client';
+import { EventEmitter2 } from 'eventemitter2';
 
-class SocketListener extends EventEmitter {
+class SocketListener extends EventEmitter2 {
 
     constructor(game) {
         super();
@@ -9,16 +9,24 @@ class SocketListener extends EventEmitter {
     }
 
     listen() {
-        this.io = io.connect("http://localhost:8081", {
-            "transports": ['websocket']
+        this.io = io("http://localhost:8021", {
+            transports: ['websocket']
         });
         this.io.on("connect", () => {
             console.log("connected");
             this.emit("connected");
         });
+        this.io.on("connect_error", (err) => {
+            console.error("socket connect_error", err?.message ?? err);
+        });
+        this.io.on("disconnect", (reason) => {
+            console.warn("socket disconnected", reason);
+        });
 
         this.io.on("enter_game", (player) => {
             var player = JSON.parse(player);
+            player.city = player.city ?? 0;
+            player.isMayor = !!player.isMayor;
             console.log("Player entered game");
             console.log(player);
             this.game.otherPlayers[player.id] = player;
@@ -26,6 +34,8 @@ class SocketListener extends EventEmitter {
 
         this.io.on("player", (player) => {
             var player = JSON.parse(player);
+            player.city = player.city ?? 0;
+            player.isMayor = !!player.isMayor;
             this.game.otherPlayers[player.id] = player;
         });
 
@@ -38,12 +48,67 @@ class SocketListener extends EventEmitter {
             var icon = JSON.parse(icon);
             this.game.iconFactory.newIcon(null, icon.x, icon.y, icon.type)
         });
+
+        this.io.on("new_building", (payload) => {
+            try {
+                const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (data) {
+                    data.type = Number(data.type);
+                    data.population = data.population || 0;
+                    data.ownerId = data.ownerId || data.owner || null;
+                    data.attachedHouseId = data.attachedHouseId ?? null;
+                    data.city = data.city ?? 0;
+                    data.itemsLeft = data.itemsLeft || 0;
+                    data.smokeActive = !!data.smokeActive;
+                    data.smokeFrame = data.smokeFrame || 0;
+                }
+                this.emit('building:new', data);
+            } catch (error) {
+                console.warn('Failed to parse new_building payload', error);
+            }
+        });
+
+        this.io.on("population:update", (update) => {
+            try {
+                const data = typeof update === 'string' ? JSON.parse(update) : update;
+                if (data) {
+                    data.type = Number(data.type);
+                    data.population = data.population || 0;
+                    data.attachedHouseId = data.attachedHouseId ?? null;
+                    data.city = data.city ?? 0;
+                    data.smokeActive = !!data.smokeActive;
+                    data.smokeFrame = data.smokeFrame || 0;
+                    data.itemsLeft = data.itemsLeft || 0;
+                }
+                this.emit('population:update', data);
+            } catch (error) {
+                console.warn('Failed to parse population update', error);
+            }
+        });
+
+        this.io.on("demolish_building", (payload) => {
+            try {
+                const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (data && data.id && this.game.buildingFactory?.removeBuildingById) {
+                    this.game.buildingFactory.removeBuildingById(data.id);
+                }
+            } catch (error) {
+                console.warn('Failed to handle demolish payload', error);
+            }
+        });
     }
 
-    sendNewBuilding(building, callback) {
+    sendNewBuilding(building) {
         if (this.io) {
             this.io.emit("new_building", JSON.stringify(building));
         }
+    }
+
+    sendDemolishBuilding(buildingId) {
+        if (!this.io || !buildingId) {
+            return;
+        }
+        this.io.emit('demolish_building', JSON.stringify({ id: buildingId }));
     }
 
     sendBulletShot(bullet) {
