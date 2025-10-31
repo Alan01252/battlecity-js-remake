@@ -4,6 +4,7 @@ import {CAN_BUILD_HOUSE} from "../constants";
 import {HAS_BUILT} from "../constants";
 import {CAN_BUILD} from "../constants";
 import {DEPENDENCY_TREE} from "../constants";
+import {COST_BUILDING} from "../constants";
 import _ from 'underscore';
 import {BUILDING_COMMAND_CENTER} from "../constants";
 import {MAP_SQUARE_BUILDING} from "../constants";
@@ -48,6 +49,7 @@ class BuildingFactory {
         this.buildingListHead = null;
         this.buildingsById = {};
         this.buildingsByCoord = {};
+        this.pendingBuildCosts = new Map();
     }
 
     cycle() {
@@ -66,6 +68,21 @@ class BuildingFactory {
         } = options;
 
         const coordKey = `${x}_${y}`;
+        const cityId = Number.isFinite(city) ? city : parseInt(city, 10) || 0;
+        const isLocalPlacement = notifyServer && owner !== null && owner !== undefined && this.game?.player && owner === this.game.player.id;
+        if (isLocalPlacement) {
+            const cityState = this.game.cities?.[cityId];
+            if (!cityState) {
+                console.warn('Cannot place building without city state');
+                return false;
+            }
+            const availableCash = Number.isFinite(cityState.cash) ? cityState.cash : parseInt(cityState.cash, 10) || 0;
+            if (availableCash < COST_BUILDING) {
+                console.warn('City lacks funds for new building');
+                this.game.forceDraw = true;
+                return false;
+            }
+        }
 
         var building = {
             "id": id,
@@ -88,15 +105,6 @@ class BuildingFactory {
             console.log("Collision");
             return false;
         }
-
-        if (!this.game.tiles[x]) {
-            this.game.tiles[x] = [];
-        }
-        this.game.tiles[x][y] = type;
-        if (this.game.map && this.game.map[x]) {
-            this.game.map[x][y] = MAP_SQUARE_BUILDING;
-        }
-
 
         if (notifyServer && this.game.socketListener && this.game.socketListener.sendNewBuilding) {
             this.game.socketListener.sendNewBuilding(building);
@@ -129,6 +137,30 @@ class BuildingFactory {
         this.buildingsByCoord[coordKey] = building;
         this.syncFactoryItems(building);
         this.persistFactoryItems(building);
+
+        if (!this.game.tiles[x]) {
+            this.game.tiles[x] = [];
+        }
+        this.game.tiles[x][y] = type;
+        if (this.game.map && this.game.map[x]) {
+            this.game.map[x][y] = MAP_SQUARE_BUILDING;
+        }
+
+        if (isLocalPlacement) {
+            const cityState = this.game.cities?.[cityId];
+            if (cityState) {
+                const availableCash = Number.isFinite(cityState.cash) ? cityState.cash : parseInt(cityState.cash, 10) || 0;
+                cityState.cash = Math.max(0, availableCash - COST_BUILDING);
+                cityState.construction = (Number.isFinite(cityState.construction) ? cityState.construction : parseInt(cityState.construction, 10) || 0) + COST_BUILDING;
+                cityState.updatedAt = Date.now();
+                this.pendingBuildCosts.set(building.id, {
+                    cityId,
+                    cost: COST_BUILDING,
+                });
+                this.game.forceDraw = true;
+            }
+        }
+
         return building;
     }
 
@@ -236,6 +268,9 @@ class BuildingFactory {
         delete this.buildingsById[building.id];
         const coordKey = building.coordKey || `${building.x}_${building.y}`;
         delete this.buildingsByCoord[coordKey];
+        if (this.pendingBuildCosts.has(building.id)) {
+            this.pendingBuildCosts.delete(building.id);
+        }
 
         return returnBuilding;
     }
@@ -249,6 +284,33 @@ class BuildingFactory {
             }
             node = node.next;
         }
+    }
+
+    handleBuildDenied(data) {
+        if (!data) {
+            return;
+        }
+        const id = data.id || `${data.x}_${data.y}`;
+        if (!id) {
+            return;
+        }
+        const pending = this.pendingBuildCosts.get(id);
+        if (pending) {
+            const cityState = this.game.cities?.[pending.cityId];
+            if (cityState) {
+                const currentCash = Number.isFinite(cityState.cash) ? cityState.cash : parseInt(cityState.cash, 10) || 0;
+                cityState.cash = currentCash + pending.cost;
+                const currentConstruction = Number.isFinite(cityState.construction) ? cityState.construction : parseInt(cityState.construction, 10) || 0;
+                cityState.construction = Math.max(0, currentConstruction - pending.cost);
+                cityState.updatedAt = Date.now();
+            }
+            this.pendingBuildCosts.delete(id);
+        }
+        const building = this.getBuildingById(id);
+        if (building && building.owner === this.game.player.id) {
+            this.deleteBuilding(building, false);
+        }
+        this.game.forceDraw = true;
     }
 
     searchTree(element, matchingId) {
@@ -347,6 +409,10 @@ class BuildingFactory {
 
         this.syncFactoryItems(building);
         this.persistFactoryItems(building);
+
+        if (update.id && this.pendingBuildCosts.has(update.id)) {
+            this.pendingBuildCosts.delete(update.id);
+        }
 
         this.game.forceDraw = true;
     }

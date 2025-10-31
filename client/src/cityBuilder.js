@@ -1,10 +1,18 @@
 import {MAP_SQUARE_BUILDING} from "./constants";
 import {DEFAULT_CITY_CAN_BUILD} from "./constants";
+import {MONEY_STARTING_VALUE} from "./constants";
 
 const createDefaultCanBuild = () => ({ ...DEFAULT_CITY_CAN_BUILD });
 
 var city = {
-    canBuild: createDefaultCanBuild()
+    canBuild: createDefaultCanBuild(),
+    cash: MONEY_STARTING_VALUE,
+    income: 0,
+    itemProduction: 0,
+    research: 0,
+    hospital: 0,
+    construction: 0,
+    grossIncome: 0,
 };
 
 function createFakeCity(game) {

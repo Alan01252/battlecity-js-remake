@@ -29,7 +29,8 @@ server.listen(PORT, () => {
 var game = {
     tick: 0,
 
-    players: {}
+    players: {},
+    cities: []
 };
 
 

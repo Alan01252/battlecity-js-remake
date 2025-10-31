@@ -23,6 +23,13 @@ export const DAMAGE_MINE = 19;
 export const DAMAGE_BOMB = 40;
 
 export const MAX_HEALTH = 40;
+export const MONEY_STARTING_VALUE = 95000000;
+export const MONEY_MAX_VALUE = 95000000;
+export const MONEY_TICK_INTERVAL = 7000;
+export const COST_BUILDING = 500000;
+export const COST_ITEM = 750000;
+export const COST_INCOME_POPULATION = 10000;
+export const COST_UPKEEP_HOSPITAL = 2000000;
 export const BOMB_EXPLOSION_TILE_RADIUS = 2;
 export const BOMB_ITEM_TILE_RADIUS = 1;
 
@@ -38,8 +45,8 @@ export const BUILDING_RESEARCH = 4;
 
 export const BUILDING_HAS_BAY = 2;
 
-export const POPULATION_MAX_HOUSE = 160;
-export const POPULATION_MAX_NON_HOUSE = 80;
+export const POPULATION_MAX_HOUSE = 100;
+export const POPULATION_MAX_NON_HOUSE = 50;
 
 export const CANT_BUILD = 0;
 export const CAN_BUILD = 1;
@@ -86,6 +93,21 @@ export const ITEM_TYPE_TURRET = 9;
 export const ITEM_TYPE_SLEEPER = 10;
 export const ITEM_TYPE_PLASMA = 11;
 export const ITEM_TYPE_LASER = 12;
+
+export const ITEM_TYPE_LIMITS = {
+    [ITEM_TYPE_CLOAK]: 4,
+    [ITEM_TYPE_ROCKET]: 4,
+    [ITEM_TYPE_MEDKIT]: 5,
+    [ITEM_TYPE_BOMB]: 20,
+    [ITEM_TYPE_MINE]: 10,
+    [ITEM_TYPE_ORB]: 1,
+    [ITEM_TYPE_FLARE]: 4,
+    [ITEM_TYPE_DFG]: 5,
+    [ITEM_TYPE_WALL]: 20,
+    [ITEM_TYPE_TURRET]: 10,
+    [ITEM_TYPE_SLEEPER]: 5,
+    [ITEM_TYPE_PLASMA]: 5,
+};
 
 export const BUILD_TREE_CONFIG = [
     {

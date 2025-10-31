@@ -86,6 +86,28 @@ class SocketListener extends EventEmitter2 {
             }
         });
 
+        this.io.on("city:finance", (payload) => {
+            try {
+                const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (data) {
+                    this.emit('city:finance', data);
+                }
+            } catch (error) {
+                console.warn('Failed to parse finance update', error);
+            }
+        });
+
+        this.io.on("build:denied", (payload) => {
+            try {
+                const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                if (data) {
+                    this.emit('build:denied', data);
+                }
+            } catch (error) {
+                console.warn('Failed to parse build denied payload', error);
+            }
+        });
+
         this.io.on("demolish_building", (payload) => {
             try {
                 const data = typeof payload === 'string' ? JSON.parse(payload) : payload;

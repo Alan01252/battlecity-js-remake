@@ -1,4 +1,4 @@
-import {ITEM_TYPE_BOMB} from "../constants";
+import {ITEM_TYPE_BOMB, ITEM_TYPE_LIMITS} from "../constants";
 
 class IconFactory {
 
@@ -10,7 +10,60 @@ class IconFactory {
     cycle() {
     }
 
+    getLimitForType(type) {
+        const limit = ITEM_TYPE_LIMITS?.[type];
+        return typeof limit === 'number' ? limit : Infinity;
+    }
+
+    getOwnedQuantity(ownerId, type) {
+        if (ownerId === null || ownerId === undefined) {
+            return 0;
+        }
+        let total = 0;
+        let node = this.getHead();
+        while (node) {
+            if (node.owner === ownerId && node.type === type) {
+                const quantity = Number.isFinite(node.quantity) ? node.quantity : parseInt(node.quantity, 10) || 1;
+                total += Math.max(1, quantity);
+            }
+            node = node.next;
+        }
+        return total;
+    }
+
+    getAllowedQuantity(ownerId, type, requestedQuantity) {
+        const desired = Math.max(1, parseInt(requestedQuantity, 10) || 1);
+        if (ownerId === null || ownerId === undefined) {
+            return desired;
+        }
+        const limit = this.getLimitForType(type);
+        if (!Number.isFinite(limit)) {
+            return desired;
+        }
+        const owned = this.getOwnedQuantity(ownerId, type);
+        const remaining = limit - owned;
+        if (remaining <= 0) {
+            return 0;
+        }
+        return Math.min(desired, remaining);
+    }
+
     newIcon(owner, x, y, type, options = {}) {
+        const requestedQuantity = options.quantity !== undefined ? options.quantity : 1;
+        let quantity = Math.max(1, parseInt(requestedQuantity, 10) || 1);
+        if (owner !== null && owner !== undefined) {
+            const allowed = this.getAllowedQuantity(owner, type, quantity);
+            if (allowed <= 0) {
+                return null;
+            }
+            quantity = allowed;
+        }
+
+        const resolvedCity = (options.city !== undefined)
+            ? options.city
+            : ((owner !== null && owner !== undefined && owner === this.game.player?.id)
+                ? this.game.player.city ?? null
+                : null);
 
         var icon = {
             "owner": owner,
@@ -20,9 +73,10 @@ class IconFactory {
             "next": null,
             "previous": null,
             "sourceBuildingId": options.sourceBuildingId ?? null,
-            "quantity": options.quantity ?? 1,
+            "quantity": quantity,
             "selected": !!options.selected,
-            "armed": !!options.armed
+            "armed": !!options.armed,
+            "city": resolvedCity
 
         };
 
@@ -78,8 +132,12 @@ class IconFactory {
         var icon = this.findIconByLocation();
         if (icon) {
             const ownerId = this.game.player.id;
-            const existing = this.findOwnedIconByType(ownerId, icon.type);
             const quantityToAdd = icon.quantity ?? 1;
+            const allowedQuantity = this.getAllowedQuantity(ownerId, icon.type, quantityToAdd);
+            if (allowedQuantity <= 0 || allowedQuantity < quantityToAdd) {
+                return;
+            }
+            const existing = this.findOwnedIconByType(ownerId, icon.type);
 
             icon.owner = ownerId;
             icon.city = this.game.player.city ?? null;
@@ -92,7 +150,11 @@ class IconFactory {
             }
 
             if (existing && existing !== icon) {
-                existing.quantity = (existing.quantity ?? 1) + quantityToAdd;
+                const limit = this.getLimitForType(icon.type);
+                const updatedQuantity = (existing.quantity ?? 1) + quantityToAdd;
+                existing.quantity = Number.isFinite(limit)
+                    ? Math.min(limit, Math.max(1, updatedQuantity))
+                    : Math.max(1, updatedQuantity);
                 this.deleteIcon(icon);
             }
 

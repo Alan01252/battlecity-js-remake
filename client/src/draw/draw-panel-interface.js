@@ -35,6 +35,27 @@ const resolveSlotPosition = (type, defaultX, defaultY) => {
     return INVENTORY_SLOTS[type] ?? {x: defaultX, y: defaultY};
 };
 
+const formatCash = (value) => {
+    const amount = Number.isFinite(value) ? value : parseInt(value, 10) || 0;
+    try {
+        return amount.toLocaleString('en-US');
+    } catch (error) {
+        return `${amount}`;
+    }
+};
+
+const getGrossIncome = (city) => {
+    if (!city) {
+        return 0;
+    }
+    if (typeof city.grossIncome === 'number' && Number.isFinite(city.grossIncome)) {
+        return city.grossIncome;
+    }
+    const income = Number(city.income || 0);
+    const expenses = Number(city.itemProduction || 0) + Number(city.research || 0) + Number(city.hospital || 0) + Number(city.construction || 0);
+    return income - expenses;
+};
+
 var drawPanel = (game, stage) => {
     var interfaceTop = new PIXI.Sprite(game.textures["interfaceTop"]);
     interfaceTop.x = game.maxMapX;
@@ -45,6 +66,47 @@ var drawPanel = (game, stage) => {
     interfaceBottom.x = game.maxMapX;
     interfaceBottom.y = 430;
     stage.addChild(interfaceBottom);
+};
+
+var drawFinance = (game, stage) => {
+    if (!game.player.isMayor) {
+        return;
+    }
+    const cityIndex = game.player.city ?? 0;
+    const city = game.cities?.[cityIndex];
+    if (!city) {
+        return;
+    }
+
+    const boxTexture = game.textures['imgMoneyBox'];
+    if (boxTexture) {
+        const moneyBox = new PIXI.Sprite(boxTexture);
+        moneyBox.x = game.maxMapX + 2;
+        moneyBox.y = 224;
+        stage.addChild(moneyBox);
+    }
+
+    const gross = getGrossIncome(city);
+    const iconKey = gross < 0 ? 'imgMoneyDown' : 'imgMoneyUp';
+    const iconTexture = game.textures[iconKey];
+    if (iconTexture) {
+        const indicator = new PIXI.Sprite(iconTexture);
+        indicator.x = game.maxMapX + 8;
+        indicator.y = 225;
+        stage.addChild(indicator);
+    }
+
+    const cashText = new PIXI.Text(formatCash(city.cash ?? 0), {
+        fontFamily: 'Arial',
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: gross < 0 ? 0xE74C3C : 0x2ECC71,
+        stroke: 0x000000,
+        strokeThickness: 2,
+    });
+    cashText.x = game.maxMapX + 21;
+    cashText.y = 226;
+    stage.addChild(cashText);
 };
 
 var drawItems = (game, stage) => {
@@ -182,6 +244,7 @@ export const drawPanelInterface = (game, panelContainer) => {
     if (game.forceDraw) {
         panelContainer.removeChildren();
         drawPanel(game, panelContainer);
+        drawFinance(game, panelContainer);
         drawHealth(game, panelContainer);
         drawItems(game, panelContainer);
         drawMayorIndicator(game, panelContainer);

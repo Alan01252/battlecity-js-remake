@@ -4,10 +4,12 @@ const debug = require('debug')('BattleCity:BuildingFactory');
 
 const Building = require('./Building');
 const FactoryBuilding = require('./FactoryBuilding');
+const CityManager = require('./CityManager');
 const {
     isHouse,
     isFactory,
     POPULATION_MAX_HOUSE,
+    COST_BUILDING,
 } = require('./constants');
 
 class BuildingFactory {
@@ -16,6 +18,7 @@ class BuildingFactory {
         this.io = null;
         this.buildings = new Map();
         this.buildingsBySocket = new Map();
+        this.cityManager = new CityManager(game);
     }
 
     serializeBuilding(building) {
@@ -50,6 +53,7 @@ class BuildingFactory {
 
     listen(io) {
         this.io = io;
+        this.cityManager.setIo(io);
 
         io.on('connection', (socket) => {
             debug(`Client connected ${socket.id}`);
@@ -83,8 +87,44 @@ class BuildingFactory {
 
         buildingData.id = buildingData.id || `${buildingData.x}_${buildingData.y}`;
         buildingData.ownerId = socket.id;
-        buildingData.city = buildingData.city !== undefined ? buildingData.city : (this.game.players[socket.id]?.city ?? 0);
+        const playerState = this.game.players[socket.id];
+        const resolvedCityId = buildingData.city !== undefined ? buildingData.city : (playerState?.city ?? 0);
+        buildingData.city = resolvedCityId;
         buildingData.itemsLeft = buildingData.itemsLeft || 0;
+
+        if (!playerState || playerState.city !== resolvedCityId) {
+            socket.emit('build:denied', JSON.stringify({
+                reason: 'wrong_city',
+                city: resolvedCityId,
+                x: buildingData.x,
+                y: buildingData.y,
+                id: buildingData.id,
+            }));
+            return;
+        }
+
+        if (!playerState.isMayor) {
+            socket.emit('build:denied', JSON.stringify({
+                reason: 'not_mayor',
+                city: resolvedCityId,
+                x: buildingData.x,
+                y: buildingData.y,
+                id: buildingData.id,
+            }));
+            return;
+        }
+
+        const city = this.cityManager.ensureCity(resolvedCityId);
+        if (city.cash < COST_BUILDING) {
+            socket.emit('build:denied', JSON.stringify({
+                reason: 'insufficient_funds',
+                city: resolvedCityId,
+                x: buildingData.x,
+                y: buildingData.y,
+                id: buildingData.id,
+            }));
+            return;
+        }
 
         const newBuilding = new Building(socket.id, buildingData, socket);
 
@@ -94,6 +134,7 @@ class BuildingFactory {
         }
 
         this.registerBuilding(socket.id, newBuilding);
+        this.cityManager.recordBuildingCost(newBuilding.cityId);
 
         if (isHouse(newBuilding.type)) {
             this.backfillAttachmentsForHouse(newBuilding);
@@ -198,6 +239,7 @@ class BuildingFactory {
         for (const building of this.buildings.values()) {
             building.cycle(this.game, this);
         }
+        this.cityManager.cycle(this.game.tick);
     }
 
     ensureAttachment(building) {
@@ -247,6 +289,7 @@ class BuildingFactory {
     }
 
     attachBuildingToHouse(house, building) {
+        this.cityManager.ensureCity(house.cityId);
         house.attachments.push({ buildingId: building.id, population: building.population });
         building.attachedHouseId = house.id;
         building.cityId = house.cityId;
@@ -299,6 +342,7 @@ class BuildingFactory {
     }
 
     backfillAttachmentsForHouse(house) {
+        this.cityManager.ensureCity(house.cityId);
         for (const building of this.buildings.values()) {
             if (isHouse(building.type) || building.attachedHouseId) {
                 continue;

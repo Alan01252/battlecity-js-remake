@@ -5,6 +5,10 @@ const {
     POPULATION_INCREMENT,
     POPULATION_MAX_HOUSE,
     POPULATION_MAX_NON_HOUSE,
+    MONEY_TICK_INTERVAL,
+    COST_INCOME_POPULATION,
+    COST_ITEM,
+    COST_UPKEEP_HOSPITAL,
     isHouse,
     isResearch,
     isFactory,
@@ -85,6 +89,7 @@ class Building {
     cycle(game, factory) {
         this.handlePopulation(game, factory);
         this.updateSmoke(game, factory);
+        this.handleEconomy(game, factory);
         if (this.subType && factory && factory.io) {
             this.subType.cycle(factory, factory.io);
         }
@@ -141,6 +146,37 @@ class Building {
             this.smokeActive = false;
             this.smokeFrame = 0;
             factory.emitPopulationUpdate(this);
+        }
+    }
+
+    handleEconomy(game, factory) {
+        if (!factory || !factory.cityManager) {
+            return;
+        }
+
+        if (game.tick <= this.moneyTick) {
+            return;
+        }
+
+        this.moneyTick = game.tick + MONEY_TICK_INTERVAL;
+        const cityId = this.cityId ?? 0;
+        const cityManager = factory.cityManager;
+
+        if (this.isHouse()) {
+            const income = this.population * COST_INCOME_POPULATION;
+            if (income > 0) {
+                cityManager.addIncome(cityId, income);
+            }
+            return;
+        }
+
+        if (this.isResearch() && this.hasMaxPopulation()) {
+            cityManager.spendForResearch(cityId, COST_ITEM);
+            return;
+        }
+
+        if (this.isHospital()) {
+            cityManager.spendForHospital(cityId, COST_UPKEEP_HOSPITAL);
         }
     }
 }

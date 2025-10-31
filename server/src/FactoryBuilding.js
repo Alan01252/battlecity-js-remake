@@ -3,7 +3,7 @@
 
 
 var debug = require('debug')('BattleCity:FactoryBuilding');
-const { POPULATION_MAX_NON_HOUSE, FACTORY_ITEM_LIMITS } = require('./constants');
+const { POPULATION_MAX_NON_HOUSE, FACTORY_ITEM_LIMITS, COST_ITEM } = require('./constants');
 
 class FactoryBuilding {
 
@@ -28,6 +28,13 @@ class FactoryBuilding {
         }
 
         if (this.game.tick > this.productionTick) {
+            const cityManager = factory ? factory.cityManager : null;
+            const cityId = this.building.cityId ?? 0;
+            if (cityManager && !cityManager.trySpendForFactory(cityId, COST_ITEM)) {
+                this.productionTick = this.game.tick + 1000;
+                return;
+            }
+
             this.productionTick = this.game.tick + 7000;
 
             const icon = {

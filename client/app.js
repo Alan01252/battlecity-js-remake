@@ -78,6 +78,19 @@ const applyColorKey = (resource, color = COLOR_KEY_MAGENTA) => {
     resource.baseTexture = baseTexture;
 };
 
+const toFiniteNumber = (value, fallback = 0) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = parseInt(value, 10);
+        if (!Number.isNaN(parsed)) {
+            return parsed;
+        }
+    }
+    return fallback;
+};
+
 
 var type = "WebGL";
 
@@ -175,6 +188,9 @@ const resourcesToLoad = [
     { name: 'imgInventorySelection', url: assetUrl('imgInventorySelection.png') },
     { name: 'imgPopulation', url: assetUrl('imgPopulation.png') },
     { name: 'imgBlackNumbers', url: assetUrl('imgBlackNumbers.png') },
+    { name: 'imgMoneyBox', url: assetUrl('skins/BattleCity3.1/imgMoneyBox.png') },
+    { name: 'imgMoneyUp', url: assetUrl('skins/BattleCity3.1/imgMoneyUp.png') },
+    { name: 'imgMoneyDown', url: assetUrl('skins/BattleCity3.1/imgMoneyDown.png') },
     { name: 'imgTurretBase', url: assetUrl('skins/BattleCityDX/imgTurretBase.png') },
     { name: 'imgTurretHead', url: assetUrl('skins/BattleCityDX/imgTurretHead.png') },
     { name: 'imgSmoke', url: assetUrl('imgSmoke.png') },
@@ -235,6 +251,9 @@ function setup() {
         resources.imgTurretHead,
         resources.imgPopulation,
         resources.imgBlackNumbers,
+        resources.imgMoneyBox,
+        resources.imgMoneyUp,
+        resources.imgMoneyDown,
         resources.imgSmoke,
         resources.imgLEExplosion
     ];
@@ -258,6 +277,9 @@ function setup() {
     game.textures['imageTurretHead'] = resources.imgTurretHead.texture;
     game.textures['population'] = resources.imgPopulation.texture;
     game.textures['blackNumbers'] = resources.imgBlackNumbers.texture;
+    game.textures['imgMoneyBox'] = resources.imgMoneyBox.texture;
+    game.textures['imgMoneyUp'] = resources.imgMoneyUp.texture;
+    game.textures['imgMoneyDown'] = resources.imgMoneyDown.texture;
     game.textures['smoke'] = resources.imgSmoke.texture;
     game.textures['imageLEExplosion'] = resources.imgLEExplosion.texture;
     game.textures['imgLEExplosion'] = resources.imgLEExplosion.texture;
@@ -291,6 +313,66 @@ function setup() {
             updateCity: false,
         });
         game.forceDraw = true;
+    });
+    game.socketListener.on('city:finance', (payload) => {
+        let data = payload;
+        if (typeof payload === 'string') {
+            try {
+                data = JSON.parse(payload);
+            } catch (error) {
+                console.warn('Failed to parse finance payload', error);
+                return;
+            }
+        }
+        if (!data) {
+            return;
+        }
+        const cityIdRaw = data.id ?? data.city;
+        if (cityIdRaw === undefined || cityIdRaw === null) {
+            return;
+        }
+        const cityId = toFiniteNumber(cityIdRaw, 0);
+        if (!game.cities[cityId]) {
+            game.cities[cityId] = {
+                id: cityId,
+                canBuild: {},
+                cash: 0,
+                income: 0,
+                itemProduction: 0,
+                research: 0,
+                hospital: 0,
+                construction: 0,
+                grossIncome: 0,
+            };
+        }
+        const city = game.cities[cityId];
+        city.cash = toFiniteNumber(data.cash, city.cash ?? 0);
+        city.income = toFiniteNumber(data.income, 0);
+        city.itemProduction = toFiniteNumber(data.itemProduction, 0);
+        city.research = toFiniteNumber(data.research, 0);
+        city.hospital = toFiniteNumber(data.hospital, 0);
+        city.construction = toFiniteNumber(data.construction, 0);
+        if (data.grossIncome !== undefined) {
+            city.grossIncome = toFiniteNumber(data.grossIncome, city.grossIncome ?? 0);
+        } else {
+            city.grossIncome = city.income - (city.itemProduction + city.research + city.hospital + city.construction);
+        }
+        city.updatedAt = data.updatedAt ? toFiniteNumber(data.updatedAt, Date.now()) : Date.now();
+        game.forceDraw = true;
+    });
+    game.socketListener.on('build:denied', (payload) => {
+        let data = payload;
+        if (typeof payload === 'string') {
+            try {
+                data = JSON.parse(payload);
+            } catch (error) {
+                console.warn('Failed to parse build denied payload', error);
+                return;
+            }
+        }
+        if (data) {
+            game.buildingFactory.handleBuildDenied(data);
+        }
     });
 
 
