@@ -57,7 +57,7 @@ function createCities(game) {
     for (var j = 0; j < game.map.length; j++) {
         for (var i = 0; i < game.map.length; i++) {
             if ((game.map[i][j] == MAP_SQUARE_BUILDING)) {
-                var newCity = Object.assign({}, city);
+                var newCity = JSON.parse(JSON.stringify(city));
                 newCity.id = i;
                 newCity.x = i * 48;
                 newCity.y = j * 48;

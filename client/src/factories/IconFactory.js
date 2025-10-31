@@ -31,6 +31,9 @@ class IconFactory {
 
 
         this.iconListHead = icon;
+        if (this.game.player && icon.owner === this.game.player.id && this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
+            this.game.persistence.saveInventory();
+        }
         return icon;
     }
 
@@ -41,6 +44,9 @@ class IconFactory {
             icon.owner = this.game.player.id;
             icon.city = this.game.player.city ?? null;
             this.game.forceDraw = true;
+            if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
+                this.game.persistence.saveInventory();
+            }
         }
     }
 
@@ -54,6 +60,9 @@ class IconFactory {
                 this.deleteIcon(icon);
             }
             icon = icon.next;
+        }
+        if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
+            this.game.persistence.saveInventory();
         }
         return selectedIcon;
     }
@@ -72,6 +81,9 @@ class IconFactory {
                 icon.selected = false;
             }
             icon = icon.next;
+        }
+        if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
+            this.game.persistence.saveInventory();
         }
     }
 
@@ -107,6 +119,10 @@ class IconFactory {
             icon.previous.next = icon.next
         } else {
             this.iconListHead = icon.next;
+        }
+
+        if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
+            this.game.persistence.saveInventory();
         }
 
         return returnIcon;

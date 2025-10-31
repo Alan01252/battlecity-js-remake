@@ -27,6 +27,7 @@ import {drawBuilding} from "./src/draw/draw-building-interface";
 import {drawItems} from "./src/draw/draw-items";
 import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
+import {initPersistence} from "./src/storage/persistence";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -212,6 +213,7 @@ function setup() {
     var mapData = resources.mapData.data;
     mapBuilder.build(game, mapData);
     cityBuilder.build(game);
+    initPersistence(game);
 
     game.player.offset.x = game.cities[game.player.city].x + 48;
     game.player.offset.y = game.cities[game.player.city].y + 100;
@@ -262,6 +264,9 @@ function setup() {
     game.socketListener.on("connected", () => {
         game.player.id = game.socketListener.enterGame();
         console.log("Connected starting game");
+        if (game.persistence && typeof game.persistence.restoreInventory === 'function') {
+            game.persistence.restoreInventory();
+        }
     });
     game.socketListener.on('population:update', (update) => {
         game.buildingFactory.applyPopulationUpdate(update);

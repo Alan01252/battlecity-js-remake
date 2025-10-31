@@ -34,6 +34,11 @@ var unflatten = function (array, parent, tree) {
 
 var dependencyTree = unflatten(DEPENDENCY_TREE);
 
+const TYPE_LABEL_LOOKUP = Object.keys(LABELS).reduce((acc, key) => {
+    acc[LABELS[key].TYPE] = key;
+    return acc;
+}, {});
+
 class BuildingFactory {
 
     constructor(game) {
@@ -104,6 +109,8 @@ class BuildingFactory {
 
         if (shouldUpdateCity) {
             this.adjustAllowedBuilds(building)
+        } else {
+            this.applyResearchProgress(building.city, building.type);
         }
         console.log("Created building");
         console.log(building);
@@ -232,34 +239,9 @@ class BuildingFactory {
             return;
         }
 
-        Object.keys(this.game.cities[this.game.player.city].canBuild).forEach((id) => {
-
-            var tempId = LABELS[id].TYPE;
-            console.log(tempId + " " + this.game.isBuilding);
-            if (parseInt(tempId) == this.game.isBuilding) {
-
-                if (tempId != CAN_BUILD_HOUSE) {
-                    this.game.cities[this.game.player.city].canBuild[id] = HAS_BUILT;
-                }
-
-                var node = this.searchTree(dependencyTree[0], tempId);
-                if (node && node.children) {
-                    node.children.forEach((item) => {
-                        Object.keys(this.game.cities[this.game.player.city].canBuild).forEach((id) => {
-
-
-                            if (this.game.cities[this.game.player.city].canBuild[id] !== HAS_BUILT) {
-                                var tempId = LABELS[id].TYPE;
-                                console.log("finding children" + tempId + " " + item.id);
-                                if (parseInt(tempId) == item.id) {
-                                    this.game.cities[this.game.player.city].canBuild[id] = CAN_BUILD;
-                                }
-                            }
-                        });
-                    })
-                }
-            }
-        });
+        const cityId = building.city ?? this.game.player.city;
+        const buildingType = this.game.isBuilding || building.type;
+        this.applyResearchProgress(cityId, buildingType);
     }
 
 
@@ -297,6 +279,9 @@ class BuildingFactory {
                 itemsLeft: update.itemsLeft || 0,
                 city: update.city ?? 0,
             });
+            if (building) {
+                this.applyResearchProgress(building.city ?? 0, building.type);
+            }
         }
         if (!building) {
             return;
@@ -329,6 +314,40 @@ class BuildingFactory {
         }
 
         this.game.forceDraw = true;
+    }
+
+    applyResearchProgress(cityId, buildingType) {
+        if (buildingType == null || cityId == null || cityId === undefined) {
+            return;
+        }
+        const cityIndex = parseInt(cityId, 10);
+        const city = this.game.cities?.[cityIndex];
+        if (!city || !city.canBuild) {
+            return;
+        }
+        const typeKey = Number(buildingType);
+        const labelKey = TYPE_LABEL_LOOKUP[typeKey];
+        if (!labelKey || city.canBuild[labelKey] === undefined) {
+            return;
+        }
+
+        if (typeKey !== CAN_BUILD_HOUSE) {
+            city.canBuild[labelKey] = HAS_BUILT;
+        }
+
+        const node = this.searchTree(dependencyTree[0], typeKey);
+        if (node && node.children) {
+            node.children.forEach((child) => {
+                const unlockKey = TYPE_LABEL_LOOKUP[child.id];
+                if (unlockKey && city.canBuild[unlockKey] !== HAS_BUILT) {
+                    city.canBuild[unlockKey] = CAN_BUILD;
+                }
+            });
+        }
+
+        if (this.game.persistence && typeof this.game.persistence.saveCityState === 'function') {
+            this.game.persistence.saveCityState(cityIndex);
+        }
     }
 }
 
