@@ -20,6 +20,17 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Dropping a Mine icon spawns an armed mine item that remembers the owner's city, renders via the item tile layer, and is removed from the item list once triggered. (client/src/factories/ItemFactory.js:12, client/src/draw/draw-items.js:27)
 - Bomb icons snap to the tile grid when placed; armed bombs start a 5-second detonation timer, while unarmed bombs remain inert until dropped while armed. (client/src/factories/ItemFactory.js:135, client/src/draw/draw-items.js:14)
 - Factory output counts persist locally; on reload, stored `itemsLeft` values recreate the appropriate icons at each factory so players can pick up previously-produced stock. (client/src/factories/BuildingFactory.js:70, client/src/storage/persistence.js:71)
+- Inventory stacks repeatable items (bombs, mines, turrets) and shows a count overlay; selecting a bomb arms the stack so drops inherit the armed state. (client/src/factories/IconFactory.js:20, client/src/draw/draw-panel-interface.js:37)
+
+## Build Tree
+- Housing is available immediately and permits launching the two starting research lines.
+- Bazooka Research (→ Bazooka Factory) is unlocked from the start and, once completed, enables Cloak Research, MedKit Research, and their factories.
+- Turret Research (→ Turret Factory) is also granted at the start and unlocks Plasma Turret Research and Mine Research.
+- Cloak Research unlocks Cloak Factory plus Orb Research and Time Bomb Research, which then unlock their matching factories.
+- MedKit Research unlocks MedKit Factory and allows the city to construct Hospitals.
+- Plasma Turret Research unlocks Plasma Turret Factory as well as Sleeper Research and Wall Research; each research unlocks its paired factory.
+- Mine Research unlocks Mine Factory and DFG Research (and then DFG Factory).
+- Orb Research grants Orb Factory production and unlocks Flare Gun Research (and the Flare Gun Factory).
 
 ## Networking
 - Socket.IO server runs on port 8021 and rebroadcasts player, bullet, and building updates it receives from clients.

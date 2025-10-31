@@ -45,23 +45,33 @@ export const CANT_BUILD = 0;
 export const CAN_BUILD = 1;
 export const HAS_BUILT = 2;
 
+export const CAN_BUILD_HOSPITAL = 200;
 export const CAN_BUILD_HOUSE = 300;
 
-export const CAN_BUILD_LASER_RESEARCH = 412;
+export const CAN_BUILD_BAZOOKA_RESEARCH = 401;
+export const CAN_BUILD_BAZOOKA_FACTORY = 101;
 export const CAN_BUILD_TURRET_RESEARCH = 409;
-export const CAN_BUILD_BOMB_RESEARCH = 403;
-export const CAN_BUILD_MEDKIT_RESEARCH = 402;
-export const CAN_BUILD_MINE_RESEARCH = 404;
-export const CAN_BUILD_ORB_RESEARCH = 405;
-export const CAN_BUILD_COUGAR_RESEARCH = 401;
-
-export const CAN_BUILD_LASER_FACTORY = 112;
 export const CAN_BUILD_TURRET_FACTORY = 109;
-export const CAN_BUILD_BOMB_FACTORY = 103;
+export const CAN_BUILD_CLOAK_RESEARCH = 400;
+export const CAN_BUILD_CLOAK_FACTORY = 100;
+export const CAN_BUILD_MEDKIT_RESEARCH = 402;
 export const CAN_BUILD_MEDKIT_FACTORY = 102;
+export const CAN_BUILD_PLASMA_RESEARCH = 411;
+export const CAN_BUILD_PLASMA_FACTORY = 111;
+export const CAN_BUILD_MINE_RESEARCH = 404;
 export const CAN_BUILD_MINE_FACTORY = 104;
+export const CAN_BUILD_ORB_RESEARCH = 405;
 export const CAN_BUILD_ORB_FACTORY = 105;
-export const CAN_BUILD_COUGAR_FACTORY = 105;
+export const CAN_BUILD_BOMB_RESEARCH = 403;
+export const CAN_BUILD_BOMB_FACTORY = 103;
+export const CAN_BUILD_SLEEPER_RESEARCH = 410;
+export const CAN_BUILD_SLEEPER_FACTORY = 110;
+export const CAN_BUILD_WALL_RESEARCH = 408;
+export const CAN_BUILD_WALL_FACTORY = 108;
+export const CAN_BUILD_DFG_RESEARCH = 407;
+export const CAN_BUILD_DFG_FACTORY = 107;
+export const CAN_BUILD_FLARE_RESEARCH = 406;
+export const CAN_BUILD_FLARE_FACTORY = 106;
 
 export const ITEM_TYPE_CLOAK = 0;
 export const ITEM_TYPE_ROCKET = 1;
@@ -77,119 +87,261 @@ export const ITEM_TYPE_SLEEPER = 10;
 export const ITEM_TYPE_PLASMA = 11;
 export const ITEM_TYPE_LASER = 12;
 
-export const DEPENDENCY_TREE = [
-    {'id': CAN_BUILD_HOUSE, 'parentid': 0},
-
-    {'id': CAN_BUILD_LASER_RESEARCH, 'parentid': CAN_BUILD_HOUSE},
-    {'id': CAN_BUILD_TURRET_RESEARCH, 'parentid': CAN_BUILD_HOUSE},
-    {'id': CAN_BUILD_BOMB_RESEARCH, 'parentid': CAN_BUILD_LASER_RESEARCH},
-    {'id': CAN_BUILD_MEDKIT_RESEARCH, 'parentid': CAN_BUILD_TURRET_RESEARCH},
-    {'id': CAN_BUILD_MINE_RESEARCH, 'parentid': CAN_BUILD_BOMB_RESEARCH},
-    {'id': CAN_BUILD_ORB_RESEARCH, 'parentid': CAN_BUILD_MINE_RESEARCH},
-    {'id': CAN_BUILD_COUGAR_RESEARCH, 'parentid': CAN_BUILD_MEDKIT_RESEARCH},
-
-    {'id': CAN_BUILD_LASER_FACTORY, 'parentid': CAN_BUILD_LASER_RESEARCH},
-    {'id': CAN_BUILD_TURRET_FACTORY, 'parentid': CAN_BUILD_TURRET_RESEARCH},
-    {'id': CAN_BUILD_BOMB_FACTORY, 'parentid': CAN_BUILD_BOMB_RESEARCH},
-    {'id': CAN_BUILD_MEDKIT_FACTORY, 'parentid': CAN_BUILD_MEDKIT_RESEARCH},
-    {'id': CAN_BUILD_MINE_FACTORY, 'parentid': CAN_BUILD_MINE_RESEARCH},
-    {'id': CAN_BUILD_ORB_FACTORY, 'parentid': CAN_BUILD_ORB_RESEARCH},
-    {'id': CAN_BUILD_COUGAR_FACTORY, 'parentid': CAN_BUILD_COUGAR_RESEARCH},
+export const BUILD_TREE_CONFIG = [
+    {
+        key: 'CAN_BUILD_HOSPITAL',
+        type: CAN_BUILD_HOSPITAL,
+        label: 'Hospital',
+        icon: 12,
+        image: BUILDING_REPAIR,
+        parent: CAN_BUILD_MEDKIT_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_HOUSE',
+        type: CAN_BUILD_HOUSE,
+        label: 'Housing',
+        icon: 0,
+        image: BUILDING_HOUSE,
+        parent: 0,
+        initial: CAN_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_BAZOOKA_RESEARCH',
+        type: CAN_BUILD_BAZOOKA_RESEARCH,
+        label: 'Bazooka Research',
+        icon: 2,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_HOUSE,
+        initial: CAN_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_BAZOOKA_FACTORY',
+        type: CAN_BUILD_BAZOOKA_FACTORY,
+        label: 'Bazooka Factory',
+        icon: 2,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_BAZOOKA_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_TURRET_RESEARCH',
+        type: CAN_BUILD_TURRET_RESEARCH,
+        label: 'Turret Research',
+        icon: 9,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_HOUSE,
+        initial: CAN_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_TURRET_FACTORY',
+        type: CAN_BUILD_TURRET_FACTORY,
+        label: 'Turret Factory',
+        icon: 9,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_TURRET_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_CLOAK_RESEARCH',
+        type: CAN_BUILD_CLOAK_RESEARCH,
+        label: 'Cloak Research',
+        icon: 1,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_BAZOOKA_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_CLOAK_FACTORY',
+        type: CAN_BUILD_CLOAK_FACTORY,
+        label: 'Cloak Factory',
+        icon: 1,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_CLOAK_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_MEDKIT_RESEARCH',
+        type: CAN_BUILD_MEDKIT_RESEARCH,
+        label: 'MedKit Research',
+        icon: 3,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_BAZOOKA_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_MEDKIT_FACTORY',
+        type: CAN_BUILD_MEDKIT_FACTORY,
+        label: 'MedKit Factory',
+        icon: 3,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_MEDKIT_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_PLASMA_RESEARCH',
+        type: CAN_BUILD_PLASMA_RESEARCH,
+        label: 'Plasma Turret Research',
+        icon: 10,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_TURRET_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_PLASMA_FACTORY',
+        type: CAN_BUILD_PLASMA_FACTORY,
+        label: 'Plasma Turret Factory',
+        icon: 10,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_PLASMA_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_MINE_RESEARCH',
+        type: CAN_BUILD_MINE_RESEARCH,
+        label: 'Mine Research',
+        icon: 5,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_TURRET_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_MINE_FACTORY',
+        type: CAN_BUILD_MINE_FACTORY,
+        label: 'Mine Factory',
+        icon: 5,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_MINE_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_ORB_RESEARCH',
+        type: CAN_BUILD_ORB_RESEARCH,
+        label: 'Orb Research',
+        icon: 6,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_CLOAK_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_ORB_FACTORY',
+        type: CAN_BUILD_ORB_FACTORY,
+        label: 'Orb Factory',
+        icon: 6,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_ORB_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_BOMB_RESEARCH',
+        type: CAN_BUILD_BOMB_RESEARCH,
+        label: 'Time Bomb Research',
+        icon: 4,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_CLOAK_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_BOMB_FACTORY',
+        type: CAN_BUILD_BOMB_FACTORY,
+        label: 'Time Bomb Factory',
+        icon: 4,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_BOMB_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_SLEEPER_RESEARCH',
+        type: CAN_BUILD_SLEEPER_RESEARCH,
+        label: 'Sleeper Research',
+        icon: 8,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_PLASMA_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_SLEEPER_FACTORY',
+        type: CAN_BUILD_SLEEPER_FACTORY,
+        label: 'Sleeper Factory',
+        icon: 8,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_SLEEPER_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_WALL_RESEARCH',
+        type: CAN_BUILD_WALL_RESEARCH,
+        label: 'Wall Research',
+        icon: 11,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_PLASMA_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_WALL_FACTORY',
+        type: CAN_BUILD_WALL_FACTORY,
+        label: 'Wall Factory',
+        icon: 11,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_WALL_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_DFG_RESEARCH',
+        type: CAN_BUILD_DFG_RESEARCH,
+        label: 'DFG Research',
+        icon: 8,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_MINE_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_DFG_FACTORY',
+        type: CAN_BUILD_DFG_FACTORY,
+        label: 'DFG Factory',
+        icon: 8,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_DFG_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_FLARE_RESEARCH',
+        type: CAN_BUILD_FLARE_RESEARCH,
+        label: 'Flare Gun Research',
+        icon: 7,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_ORB_RESEARCH,
+        initial: CANT_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_FLARE_FACTORY',
+        type: CAN_BUILD_FLARE_FACTORY,
+        label: 'Flare Gun Factory',
+        icon: 7,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_FLARE_RESEARCH,
+        initial: CANT_BUILD,
+    },
 ];
 
+export const DEPENDENCY_TREE = BUILD_TREE_CONFIG.map((entry) => ({
+    id: entry.type,
+    parentid: entry.parent ?? 0,
+}));
 
-export const LABELS = {
-    CAN_BUILD_HOUSE: {
-        ICON: 0,
-        IMAGE: BUILDING_HOUSE,
-        TYPE: CAN_BUILD_HOUSE,
-        LABEL: "Housing",
-    },
-    CAN_BUILD_LASER_RESEARCH: {
-        ICON: 1,
-        TYPE: CAN_BUILD_LASER_RESEARCH,
-        IMAGE: BUILDING_RESEARCH,
-        LABEL: "Laser Research",
-    },
-    CAN_BUILD_TURRET_RESEARCH: {
-        ICON: 10,
-        TYPE: CAN_BUILD_TURRET_RESEARCH,
-        IMAGE: BUILDING_RESEARCH,
-        LABEL: "Turret Research",
-    },
-    CAN_BUILD_BOMB_RESEARCH: {
-        ICON: 4,
-        TYPE: CAN_BUILD_BOMB_RESEARCH,
-        IMAGE: BUILDING_RESEARCH,
-        LABEL: "Bomb Research",
-    },
-    CAN_BUILD_MEDKIT_RESEARCH: {
-        ICON: 3,
-        TYPE: CAN_BUILD_MEDKIT_RESEARCH,
-        IMAGE: BUILDING_RESEARCH,
-        LABEL: "Medkit Research",
-    },
-    CAN_BUILD_MINE_RESEARCH: {
-        ICON: 5,
-        TYPE: CAN_BUILD_MINE_RESEARCH,
-        IMAGE: BUILDING_RESEARCH,
-        LABEL: "Mine Research",
-    },
-    CAN_BUILD_ORB_RESEARCH: {
-        ICON: 6,
-        TYPE: CAN_BUILD_ORB_RESEARCH,
-        IMAGE: BUILDING_RESEARCH,
-        LABEL: "Orb Research",
-    },
-    CAN_BUILD_COUGAR_RESEARCH: {
-        ICON: 2,
-        TYPE: CAN_BUILD_COUGAR_RESEARCH,
-        IMAGE: BUILDING_RESEARCH,
-        LABEL: "Cougar Research",
-    },
+export const LABELS = BUILD_TREE_CONFIG.reduce((acc, entry) => {
+    acc[entry.key] = {
+        ICON: entry.icon,
+        IMAGE: entry.image,
+        TYPE: entry.type,
+        LABEL: entry.label,
+    };
+    return acc;
+}, {});
 
-    CAN_BUILD_LASER_FACTORY: {
-        ICON: 1,
-        TYPE: CAN_BUILD_LASER_FACTORY,
-        IMAGE: BUILDING_FACTORY,
-        LABEL: "Laser Factory",
-    },
-    CAN_BUILD_TURRET_FACTORY: {
-        ICON: 10,
-        TYPE: CAN_BUILD_TURRET_FACTORY,
-        IMAGE: BUILDING_FACTORY,
-        LABEL: "Turret Factory",
-    },
-    CAN_BUILD_BOMB_FACTORY: {
-        ICON: 4,
-        TYPE: CAN_BUILD_BOMB_FACTORY,
-        IMAGE: BUILDING_FACTORY,
-        LABEL: "Bomb Factory",
-    },
-    CAN_BUILD_MEDKIT_FACTORY: {
-        ICON: 3,
-        TYPE: CAN_BUILD_MEDKIT_FACTORY,
-        IMAGE: BUILDING_FACTORY,
-        LABEL: "Medkit Factory",
-    },
-    CAN_BUILD_MINE_FACTORY: {
-        ICON: 3,
-        TYPE: CAN_BUILD_MINE_FACTORY,
-        IMAGE: BUILDING_FACTORY,
-        LABEL: "Mine Factory",
-    },
-    CAN_BUILD_ORB_FACTORY: {
-        ICON: 6,
-        TYPE: CAN_BUILD_ORB_FACTORY,
-        IMAGE: BUILDING_FACTORY,
-        LABEL: "Orb Factory",
-    },
-    CAN_BUILD_COUGAR_FACTORY: {
-        ICON: 2,
-        TYPE: CAN_BUILD_COUGAR_FACTORY,
-        IMAGE: BUILDING_FACTORY,
-        LABEL: "Cougar Factory",
-    },
-
-
-};
+export const DEFAULT_CITY_CAN_BUILD = Object.freeze(
+    BUILD_TREE_CONFIG.reduce((acc, entry) => {
+        acc[entry.key] = entry.initial ?? CANT_BUILD;
+        return acc;
+    }, {})
+);
