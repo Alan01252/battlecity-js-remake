@@ -7,6 +7,7 @@ const FactoryBuilding = require('./FactoryBuilding');
 const {
     isHouse,
     isFactory,
+    POPULATION_MAX_HOUSE,
 } = require('./constants');
 
 class BuildingFactory {
@@ -293,7 +294,8 @@ class BuildingFactory {
     }
 
     updateHousePopulation(house) {
-        house.population = house.attachments.reduce((total, slot) => total + slot.population, 0);
+        const total = house.attachments.reduce((sum, slot) => sum + slot.population, 0);
+        house.population = Math.min(POPULATION_MAX_HOUSE, total);
     }
 
     backfillAttachmentsForHouse(house) {

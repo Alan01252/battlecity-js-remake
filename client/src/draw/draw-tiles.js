@@ -66,7 +66,7 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
     if (buildingOverlayTexture) {
         switch (baseType) {
             case BUILDING_RESEARCH:
-                backgroundTiles.addFrame(buildingOverlayTexture, (i * 48) + 14, (j * 48) + 100);
+                backgroundTiles.addFrame(buildingOverlayTexture, (i * 48) + 14, (j * 48) + 98);
                 break;
             case BUILDING_FACTORY:
                 backgroundTiles.addFrame(buildingOverlayTexture, (i * 48) + 56, (j * 48) + 52);
@@ -78,44 +78,34 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
         const frameWidth = 48;
         const frameHeight = 48;
         const columns = 7;
-        const totalFrames = columns * 2;
-        const isHouseBuilding = baseType === BUILDING_HOUSE;
+        const maxStage = columns - 1; // stages 0-6 per original sprite sheet
+        const buildingFamily = building ? Math.floor(Number(building.type) / 100) : baseType;
+        const isHouseBuilding = buildingFamily === BUILDING_HOUSE;
+        const isCommandCenter = buildingFamily === BUILDING_COMMAND_CENTER;
         const maxPop = isHouseBuilding ? POPULATION_MAX_HOUSE : POPULATION_MAX_NON_HOUSE;
         if (maxPop > 0) {
             const clampedPop = Math.max(0, Math.min(maxPop, building.population));
-            const frameIndex = Math.min(totalFrames - 1, Math.floor((clampedPop / maxPop) * (totalFrames - 1)));
-            const frameColumn = frameIndex % columns;
-            const frameRow = Math.floor(frameIndex / columns);
+            const frameIndex = Math.min(maxStage, Math.floor((clampedPop * maxStage) / maxPop));
+            const frameColumn = frameIndex; // single row progression (0-6)
+            const frameRow = isCommandCenter ? 1 : 0;
 
             const populationTexture = new PIXI.Texture(
                 game.textures['population'].baseTexture,
                 new PIXI.Rectangle(frameColumn * frameWidth, frameRow * frameHeight, frameWidth, frameHeight)
             );
 
-            let offsetX = 96;
-            let offsetY = 48;
+            const populationOffsets = {
+                [BUILDING_COMMAND_CENTER]: { x: 96, y: 49 },
+                [BUILDING_FACTORY]: { x: 96, y: 48 },
+                [BUILDING_REPAIR]: { x: 92, y: 92 },
+                [BUILDING_HOUSE]: { x: 96, y: 90 },
+                [BUILDING_RESEARCH]: { x: 96, y: 90 },
+            };
 
-            switch (baseType) {
-                case BUILDING_COMMAND_CENTER:
-                    offsetY = 49;
-                    break;
-                case BUILDING_FACTORY:
-                    offsetY = 48;
-                    break;
-                case BUILDING_REPAIR:
-                    offsetX = 92;
-                    offsetY = 92;
-                    break;
-                case BUILDING_HOUSE:
-                    offsetY = 90;
-                    break;
-                case BUILDING_RESEARCH:
-                    offsetY = 90;
-                    break;
-                default:
-                    offsetX = 96;
-                    offsetY = 48;
-            }
+            const { x: offsetX = 96, y: offsetY = 48 } =
+                populationOffsets[buildingFamily] ||
+                populationOffsets[baseType] ||
+                { x: 96, y: 48 };
 
             const overlayX = (i * 48) + offsetX;
             const overlayY = (j * 48) + offsetY;
