@@ -1,3 +1,5 @@
+import {ITEM_TYPE_BOMB} from "../constants";
+
 const CITY_STORAGE_KEY = 'battlecity:cities';
 const INVENTORY_STORAGE_KEY = 'battlecity:inventory';
 const FACTORY_STORAGE_KEY = 'battlecity:factories';
@@ -59,6 +61,8 @@ const capturePlayerInventory = (game) => {
             inventory.push({
                 type: icon.type,
                 selected: !!icon.selected,
+                quantity: icon.quantity ?? 1,
+                armed: !!icon.armed,
             });
         }
         icon = icon.next;
@@ -93,10 +97,15 @@ const restoreInventoryIfNeeded = (game) => {
         return;
     }
 
+    game.player.bombsArmed = false;
     pendingInventory.forEach((entry, index) => {
-        const icon = game.iconFactory?.newIcon(game.player.id, game.player.offset.x, game.player.offset.y, entry.type);
-        if (icon) {
-            icon.selected = !!entry.selected && pendingInventory.findIndex((item) => item.selected) === index;
+        const icon = game.iconFactory?.newIcon(game.player.id, game.player.offset.x, game.player.offset.y, entry.type, {
+            quantity: entry.quantity ?? 1,
+            selected: !!entry.selected && pendingInventory.findIndex((item) => item.selected) === index,
+            armed: !!entry.armed,
+        });
+        if (icon && icon.type === ITEM_TYPE_BOMB && icon.armed) {
+            game.player.bombsArmed = true;
         }
     });
     pendingInventory = [];

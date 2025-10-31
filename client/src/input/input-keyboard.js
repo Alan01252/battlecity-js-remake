@@ -1,4 +1,5 @@
 import {TIMER_SHOOT_LASER} from "../constants";
+import {ITEM_TYPE_BOMB} from "../constants";
 /**
  * Created by alan on 27/03/17.
  */
@@ -97,7 +98,7 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
 
     d.press = function () {
 
-        var icon = game.iconFactory.dropSelectedIcon();
+        var dropInfo = game.iconFactory.dropSelectedIcon();
 
 
         var angle = -game.player.direction;
@@ -107,21 +108,37 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         var x2 = ((game.player.offset.x)) + (x * 20);
         var y2 = ((game.player.offset.y) + 20) + (y * 20);
 
-        if (icon) {
-            var item = game.itemFactory.newItem(icon, x2, y2, icon.type);
+        if (dropInfo) {
+            var item = game.itemFactory.newItem(dropInfo, x2, y2, dropInfo.type);
             if (item) {
                 game.player.offset.x += 30;
                 game.player.offset.x += 30;
             }
             // It's not been converted to an item and so is able to be picked up again
             if (!item) {
-                game.iconFactory.newIcon(null, parseInt(x2), parseInt(y2), icon.type)
+                game.iconFactory.newIcon(null, parseInt(x2), parseInt(y2), dropInfo.type, {skipProductionUpdate: true})
             }
         }
 
     };
 
     b.press = function () {
+        if (game.iconFactory && typeof game.iconFactory.getSelectedIcon === 'function') {
+            const selectedIcon = game.iconFactory.getSelectedIcon(game.player.id);
+            if (selectedIcon && selectedIcon.type === ITEM_TYPE_BOMB) {
+                selectedIcon.armed = !selectedIcon.armed;
+                if (!selectedIcon.selected) {
+                    selectedIcon.selected = true;
+                }
+                game.player.bombsArmed = selectedIcon.armed;
+                if (game.persistence && typeof game.persistence.saveInventory === 'function') {
+                    game.persistence.saveInventory();
+                }
+                game.forceDraw = true;
+                console.log(`Bombs ${selectedIcon.armed ? 'activated' : 'deactivated'}`);
+                return;
+            }
+        }
         game.player.bombsArmed = !game.player.bombsArmed;
         console.log(`Bombs ${game.player.bombsArmed ? 'activated' : 'deactivated'}`);
     };

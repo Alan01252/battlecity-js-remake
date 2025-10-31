@@ -55,13 +55,20 @@ var drawMine = (game, itemTiles, item, offTileX, offTileY) => {
 };
 
 var drawBomb = (game, itemTiles, item, offTileX, offTileY) => {
-    var tmpText = new PIXI.Texture(
-        game.textures['imageItems'].baseTexture,
-        new PIXI.Rectangle(ITEM_TYPE_BOMB * 32, 0, 32, 32)
-    );
-    var drawX = item.x - game.player.offset.x + offTileX + 8;
-    var drawY = item.y - game.player.offset.y + offTileY + 8;
-    itemTiles.addFrame(tmpText, drawX, drawY);
+    const baseTexture = game.textures['imageItems']?.baseTexture;
+    if (!baseTexture) {
+        return;
+    }
+
+    const armed = !!item.active;
+    const frame = armed
+        ? new PIXI.Rectangle(144, 91, 48, 48)
+        : new PIXI.Rectangle(ITEM_TYPE_BOMB * 48, 42, 48, 48);
+
+    const texture = new PIXI.Texture(baseTexture, frame);
+    const drawX = item.x - game.player.offset.x + offTileX;
+    const drawY = item.y - game.player.offset.y + offTileY;
+    itemTiles.addFrame(texture, drawX, drawY);
 };
 
 export const drawItems = (game, itemTiles) => {

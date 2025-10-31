@@ -158,6 +158,10 @@ class ItemFactory {
             adjustedY = Math.floor(y / 48) * 48;
         }
 
+        const bombArmed = owner && typeof owner === 'object' && owner.armed !== undefined
+            ? !!owner.armed
+            : (this.game.player?.bombsArmed ?? false);
+
         var item = {
             "owner": ownerId,
             "ownerId": ownerId,
@@ -169,7 +173,7 @@ class ItemFactory {
             "targetTeam": null,
             "type": type,
             "lastFired": 0,
-            "active": type !== ITEM_TYPE_BOMB,
+            "active": type === ITEM_TYPE_BOMB ? bombArmed : true,
             "detonateTick": null,
             "next": null,
             "previous": null
@@ -186,12 +190,10 @@ class ItemFactory {
         console.log(item);
         this.game.forceDraw = true;
 
-        if (type === ITEM_TYPE_BOMB) {
-            this.armBomb(item, this.game.player?.bombsArmed ?? false);
-        }
-
-
         this.itemListHead = item;
+        if (type === ITEM_TYPE_BOMB) {
+            this.armBomb(item, bombArmed);
+        }
         return item;
     }
 

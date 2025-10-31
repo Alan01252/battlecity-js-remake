@@ -149,6 +149,7 @@ const game = {
         },
         bombsArmed: false
     },
+    explosions: [],
     app: app,
     stage: app.stage,
     objectContainer: objectContainer
@@ -177,6 +178,7 @@ const resourcesToLoad = [
     { name: 'imgTurretBase', url: assetUrl('skins/BattleCityDX/imgTurretBase.png') },
     { name: 'imgTurretHead', url: assetUrl('skins/BattleCityDX/imgTurretHead.png') },
     { name: 'imgSmoke', url: assetUrl('imgSmoke.png') },
+    { name: 'imgLEExplosion', url: assetUrl('imgLExplosion.png') },
     {
         name: 'mapData',
         url: assetUrl('map.dat'),
@@ -233,7 +235,8 @@ function setup() {
         resources.imgTurretHead,
         resources.imgPopulation,
         resources.imgBlackNumbers,
-        resources.imgSmoke
+        resources.imgSmoke,
+        resources.imgLEExplosion
     ];
 
     colorKeyTargets.forEach((resource) => applyColorKey(resource));
@@ -256,6 +259,8 @@ function setup() {
     game.textures['population'] = resources.imgPopulation.texture;
     game.textures['blackNumbers'] = resources.imgBlackNumbers.texture;
     game.textures['smoke'] = resources.imgSmoke.texture;
+    game.textures['imageLEExplosion'] = resources.imgLEExplosion.texture;
+    game.textures['imgLEExplosion'] = resources.imgLEExplosion.texture;
 
 
     setupKeyboardInputs(game);

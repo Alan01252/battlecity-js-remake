@@ -179,6 +179,17 @@ class BuildingFactory {
         this.game.map[building.x][building.y] = 0;
         this.game.tiles[building.x][building.y] = 0;
 
+        if (Array.isArray(this.game.explosions)) {
+            const tileX = Number.isFinite(building.x) ? Number(building.x) : 0;
+            const tileY = Number.isFinite(building.y) ? Number(building.y) : 0;
+            this.game.explosions.push({
+                x: tileX * 48,
+                y: tileY * 48,
+                frame: 0,
+                nextFrameTick: (this.game.tick || Date.now()) + 75
+            });
+        }
+
         if (isFactoryType(building.type)) {
             const drop = this.getFactoryDropPosition(building);
             const itemType = building.type % 100;

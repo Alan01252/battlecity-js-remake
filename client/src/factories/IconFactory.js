@@ -1,3 +1,5 @@
+import {ITEM_TYPE_BOMB} from "../constants";
+
 class IconFactory {
 
     constructor(game) {
@@ -17,7 +19,10 @@ class IconFactory {
             "type": type,
             "next": null,
             "previous": null,
-            "sourceBuildingId": options.sourceBuildingId ?? null
+            "sourceBuildingId": options.sourceBuildingId ?? null,
+            "quantity": options.quantity ?? 1,
+            "selected": !!options.selected,
+            "armed": !!options.armed
 
         };
 
@@ -32,6 +37,8 @@ class IconFactory {
 
 
         this.iconListHead = icon;
+        icon.quantity = Math.max(1, parseInt(icon.quantity, 10) || 1);
+
         if (this.game.buildingFactory && icon.owner == null) {
             if (!icon.sourceBuildingId && typeof this.game.buildingFactory.assignIconSource === 'function') {
                 const building = this.game.buildingFactory.assignIconSource(icon);
@@ -46,6 +53,23 @@ class IconFactory {
         if (this.game.player && icon.owner === this.game.player.id && this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
             this.game.persistence.saveInventory();
         }
+        if (icon.owner === this.game.player?.id && icon.selected) {
+            let node = this.iconListHead;
+            while (node) {
+                if (node !== icon && node.owner === icon.owner) {
+                    node.selected = false;
+                    if (node.type === ITEM_TYPE_BOMB) {
+                        node.armed = false;
+                    }
+                }
+                node = node.next;
+            }
+            if (icon.type === ITEM_TYPE_BOMB) {
+                icon.armed = !!icon.armed;
+                this.game.player.bombsArmed = icon.armed;
+            }
+            this.game.forceDraw = true;
+        }
         return icon;
     }
 
@@ -53,12 +77,26 @@ class IconFactory {
     pickupIcon() {
         var icon = this.findIconByLocation();
         if (icon) {
-            icon.owner = this.game.player.id;
+            const ownerId = this.game.player.id;
+            const existing = this.findOwnedIconByType(ownerId, icon.type);
+            const quantityToAdd = icon.quantity ?? 1;
+
+            icon.owner = ownerId;
             icon.city = this.game.player.city ?? null;
-            this.game.forceDraw = true;
+            icon.quantity = quantityToAdd;
+            icon.selected = false;
+            icon.armed = false;
+
             if (this.game.buildingFactory && typeof this.game.buildingFactory.handleIconCollected === 'function') {
                 this.game.buildingFactory.handleIconCollected(icon);
             }
+
+            if (existing && existing !== icon) {
+                existing.quantity = (existing.quantity ?? 1) + quantityToAdd;
+                this.deleteIcon(icon);
+            }
+
+            this.game.forceDraw = true;
             if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
                 this.game.persistence.saveInventory();
             }
@@ -70,16 +108,45 @@ class IconFactory {
         var selectedIcon = null;
         while (icon) {
             if (icon.owner == this.game.player.id && icon.selected) {
-                this.game.forceDraw = true;
                 selectedIcon = icon;
-                this.deleteIcon(icon);
+                break;
             }
             icon = icon.next;
         }
+        if (!selectedIcon) {
+            return null;
+        }
+
+        const quantity = selectedIcon.quantity ?? 1;
+        const dropInfo = {
+            type: selectedIcon.type,
+            armed: !!selectedIcon.armed,
+            owner: this.game.player.id,
+            city: this.game.player.city ?? null,
+            teamId: this.game.player.city ?? null,
+        };
+
+        if (quantity > 1) {
+            selectedIcon.quantity = quantity - 1;
+            selectedIcon.selected = true;
+        } else {
+            this.deleteIcon(selectedIcon);
+        }
+
+        if (dropInfo.type === ITEM_TYPE_BOMB) {
+            if (quantity > 1) {
+                selectedIcon.armed = dropInfo.armed;
+                this.game.player.bombsArmed = selectedIcon.armed;
+            } else {
+                this.game.player.bombsArmed = false;
+            }
+        }
+
+        this.game.forceDraw = true;
         if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
             this.game.persistence.saveInventory();
         }
-        return selectedIcon;
+        return dropInfo;
     }
 
     /**
@@ -96,6 +163,12 @@ class IconFactory {
                 icon.selected = false;
             }
             icon = icon.next;
+        }
+        if (selectedIcon.type === ITEM_TYPE_BOMB) {
+            selectedIcon.armed = selectedIcon.selected;
+            this.game.player.bombsArmed = selectedIcon.armed;
+        } else if (selectedIcon.selected) {
+            this.game.player.bombsArmed = false;
         }
         if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
             this.game.persistence.saveInventory();
@@ -123,6 +196,28 @@ class IconFactory {
         return null;
     }
 
+    findOwnedIconByType(ownerId, type) {
+        var icon = this.getHead();
+        while (icon) {
+            if (icon.owner === ownerId && icon.type === type) {
+                return icon;
+            }
+            icon = icon.next;
+        }
+        return null;
+    }
+
+    getSelectedIcon(ownerId) {
+        var icon = this.getHead();
+        while (icon) {
+            if (icon.owner === ownerId && icon.selected) {
+                return icon;
+            }
+            icon = icon.next;
+        }
+        return null;
+    }
+
 
     deleteIcon(icon) {
         var returnIcon = icon.next;
@@ -137,8 +232,7 @@ class IconFactory {
             this.iconListHead = icon.next;
         }
 
-        if (icon.owner !== null && icon.owner !== undefined &&
-            this.game.player && icon.owner === this.game.player.id &&
+        if (this.game.player && icon.owner === this.game.player.id &&
             this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
             this.game.persistence.saveInventory();
         }

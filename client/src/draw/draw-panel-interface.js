@@ -7,6 +7,33 @@ import {ITEM_TYPE_MINE} from "../constants";
 import {ITEM_TYPE_MEDKIT} from "../constants";
 import {ITEM_TYPE_ROCKET} from "../constants";
 import {ITEM_TYPE_BOMB} from "../constants";
+import {ITEM_TYPE_ORB} from "../constants";
+import {ITEM_TYPE_CLOAK} from "../constants";
+import {ITEM_TYPE_DFG} from "../constants";
+import {ITEM_TYPE_WALL} from "../constants";
+import {ITEM_TYPE_SLEEPER} from "../constants";
+import {ITEM_TYPE_PLASMA} from "../constants";
+import {ITEM_TYPE_FLARE} from "../constants";
+
+const INVENTORY_SLOTS = {
+    [ITEM_TYPE_LASER]: {x: 7, y: 267},
+    [ITEM_TYPE_ROCKET]: {x: 42, y: 267},
+    [ITEM_TYPE_MEDKIT]: {x: 77, y: 267},
+    [ITEM_TYPE_BOMB]: {x: 7, y: 302},
+    [ITEM_TYPE_MINE]: {x: 42, y: 302},
+    [ITEM_TYPE_ORB]: {x: 77, y: 302},
+    [ITEM_TYPE_FLARE]: {x: 7, y: 337},
+    [ITEM_TYPE_DFG]: {x: 42, y: 337},
+    [ITEM_TYPE_WALL]: {x: 77, y: 337},
+    [ITEM_TYPE_TURRET]: {x: 7, y: 372},
+    [ITEM_TYPE_SLEEPER]: {x: 42, y: 372},
+    [ITEM_TYPE_PLASMA]: {x: 77, y: 372},
+    [ITEM_TYPE_CLOAK]: {x: 112, y: 267},
+};
+
+const resolveSlotPosition = (type, defaultX, defaultY) => {
+    return INVENTORY_SLOTS[type] ?? {x: defaultX, y: defaultY};
+};
 
 var drawPanel = (game, stage) => {
     var interfaceTop = new PIXI.Sprite(game.textures["interfaceTop"]);
@@ -31,40 +58,24 @@ var drawItems = (game, stage) => {
         if (icon.owner == game.player.id) {
 
 
+            let frameX = icon.type * 32;
+            let frameY = 0;
+            if (icon.type === ITEM_TYPE_BOMB && icon.armed) {
+                frameX = 152;
+                frameY = 89;
+            }
+
             var tmpText = new PIXI.Texture(
                 game.textures['imageItems'].baseTexture,
-                new PIXI.Rectangle(icon.type * 32, 0, 32, 32)
+                new PIXI.Rectangle(frameX, frameY, 32, 32)
             );
 
             var iconSprite = new PIXI.Sprite(tmpText);
 
 
-            switch (icon.type) {
-                case ITEM_TYPE_TURRET:
-                    x = game.maxMapX + 7;
-                    y = 372;
-                    break;
-                case ITEM_TYPE_LASER:
-                    x = game.maxMapX + 7;
-                    y = 267;
-                    break;
-                case ITEM_TYPE_ROCKET:
-                    x = game.maxMapX + 42;
-                    y = 267;
-                    break;
-                case ITEM_TYPE_MEDKIT:
-                    x = game.maxMapX + 77;
-                    y = 267;
-                    break;
-                case ITEM_TYPE_BOMB:
-                    x = game.maxMapX + 7;
-                    y = 302;
-                    break;
-                case ITEM_TYPE_MINE:
-                    x = game.maxMapX + 42;
-                    y = 302;
-                    break;
-            }
+            const slot = resolveSlotPosition(icon.type, 7, 267);
+            x = game.maxMapX + slot.x;
+            y = slot.y;
 
             if (icon.selected) {
                 var selected = new PIXI.Sprite(game.textures['imageInventorySelection']);
@@ -88,6 +99,21 @@ var drawItems = (game, stage) => {
                 game.forceDraw = true;
             });
             stage.addChild(iconSprite);
+
+            const quantity = icon.quantity ?? 1;
+            if (quantity > 1) {
+                const qtyText = new PIXI.Text(`${quantity}`, {
+                    fontFamily: 'Arial',
+                    fontSize: 12,
+                    fill: 0xFFFFFF,
+                    fontWeight: 'bold',
+                    stroke: 0x000000,
+                    strokeThickness: 3,
+                });
+                qtyText.x = x + 22;
+                qtyText.y = y + 12;
+                stage.addChild(qtyText);
+            }
 
         }
         icon = icon.next;

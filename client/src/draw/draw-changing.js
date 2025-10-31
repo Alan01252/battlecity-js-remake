@@ -1,6 +1,9 @@
 import PIXI from '../pixi';
 
 const MAYOR_BADGE_RADIUS = 9;
+const EXPLOSION_FRAME_SIZE = 144;
+const EXPLOSION_TOTAL_FRAMES = 8;
+const EXPLOSION_FRAME_DURATION = 100;
 
 const createMayorBadge = () => {
     const container = new PIXI.Container();
@@ -126,6 +129,55 @@ var drawBullets = (game, stage) => {
     }
 };
 
+const drawExplosions = (game, stage) => {
+    if (!Array.isArray(game.explosions) || game.explosions.length === 0) {
+        return;
+    }
+    const explosionTexture = game.textures['imageLEExplosion'];
+    if (!explosionTexture || !explosionTexture.baseTexture) {
+        return;
+    }
+    const now = game.tick || Date.now();
+    for (let i = game.explosions.length - 1; i >= 0; i--) {
+        const explosion = game.explosions[i];
+        if (!explosion) {
+            game.explosions.splice(i, 1);
+            continue;
+        }
+        if (!explosion.nextFrameTick) {
+            explosion.nextFrameTick = now + EXPLOSION_FRAME_DURATION;
+        } else if (now >= explosion.nextFrameTick) {
+            explosion.frame = (explosion.frame || 0) + 1;
+            explosion.nextFrameTick = now + EXPLOSION_FRAME_DURATION;
+        }
+
+        if ((explosion.frame || 0) >= EXPLOSION_TOTAL_FRAMES) {
+            game.explosions.splice(i, 1);
+            continue;
+        }
+
+        const frameIndex = Math.max(0, explosion.frame || 0);
+        const texture = new PIXI.Texture(
+            explosionTexture.baseTexture,
+            new PIXI.Rectangle(
+                0,
+                frameIndex * EXPLOSION_FRAME_SIZE,
+                EXPLOSION_FRAME_SIZE,
+                EXPLOSION_FRAME_SIZE
+            )
+        );
+
+        const sprite = new PIXI.Sprite(texture);
+        const offsetX = game.player.defaultOffset.x - game.player.offset.x;
+        const offsetY = game.player.defaultOffset.y - game.player.offset.y;
+
+        sprite.x = (explosion.x || 0) + offsetX;
+        sprite.y = (explosion.y || 0) + offsetY;
+
+        stage.addChild(sprite);
+    }
+};
+
 
 export const drawChanging = (game) => {
 
@@ -135,4 +187,5 @@ export const drawChanging = (game) => {
     drawPlayer(game, game.objectContainer);
     drawOtherPlayers(game, game.objectContainer);
     drawBullets(game, game.objectContainer);
+    drawExplosions(game, game.objectContainer);
 };
