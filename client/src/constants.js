@@ -16,11 +16,15 @@ export const COLLISION_MAP_EDGE_BOTTOM = 203;
 export const BULLET_ALIVE = 1;
 export const BULLET_DEAD = -1;
 export const TIMER_SHOOT_LASER = 650;
+export const TIMER_BOMB = 5000;
 
 export const DAMAGE_LASER = 5;
 export const DAMAGE_MINE = 19;
+export const DAMAGE_BOMB = 40;
 
 export const MAX_HEALTH = 40;
+export const BOMB_EXPLOSION_TILE_RADIUS = 2;
+export const BOMB_ITEM_TILE_RADIUS = 1;
 
 export const MAP_SQUARE_LAVA = 1;
 export const MAP_SQUARE_ROCK = 2;

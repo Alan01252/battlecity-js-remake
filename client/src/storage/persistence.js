@@ -1,5 +1,6 @@
 const CITY_STORAGE_KEY = 'battlecity:cities';
 const INVENTORY_STORAGE_KEY = 'battlecity:inventory';
+const FACTORY_STORAGE_KEY = 'battlecity:factories';
 
 const hasStorage = () => typeof window !== 'undefined' && window.localStorage;
 
@@ -38,6 +39,13 @@ const loadInventoryState = () => {
         return [];
     }
     return parseJson(window.localStorage.getItem(INVENTORY_STORAGE_KEY), []);
+};
+
+const loadFactoryState = () => {
+    if (!hasStorage()) {
+        return {};
+    }
+    return parseJson(window.localStorage.getItem(FACTORY_STORAGE_KEY), {});
 };
 
 const capturePlayerInventory = (game) => {
@@ -117,6 +125,8 @@ export const initPersistence = (game) => {
     pendingInventory = loadInventoryState();
     inventoryRestored = false;
 
+    const factoryState = loadFactoryState();
+
     const ensureInventory = () => restoreInventoryIfNeeded(game);
     if (game.socketListener) {
         game.socketListener.on('connected', ensureInventory);
@@ -126,6 +136,23 @@ export const initPersistence = (game) => {
     game.persistence.saveCityState = (cityId) => saveCityState(game, cityId);
     game.persistence.saveInventory = () => saveInventory(game);
     game.persistence.restoreInventory = ensureInventory;
+    game.persistence.getFactoryItems = (buildingId) => {
+        if (!buildingId) {
+            return undefined;
+        }
+        return factoryState[buildingId];
+    };
+    game.persistence.saveFactoryItems = (buildingId, value) => {
+        if (!hasStorage() || !buildingId) {
+            return;
+        }
+        if (value && value > 0) {
+            factoryState[buildingId] = value;
+        } else {
+            delete factoryState[buildingId];
+        }
+        saveJson(FACTORY_STORAGE_KEY, factoryState);
+    };
 
     // Attempt restoration immediately in case we're already connected.
     ensureInventory();

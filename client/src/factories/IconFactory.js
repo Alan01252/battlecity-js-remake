@@ -8,7 +8,7 @@ class IconFactory {
     cycle() {
     }
 
-    newIcon(owner, x, y, type) {
+    newIcon(owner, x, y, type, options = {}) {
 
         var icon = {
             "owner": owner,
@@ -16,7 +16,8 @@ class IconFactory {
             "y": y,
             "type": type,
             "next": null,
-            "previous": null
+            "previous": null,
+            "sourceBuildingId": options.sourceBuildingId ?? null
 
         };
 
@@ -31,6 +32,17 @@ class IconFactory {
 
 
         this.iconListHead = icon;
+        if (this.game.buildingFactory && icon.owner == null) {
+            if (!icon.sourceBuildingId && typeof this.game.buildingFactory.assignIconSource === 'function') {
+                const building = this.game.buildingFactory.assignIconSource(icon);
+                if (building) {
+                    icon.sourceBuildingId = building.id;
+                }
+            }
+            if (!options.skipProductionUpdate && typeof this.game.buildingFactory.handleIconProduced === 'function') {
+                this.game.buildingFactory.handleIconProduced(icon);
+            }
+        }
         if (this.game.player && icon.owner === this.game.player.id && this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
             this.game.persistence.saveInventory();
         }
@@ -44,6 +56,9 @@ class IconFactory {
             icon.owner = this.game.player.id;
             icon.city = this.game.player.city ?? null;
             this.game.forceDraw = true;
+            if (this.game.buildingFactory && typeof this.game.buildingFactory.handleIconCollected === 'function') {
+                this.game.buildingFactory.handleIconCollected(icon);
+            }
             if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
                 this.game.persistence.saveInventory();
             }
@@ -94,7 +109,8 @@ class IconFactory {
 
         while (icon) {
 
-            if (icon.x >= (this.game.player.offset.x - range)
+            if (icon.owner == null &&
+                icon.x >= (this.game.player.offset.x - range)
                 && icon.x <= (this.game.player.offset.x + range)
                 && icon.y >= (this.game.player.offset.y - range)
                 && icon.y <= (this.game.player.offset.y + range)
@@ -121,7 +137,9 @@ class IconFactory {
             this.iconListHead = icon.next;
         }
 
-        if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
+        if (icon.owner !== null && icon.owner !== undefined &&
+            this.game.player && icon.owner === this.game.player.id &&
+            this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
             this.game.persistence.saveInventory();
         }
 
@@ -131,6 +149,40 @@ class IconFactory {
 
     getHead() {
         return this.iconListHead;
+    }
+
+    countUnownedIconsNear(x, y, type, radius = 48) {
+        let count = 0;
+        let icon = this.getHead();
+        while (icon) {
+            if (icon.owner == null && icon.type === type) {
+                const dx = Math.abs(icon.x - x);
+                const dy = Math.abs(icon.y - y);
+                if (dx <= radius && dy <= radius) {
+                    count++;
+                }
+            }
+            icon = icon.next;
+        }
+        return count;
+    }
+
+    removeUnownedIconsNear(x, y, type, amount, radius = 48) {
+        let removed = 0;
+        let icon = this.getHead();
+        while (icon && removed < amount) {
+            const next = icon.next;
+            if (icon.owner == null && icon.type === type) {
+                const dx = Math.abs(icon.x - x);
+                const dy = Math.abs(icon.y - y);
+                if (dx <= radius && dy <= radius) {
+                    this.deleteIcon(icon);
+                    removed++;
+                }
+            }
+            icon = next;
+        }
+        return removed;
     }
 }
 

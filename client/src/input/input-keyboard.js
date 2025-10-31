@@ -53,7 +53,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         u = keyboard(85),
         o = keyboard(79),
         d = keyboard(68),
-        s = keyboard(83);
+        s = keyboard(83),
+        b = keyboard(66);
 
 
     left.press = function () {
@@ -118,6 +119,11 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             }
         }
 
+    };
+
+    b.press = function () {
+        game.player.bombsArmed = !game.player.bombsArmed;
+        console.log(`Bombs ${game.player.bombsArmed ? 'activated' : 'deactivated'}`);
     };
 
     shift.press = function () {

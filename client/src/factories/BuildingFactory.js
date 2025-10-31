@@ -39,6 +39,8 @@ const TYPE_LABEL_LOOKUP = Object.keys(LABELS).reduce((acc, key) => {
     return acc;
 }, {});
 
+const isFactoryType = (type) => type >= 100 && type < 200;
+
 class BuildingFactory {
 
     constructor(game) {
@@ -107,6 +109,13 @@ class BuildingFactory {
 
         const shouldUpdateCity = updateCity !== undefined ? updateCity : (!owner || owner === this.game.player.id);
 
+        if (this.game.persistence && typeof this.game.persistence.getFactoryItems === 'function') {
+            const storedItems = this.game.persistence.getFactoryItems(building.id);
+            if (typeof storedItems === 'number') {
+                building.itemsLeft = Math.max(building.itemsLeft || 0, storedItems);
+            }
+        }
+
         if (shouldUpdateCity) {
             this.adjustAllowedBuilds(building)
         } else {
@@ -118,6 +127,8 @@ class BuildingFactory {
         this.buildingListHead = building;
         this.buildingsById[building.id] = building;
         this.buildingsByCoord[coordKey] = building;
+        this.syncFactoryItems(building);
+        this.persistFactoryItems(building);
         return building;
     }
 
@@ -168,6 +179,16 @@ class BuildingFactory {
         this.game.map[building.x][building.y] = 0;
         this.game.tiles[building.x][building.y] = 0;
 
+        if (isFactoryType(building.type)) {
+            const drop = this.getFactoryDropPosition(building);
+            const itemType = building.type % 100;
+            const excess = this.game.iconFactory.countUnownedIconsNear(drop.x, drop.y, itemType);
+            if (excess > 0) {
+                this.game.iconFactory.removeUnownedIconsNear(drop.x, drop.y, itemType, excess);
+            }
+            building.itemsLeft = 0;
+            this.persistFactoryItems(building);
+        }
 
         if (building.owner === null || building.owner === this.game.player.id) {
 
@@ -313,6 +334,9 @@ class BuildingFactory {
             building.itemsLeft = update.itemsLeft;
         }
 
+        this.syncFactoryItems(building);
+        this.persistFactoryItems(building);
+
         this.game.forceDraw = true;
     }
 
@@ -348,6 +372,106 @@ class BuildingFactory {
         if (this.game.persistence && typeof this.game.persistence.saveCityState === 'function') {
             this.game.persistence.saveCityState(cityIndex);
         }
+    }
+
+    assignIconSource(icon) {
+        if (!icon || typeof icon.type !== 'number') {
+            return null;
+        }
+        if (icon.sourceBuildingId && this.buildingsById[icon.sourceBuildingId]) {
+            return this.buildingsById[icon.sourceBuildingId];
+        }
+        const building = this.findFactoryForIcon(icon.type, icon.x, icon.y);
+        if (building) {
+            icon.sourceBuildingId = building.id;
+        }
+        return building;
+    }
+
+    findFactoryForIcon(itemType, x, y) {
+        let candidate = null;
+        let distance = Infinity;
+        let building = this.getHead();
+        while (building) {
+            if (isFactoryType(building.type) && (building.type % 100) === itemType) {
+                const drop = this.getFactoryDropPosition(building);
+                const diffX = drop.x - x;
+                const diffY = drop.y - y;
+                const dist = Math.sqrt((diffX * diffX) + (diffY * diffY));
+                if (dist < distance && dist <= 96) {
+                    candidate = building;
+                    distance = dist;
+                }
+            }
+            building = building.next;
+        }
+        return candidate;
+    }
+
+    handleIconProduced(icon) {
+        const building = this.assignIconSource(icon);
+        if (!building) {
+            return;
+        }
+        building.itemsLeft = (building.itemsLeft || 0) + 1;
+        this.syncFactoryItems(building);
+        this.persistFactoryItems(building);
+    }
+
+    handleIconCollected(icon) {
+        const building = this.assignIconSource(icon);
+        if (!building) {
+            return;
+        }
+        if (typeof building.itemsLeft === 'number' && building.itemsLeft > 0) {
+            building.itemsLeft -= 1;
+        }
+        this.syncFactoryItems(building);
+        this.persistFactoryItems(building);
+    }
+
+    getFactoryDropPosition(building) {
+        return {
+            x: (building.x * 48) + 56,
+            y: (building.y * 48) + 102,
+        };
+    }
+
+    syncFactoryItems(building) {
+        if (!building || !isFactoryType(building.type)) {
+            return;
+        }
+        if (!this.game.iconFactory ||
+            typeof this.game.iconFactory.countUnownedIconsNear !== 'function' ||
+            typeof this.game.iconFactory.removeUnownedIconsNear !== 'function') {
+            return;
+        }
+        const expected = building.itemsLeft || 0;
+        const itemType = building.type % 100;
+        const drop = this.getFactoryDropPosition(building);
+        const existing = this.game.iconFactory.countUnownedIconsNear(drop.x, drop.y, itemType);
+        if (existing > expected) {
+            this.game.iconFactory.removeUnownedIconsNear(drop.x, drop.y, itemType, existing - expected);
+        } else if (existing < expected) {
+            const missing = expected - existing;
+            for (let i = 0; i < missing; i++) {
+                this.game.iconFactory.newIcon(null, drop.x, drop.y, itemType, {
+                    sourceBuildingId: building.id,
+                    skipProductionUpdate: true,
+                });
+            }
+        }
+    }
+
+    persistFactoryItems(building) {
+        if (!building || !isFactoryType(building.type)) {
+            return;
+        }
+        if (!this.game.persistence || typeof this.game.persistence.saveFactoryItems !== 'function') {
+            return;
+        }
+        const value = building.itemsLeft || 0;
+        this.game.persistence.saveFactoryItems(building.id, value);
     }
 }
 

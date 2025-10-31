@@ -2,6 +2,7 @@ import PIXI from '../pixi';
 
 import {ITEM_TYPE_TURRET} from "../constants";
 import {ITEM_TYPE_MINE} from "../constants";
+import {ITEM_TYPE_BOMB} from "../constants";
 
 var drawTick = 0;
 
@@ -53,6 +54,16 @@ var drawMine = (game, itemTiles, item, offTileX, offTileY) => {
     itemTiles.addFrame(tmpText, drawX, drawY);
 };
 
+var drawBomb = (game, itemTiles, item, offTileX, offTileY) => {
+    var tmpText = new PIXI.Texture(
+        game.textures['imageItems'].baseTexture,
+        new PIXI.Rectangle(ITEM_TYPE_BOMB * 32, 0, 32, 32)
+    );
+    var drawX = item.x - game.player.offset.x + offTileX + 8;
+    var drawY = item.y - game.player.offset.y + offTileY + 8;
+    itemTiles.addFrame(tmpText, drawX, drawY);
+};
+
 export const drawItems = (game, itemTiles) => {
 
 
@@ -73,6 +84,9 @@ export const drawItems = (game, itemTiles) => {
                     break;
                 case ITEM_TYPE_MINE:
                     drawMine(game, itemTiles, item, offTileX, offTileY);
+                    break;
+                case ITEM_TYPE_BOMB:
+                    drawBomb(game, itemTiles, item, offTileX, offTileY);
                     break;
             }
 

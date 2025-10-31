@@ -145,8 +145,9 @@ const game = {
             x: 0,
             y: 0,
             vx: 0,
-            vy: 0
-        }
+        vy: 0
+        },
+        bombsArmed: false
     },
     app: app,
     stage: app.stage,
