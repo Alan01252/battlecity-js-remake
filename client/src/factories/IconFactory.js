@@ -39,6 +39,7 @@ class IconFactory {
         var icon = this.findIconByLocation();
         if (icon) {
             icon.owner = this.game.player.id;
+            icon.city = this.game.player.city ?? null;
             this.game.forceDraw = true;
         }
     }

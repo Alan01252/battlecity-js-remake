@@ -33,11 +33,37 @@ export const collidedWithRock = (game, bullet) => {
 export const collidedWithAnotherPlayer = (game, bullet) => {
 
     return Object.keys(game.otherPlayers).some((id) => {
-        return collided(getPlayerRect(game.otherPlayers[id]), bullet)
+        const player = game.otherPlayers[id];
+        if (!player || !player.offset) {
+            return false;
+        }
+
+        if (bullet.shooter && bullet.shooter === id) {
+            return false;
+        }
+
+        const bulletTeam = bullet.team ?? null;
+        const playerTeam = player.city ?? null;
+        if (bulletTeam !== null && playerTeam === bulletTeam) {
+            return false;
+        }
+
+        return collided(getPlayerRect(player), bullet)
     });
 };
 
 export const collidedWithCurrentPlayer = (game, bullet) => {
+
+    const bulletTeam = bullet.team ?? null;
+    const playerTeam = game.player?.city ?? null;
+
+    if (bulletTeam !== null && bulletTeam === playerTeam) {
+        return false;
+    }
+
+    if (bullet.shooter && bullet.shooter === game.player.id) {
+        return false;
+    }
 
     return collided(getPlayerRect(game.player), bullet);
 };

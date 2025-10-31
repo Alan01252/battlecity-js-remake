@@ -6,6 +6,23 @@ import {COLLISION_MAP_EDGE_RIGHT} from "./constants";
 import {COLLISION_MAP_EDGE_TOP} from "./constants";
 import {COLLISION_MAP_EDGE_BOTTOM} from "./constants";
 import {COLLISION_BLOCKING} from "./constants";
+import {COLLISION_MINE} from "./constants";
+import {DAMAGE_MINE} from "./constants";
+
+const handleMineCollision = (game, item) => {
+    if (!item) {
+        return;
+    }
+
+    game.itemFactory.triggerMine(item);
+
+    if (game.player.health > 0) {
+        game.player.health = Math.max(0, game.player.health - DAMAGE_MINE);
+    }
+
+    game.forceDraw = true;
+    game.player.collidedItem = null;
+};
 
 var turnPlayer = (game) => {
     if (game.tick > game.player.timeTurn) {
@@ -53,6 +70,9 @@ var movePlayer = (game) => {
             console.log("blocking");
             game.player.offset.x = preUpdate;
             break;
+        case COLLISION_MINE:
+            handleMineCollision(game, game.player.collidedItem);
+            break;
         case 0:
             break;
     }
@@ -80,6 +100,9 @@ var movePlayer = (game) => {
         case COLLISION_BLOCKING:
             console.log("blocking y");
             game.player.offset.y = preUpdate;
+            break;
+        case COLLISION_MINE:
+            handleMineCollision(game, game.player.collidedItem);
             break;
         case 0:
             break;

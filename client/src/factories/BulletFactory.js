@@ -56,10 +56,10 @@ class BulletFactory {
 
             if (collidedWithCurrentPlayer(this.game, bullet)) {
                 bullet.life = BULLET_DEAD;
-                if (bullet.shooter !== this.game.player.id) {
-                    if (this.game.player.health > 0) {
-                        this.game.player.health -= bullet.damage;
-                    }
+                const sameShooter = bullet.shooter === this.game.player.id;
+                const sameTeam = bullet.team != null && bullet.team === (this.game.player.city ?? null);
+                if (!sameShooter && !sameTeam && this.game.player.health > 0) {
+                    this.game.player.health -= bullet.damage;
                 }
             }
 
@@ -88,7 +88,7 @@ class BulletFactory {
         return returnBullet;
     }
 
-    newBullet(shooter, x, y, type, angle) {
+    newBullet(shooter, x, y, type, angle, team = null) {
 
         var bullet = {
             "shooter": shooter,
@@ -99,6 +99,7 @@ class BulletFactory {
             "animation": 0,
             "type": type,
             "angle": angle,
+            "team": team,
             "next": null,
             "previous": null
         };

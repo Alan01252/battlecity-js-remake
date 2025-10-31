@@ -3,6 +3,8 @@ import {COLLISION_MAP_EDGE_LEFT} from "../constants";
 import {COLLISION_MAP_EDGE_RIGHT} from "../constants";
 import {COLLISION_MAP_EDGE_TOP} from "../constants";
 import {COLLISION_MAP_EDGE_BOTTOM} from "../constants";
+import {COLLISION_MINE} from "../constants";
+import {ITEM_TYPE_MINE} from "../constants";
 
 export const rectangleCollision = (rect1, rect2) => {
 
@@ -48,7 +50,6 @@ export const checkItems = (game, rect) => {
 
     while (item) {
 
-        console.log("Checking item collision");
         var itemRect = {
             x: item.x,
             y: item.y,
@@ -56,10 +57,18 @@ export const checkItems = (game, rect) => {
             h: 48,
         };
 
-        console.log(itemRect);
-
         if (rectangleCollision(rect, itemRect)) {
-            return COLLISION_BLOCKING;
+            if (item.type === ITEM_TYPE_MINE && item.active !== false) {
+                const playerTeam = game.player?.city ?? null;
+                const mineTeam = item.teamId ?? null;
+                if (mineTeam === null || mineTeam !== playerTeam) {
+                    game.player.collidedItem = item;
+                    return COLLISION_MINE;
+                }
+                // Friendly mines are intangible to the owner and teammates.
+            } else if (item.active !== false) {
+                return COLLISION_BLOCKING;
+            }
         }
 
         item = item.next;

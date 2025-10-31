@@ -6,6 +6,7 @@ export const MOVEMENT_SPEED_PLAYER = 0.50;
 export const MOVEMENT_SPEED_BULLET = 0.80;
 
 export const COLLISION_BLOCKING = 2;
+export const COLLISION_MINE = 101;
 export const COLLISION_MAP_EDGE_LEFT = 200;
 export const COLLISION_MAP_EDGE_RIGHT = 201;
 export const COLLISION_MAP_EDGE_TOP = 202;
@@ -17,6 +18,7 @@ export const BULLET_DEAD = -1;
 export const TIMER_SHOOT_LASER = 650;
 
 export const DAMAGE_LASER = 5;
+export const DAMAGE_MINE = 19;
 
 export const MAX_HEALTH = 40;
 

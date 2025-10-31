@@ -38,6 +38,7 @@ var checkBuildings = (game, playerRect) => {
 export const checkPlayerCollision = (game) => {
 
     var playerRect = getPlayerRect(game.player);
+    game.player.collidedItem = null;
     var collision = checkEdges(playerRect);
     if (!collision) {
         collision = checkTiles(game, playerRect);

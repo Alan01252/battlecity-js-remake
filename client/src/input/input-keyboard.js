@@ -134,8 +134,9 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             var x2 = ((game.player.offset.x) + 24) + (x * 30);
             var y2 = ((game.player.offset.y) + 24) + (y * 30);
 
-            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, -angle);
-            game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: -angle});
+            const teamId = game.player.city ?? null;
+            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, -angle, teamId);
+            game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: -angle, team: teamId});
 
         }
 
