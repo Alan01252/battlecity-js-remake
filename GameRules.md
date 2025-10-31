@@ -6,6 +6,7 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Players control a tank mapped to the 48px tile grid; movement is clamped to the map bounds.
 - Tank collisions use the shared `{x, y, w, h}` rectangle helpers to stay consistent with bullet and building logic.
 - Death resets the player to the defined spawn location with default stats.
+- Collision resolution keeps a rolling “last safe” position, nudges outward in 6px steps, scans nearby tiles, and finally snaps to city spawn if required so players can’t be trapped by buildings or terrain pushes. (client/src/play.js:18)
 
 ## Economy
 - Each city starts with `95,000,000` cash and resolves finance ticks every 7 seconds; the server clamps balances, tracks income/expenses, and rebroadcasts updates to clients. (server/src/CityManager.js:20)
@@ -23,6 +24,7 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Building placement consumes the appropriate resources and links into the building factory's list (`next`/`previous` pointers must remain valid).
 - Mayors can only place a building when their city's cash balance covers `COST_BUILDING`; insufficient funds now reject the placement server-side and refund any optimistic client adjustments. (server/src/BuildingFactory.js:87, client/src/factories/BuildingFactory.js:50)
 - Factory buildings emit `new_icon` events when they start producing item drops.
+- Dropped items always render using the appropriate sprites (turret heads, sleepers, bombs, walls, mines, etc.), with enemy mines hidden while armed to match legacy behaviour. (client/src/draw/draw-items.js:1)
 - Houses maintain up to two attachment slots for nearby support buildings; the server keeps the attachment list authoritative and rebroadcasts population changes.
 - Dropping a Mine icon spawns an armed mine item that remembers the owner's city, renders via the item tile layer, and is removed from the item list once triggered. (client/src/factories/ItemFactory.js:12, client/src/draw/draw-items.js:27)
 - Bomb icons snap to the tile grid when placed; armed bombs start a 5-second detonation timer, while unarmed bombs remain inert until dropped while armed. (client/src/factories/ItemFactory.js:135, client/src/draw/draw-items.js:14)

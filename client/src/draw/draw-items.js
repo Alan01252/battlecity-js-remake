@@ -1,6 +1,9 @@
 import PIXI from '../pixi';
 
 import {ITEM_TYPE_TURRET} from "../constants";
+import {ITEM_TYPE_PLASMA} from "../constants";
+import {ITEM_TYPE_WALL} from "../constants";
+import {ITEM_TYPE_SLEEPER} from "../constants";
 import {ITEM_TYPE_MINE} from "../constants";
 import {ITEM_TYPE_BOMB} from "../constants";
 
@@ -33,8 +36,11 @@ var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
     );
     itemTiles.addFrame(tmpText, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
 
-    var orientation = parseInt((item.angle / 22.5) + 1);
-    if (orientation == 16) {
+    let orientation = 0;
+    if (Number.isFinite(item.angle)) {
+        orientation = parseInt((item.angle / 22.5) + 1, 10);
+    }
+    if (orientation >= 16 || orientation < 0) {
         orientation = 0;
     }
     var tmpText = new PIXI.Texture(
@@ -45,6 +51,11 @@ var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
 };
 
 var drawMine = (game, itemTiles, item, offTileX, offTileY) => {
+    const mineTeam = item.city ?? item.teamId ?? null;
+    const playerTeam = game.player?.city ?? null;
+    if (item.active && mineTeam !== null && mineTeam !== playerTeam) {
+        return;
+    }
     var tmpText = new PIXI.Texture(
         game.textures['imageItems'].baseTexture,
         new PIXI.Rectangle(ITEM_TYPE_MINE * 32, 0, 32, 32)
@@ -71,6 +82,54 @@ var drawBomb = (game, itemTiles, item, offTileX, offTileY) => {
     itemTiles.addFrame(texture, drawX, drawY);
 };
 
+const drawWall = (game, itemTiles, item, offTileX, offTileY) => {
+    const baseTexture = game.textures['imageItems']?.baseTexture;
+    if (!baseTexture) {
+        return;
+    }
+    const texture = new PIXI.Texture(
+        baseTexture,
+        new PIXI.Rectangle(ITEM_TYPE_WALL * 48, 42, 48, 48)
+    );
+    const drawX = item.x - game.player.offset.x + offTileX;
+    const drawY = item.y - game.player.offset.y + offTileY;
+    itemTiles.addFrame(texture, drawX, drawY);
+};
+
+const drawSleeper = (game, itemTiles, item, offTileX, offTileY) => {
+    const itemTeam = item.city ?? item.teamId ?? null;
+    const playerTeam = game.player?.city ?? null;
+    const isFriendly = itemTeam === null || playerTeam === null || itemTeam === playerTeam;
+    if (!isFriendly && !item.target) {
+        return;
+    }
+    drawTurret(game, itemTiles, item, offTileX, offTileY);
+};
+
+const drawGenericItem = (game, itemTiles, item, offTileX, offTileY) => {
+    const baseTexture = game.textures['imageItems']?.baseTexture;
+    if (!baseTexture) {
+        return;
+    }
+    const frameX = item.type * 48;
+    const texture = new PIXI.Texture(
+        baseTexture,
+        new PIXI.Rectangle(frameX, 42, 48, 48)
+    );
+    const drawX = item.x - game.player.offset.x + offTileX;
+    const drawY = item.y - game.player.offset.y + offTileY;
+    itemTiles.addFrame(texture, drawX, drawY);
+};
+
+const rendererMap = {
+    [ITEM_TYPE_TURRET]: drawTurret,
+    [ITEM_TYPE_PLASMA]: drawTurret,
+    [ITEM_TYPE_SLEEPER]: drawSleeper,
+    [ITEM_TYPE_WALL]: drawWall,
+    [ITEM_TYPE_MINE]: drawMine,
+    [ITEM_TYPE_BOMB]: drawBomb,
+};
+
 export const drawItems = (game, itemTiles) => {
 
 
@@ -86,15 +145,15 @@ export const drawItems = (game, itemTiles) => {
 
         foundItems.forEach((item, index) => {
             switch (item.type) {
-                case ITEM_TYPE_TURRET:
-                    drawTurret(game, itemTiles, item, offTileX, offTileY);
+                default: {
+                    const renderer = rendererMap[item.type];
+                    if (renderer) {
+                        renderer(game, itemTiles, item, offTileX, offTileY);
+                    } else {
+                        drawGenericItem(game, itemTiles, item, offTileX, offTileY);
+                    }
                     break;
-                case ITEM_TYPE_MINE:
-                    drawMine(game, itemTiles, item, offTileX, offTileY);
-                    break;
-                case ITEM_TYPE_BOMB:
-                    drawBomb(game, itemTiles, item, offTileX, offTileY);
-                    break;
+                }
             }
 
         });

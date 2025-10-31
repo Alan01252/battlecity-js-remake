@@ -160,7 +160,11 @@ const game = {
             vx: 0,
         vy: 0
         },
-        bombsArmed: false
+        bombsArmed: false,
+        lastSafeOffset: {
+            x: 0,
+            y: 0,
+        }
     },
     explosions: [],
     app: app,
@@ -236,6 +240,10 @@ function setup() {
 
     game.player.offset.x = game.cities[game.player.city].x + 48;
     game.player.offset.y = game.cities[game.player.city].y + 100;
+    game.player.lastSafeOffset = {
+        x: game.player.offset.x,
+        y: game.player.offset.y,
+    };
 
     const colorKeyTargets = [
         resources.imgGround,

@@ -9,6 +9,43 @@ import {COLLISION_BLOCKING} from "./constants";
 import {COLLISION_MINE} from "./constants";
 import {DAMAGE_MINE} from "./constants";
 
+const TILE_SIZE = 48;
+const NEAREST_SAFE_MAX_RADIUS_TILES = 12;
+
+const BLOCKING_COLLISIONS = new Set([
+    COLLISION_BLOCKING,
+    COLLISION_MAP_EDGE_LEFT,
+    COLLISION_MAP_EDGE_RIGHT,
+    COLLISION_MAP_EDGE_TOP,
+    COLLISION_MAP_EDGE_BOTTOM,
+]);
+
+const UNSTICK_DIRECTIONS = [
+    {dx: 1, dy: 0},
+    {dx: -1, dy: 0},
+    {dx: 0, dy: 1},
+    {dx: 0, dy: -1},
+    {dx: 1, dy: 1},
+    {dx: -1, dy: 1},
+    {dx: 1, dy: -1},
+    {dx: -1, dy: -1},
+];
+
+const UNSTICK_STEP = 6;
+const UNSTICK_MAX_DISTANCE = 96;
+
+const updateLastSafeOffset = (game) => {
+    if (!game || !game.player) {
+        return;
+    }
+    game.player.lastSafeOffset = {
+        x: game.player.offset.x,
+        y: game.player.offset.y
+    };
+};
+
+const isBlockingCollision = (collisionCode) => BLOCKING_COLLISIONS.has(collisionCode);
+
 const handleMineCollision = (game, item) => {
     if (!item) {
         return;
@@ -110,9 +147,202 @@ var movePlayer = (game) => {
 
 };
 
+const attemptUnstick = (game, originalPosition) => {
+    for (let distance = UNSTICK_STEP; distance <= UNSTICK_MAX_DISTANCE; distance += UNSTICK_STEP) {
+        for (const direction of UNSTICK_DIRECTIONS) {
+            const candidateX = originalPosition.x + (direction.dx * distance);
+            const candidateY = originalPosition.y + (direction.dy * distance);
+            game.player.offset.x = candidateX;
+            game.player.offset.y = candidateY;
+            const collision = checkPlayerCollision(game);
+            if (collision === COLLISION_MINE) {
+                handleMineCollision(game, game.player.collidedItem);
+                updateLastSafeOffset(game);
+                return true;
+            }
+            if (!isBlockingCollision(collision)) {
+                updateLastSafeOffset(game);
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
+const findNearestSafeOffset = (game, originOffset, maxRadiusTiles = NEAREST_SAFE_MAX_RADIUS_TILES) => {
+    if (!game || !game.player || !Array.isArray(game.map)) {
+        return null;
+    }
+
+    const mapWidth = game.map.length;
+    const mapHeight = mapWidth > 0 && Array.isArray(game.map[0]) ? game.map[0].length : 0;
+    if (mapWidth === 0 || mapHeight === 0) {
+        return null;
+    }
+
+    const startTileX = Math.floor((originOffset.x + (TILE_SIZE / 2)) / TILE_SIZE);
+    const startTileY = Math.floor((originOffset.y + (TILE_SIZE / 2)) / TILE_SIZE);
+
+    const queue = [{ x: startTileX, y: startTileY, distance: 0 }];
+    const visited = new Set();
+
+    const originalOffset = { x: game.player.offset.x, y: game.player.offset.y };
+    const originalCollidedItem = game.player.collidedItem;
+
+    while (queue.length) {
+        const node = queue.shift();
+        const key = `${node.x},${node.y}`;
+        if (visited.has(key)) {
+            continue;
+        }
+        visited.add(key);
+
+        if (node.distance > maxRadiusTiles) {
+            continue;
+        }
+
+        if (node.x < 0 || node.y < 0 || node.x >= mapWidth || node.y >= mapHeight) {
+            continue;
+        }
+
+        const candidateOffset = {
+            x: node.x * TILE_SIZE,
+            y: node.y * TILE_SIZE,
+        };
+
+        game.player.offset.x = candidateOffset.x;
+        game.player.offset.y = candidateOffset.y;
+        const collision = checkPlayerCollision(game);
+        const collidedItem = game.player.collidedItem;
+        game.player.offset.x = originalOffset.x;
+        game.player.offset.y = originalOffset.y;
+        game.player.collidedItem = originalCollidedItem;
+
+        if (collision === COLLISION_MINE) {
+            // Avoid teleporting directly onto hostile mines.
+        } else if (!isBlockingCollision(collision)) {
+            return { offset: candidateOffset, collision, collidedItem };
+        }
+
+        UNSTICK_DIRECTIONS.forEach(({ dx, dy }) => {
+            const next = { x: node.x + dx, y: node.y + dy, distance: node.distance + 1 };
+            const nextKey = `${next.x},${next.y}`;
+            if (!visited.has(nextKey)) {
+                queue.push(next);
+            }
+        });
+    }
+
+    return null;
+};
+
+const movePlayerToCitySpawn = (game) => {
+    if (!game || !game.player) {
+        return;
+    }
+    const city = game.cities?.[game.player.city];
+    if (city) {
+        game.player.offset.x = city.x + 48;
+        game.player.offset.y = city.y + 100;
+    } else {
+        game.player.offset.x = 0;
+        game.player.offset.y = 0;
+    }
+};
+
+const ensurePlayerUnstuck = (game) => {
+    if (!game || !game.player) {
+        return;
+    }
+
+    const collision = checkPlayerCollision(game);
+    if (collision === COLLISION_MINE) {
+        handleMineCollision(game, game.player.collidedItem);
+        return;
+    }
+
+    if (!isBlockingCollision(collision)) {
+        updateLastSafeOffset(game);
+        return;
+    }
+
+    const original = {
+        x: game.player.offset.x,
+        y: game.player.offset.y
+    };
+    const fallback = game.player.lastSafeOffset ? {...game.player.lastSafeOffset} : null;
+
+    if (attemptUnstick(game, original)) {
+        return;
+    }
+
+    const nearestSafe = findNearestSafeOffset(game, original);
+    if (nearestSafe) {
+        game.player.offset.x = nearestSafe.offset.x;
+        game.player.offset.y = nearestSafe.offset.y;
+        const collisionAfterNearest = checkPlayerCollision(game);
+        if (collisionAfterNearest === COLLISION_MINE) {
+            handleMineCollision(game, game.player.collidedItem);
+            return;
+        }
+        if (!isBlockingCollision(collisionAfterNearest)) {
+            updateLastSafeOffset(game);
+            return;
+        }
+    }
+
+    if (fallback && (fallback.x !== original.x || fallback.y !== original.y)) {
+        game.player.offset.x = fallback.x;
+        game.player.offset.y = fallback.y;
+        const postFallbackCollision = checkPlayerCollision(game);
+        if (postFallbackCollision === COLLISION_MINE) {
+            handleMineCollision(game, game.player.collidedItem);
+            updateLastSafeOffset(game);
+            return;
+        }
+        if (!isBlockingCollision(postFallbackCollision)) {
+            updateLastSafeOffset(game);
+            return;
+        }
+    }
+
+    game.player.offset.x = original.x;
+    game.player.offset.y = original.y;
+
+    movePlayerToCitySpawn(game);
+
+    const collisionAtSpawn = checkPlayerCollision(game);
+    if (collisionAtSpawn === COLLISION_MINE) {
+        handleMineCollision(game, game.player.collidedItem);
+        return;
+    }
+    if (!isBlockingCollision(collisionAtSpawn)) {
+        updateLastSafeOffset(game);
+        return;
+    }
+
+    const safeNearSpawn = findNearestSafeOffset(game, game.player.offset, NEAREST_SAFE_MAX_RADIUS_TILES * 2);
+    if (safeNearSpawn) {
+        game.player.offset.x = safeNearSpawn.offset.x;
+        game.player.offset.y = safeNearSpawn.offset.y;
+        const postSpawnCollision = checkPlayerCollision(game);
+        if (postSpawnCollision === COLLISION_MINE) {
+            handleMineCollision(game, game.player.collidedItem);
+            return;
+        }
+        if (!isBlockingCollision(postSpawnCollision)) {
+            updateLastSafeOffset(game);
+            return;
+        }
+    }
+
+    killPlayer(game);
+};
+
 var killPlayer = (game) => {
     game.player.offset.x = 0;
     game.player.offset.y = 0;
+    updateLastSafeOffset(game);
 };
 
 export const play = (game) => {
@@ -123,6 +353,8 @@ export const play = (game) => {
     if (game.player.isMoving) {
         movePlayer(game);
     }
+
+    ensurePlayerUnstuck(game);
 
     if (game.player.health === 0) {
         killPlayer(game);
