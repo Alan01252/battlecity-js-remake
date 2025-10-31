@@ -97,7 +97,7 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
             const populationOffsets = {
                 [BUILDING_COMMAND_CENTER]: { x: 96, y: 49 },
                 [BUILDING_FACTORY]: { x: 96, y: 48 },
-                [BUILDING_REPAIR]: { x: 92, y: 92 },
+                [BUILDING_REPAIR]: { x: 96, y: 48 },
                 [BUILDING_HOUSE]: { x: 96, y: 90 },
                 [BUILDING_RESEARCH]: { x: 96, y: 90 },
             };
