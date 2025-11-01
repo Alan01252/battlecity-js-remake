@@ -525,6 +525,13 @@ class BuildingFactory {
         if (typeof building.itemsLeft === 'number' && building.itemsLeft > 0) {
             building.itemsLeft -= 1;
         }
+        if (this.game.socketListener && typeof this.game.socketListener.collectFactoryItem === 'function' && building.id) {
+            this.game.socketListener.collectFactoryItem({
+                buildingId: building.id,
+                type: icon.type,
+                quantity: Math.max(1, icon.quantity ?? 1),
+            });
+        }
         this.syncFactoryItems(building);
     }
 

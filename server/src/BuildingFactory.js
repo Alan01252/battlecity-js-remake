@@ -12,6 +12,19 @@ const {
     COST_BUILDING,
 } = require('./constants');
 
+const toFiniteNumber = (value, fallback = null) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+    return fallback;
+};
+
 class BuildingFactory {
     constructor(game) {
         this.game = game;
@@ -66,12 +79,53 @@ class BuildingFactory {
                 this.handleDemolish(socket, payload);
             });
 
+            socket.on('factory:collect', (payload) => {
+                this.handleFactoryCollect(socket, payload);
+            });
+
             socket.on('disconnect', () => {
                 this.removeBuildingsForSocket(socket.id);
             });
 
             this.sendSnapshot(socket);
         });
+    }
+
+    handleFactoryCollect(socket, payload) {
+        let data = payload;
+        if (typeof payload === 'string') {
+            try {
+                data = JSON.parse(payload);
+            } catch (error) {
+                debug('Failed to parse factory collect payload', error);
+                return;
+            }
+        }
+
+        if (!data || !data.buildingId) {
+            return;
+        }
+
+        const building = this.buildings.get(data.buildingId);
+        if (!building) {
+            return;
+        }
+
+        const player = this.game.players[socket.id];
+        if (!player) {
+            return;
+        }
+
+        const playerCity = toFiniteNumber(player.city, null);
+        const buildingCity = toFiniteNumber(building.cityId, building.city);
+        if (playerCity !== null && buildingCity !== null && playerCity !== buildingCity) {
+            return;
+        }
+
+        const quantity = Math.max(1, toFiniteNumber(data.quantity, 1) || 1);
+        const previous = toFiniteNumber(building.itemsLeft, 0) || 0;
+        building.itemsLeft = Math.max(0, previous - quantity);
+        this.emitPopulationUpdate(building);
     }
 
     handleNewBuilding(socket, payload) {

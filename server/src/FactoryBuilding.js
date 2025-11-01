@@ -41,10 +41,11 @@ class FactoryBuilding {
                 x: (this.building.x * 48) + 56,
                 y: (this.building.y * 48) + 102,
                 type: this.building.type % 100,
-                ownerId: this.building.ownerId || null,
+                ownerId: null,
                 cityId: this.building.cityId ?? null,
                 teamId: this.building.cityId ?? null,
                 buildingId: this.building.id,
+                producedBy: this.building.ownerId || null,
             };
 
             debug("Factory produced icon", icon);
