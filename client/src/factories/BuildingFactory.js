@@ -117,13 +117,6 @@ class BuildingFactory {
 
         const shouldUpdateCity = updateCity !== undefined ? updateCity : (!owner || owner === this.game.player.id);
 
-        if (this.game.persistence && typeof this.game.persistence.getFactoryItems === 'function') {
-            const storedItems = this.game.persistence.getFactoryItems(building.id);
-            if (typeof storedItems === 'number') {
-                building.itemsLeft = Math.max(building.itemsLeft || 0, storedItems);
-            }
-        }
-
         if (shouldUpdateCity) {
             this.adjustAllowedBuilds(building)
         } else {
@@ -136,7 +129,6 @@ class BuildingFactory {
         this.buildingsById[building.id] = building;
         this.buildingsByCoord[coordKey] = building;
         this.syncFactoryItems(building);
-        this.persistFactoryItems(building);
 
         if (!this.game.tiles[x]) {
             this.game.tiles[x] = [];
@@ -225,12 +217,12 @@ class BuildingFactory {
         if (isFactoryType(building.type)) {
             const drop = this.getFactoryDropPosition(building);
             const itemType = building.type % 100;
-            const excess = this.game.iconFactory.countUnownedIconsNear(drop.x, drop.y, itemType);
+            const teamId = building.city ?? building.cityId ?? null;
+            const excess = this.game.iconFactory.countUnownedIconsNear(drop.x, drop.y, itemType, 48, teamId);
             if (excess > 0) {
-                this.game.iconFactory.removeUnownedIconsNear(drop.x, drop.y, itemType, excess);
+                this.game.iconFactory.removeUnownedIconsNear(drop.x, drop.y, itemType, excess, 48, teamId);
             }
             building.itemsLeft = 0;
-            this.persistFactoryItems(building);
         }
 
         if (building.owner === null || building.owner === this.game.player.id) {
@@ -444,7 +436,6 @@ class BuildingFactory {
         }
 
         this.syncFactoryItems(building);
-        this.persistFactoryItems(building);
 
         if (update.id && this.pendingBuildCosts.has(update.id)) {
             this.pendingBuildCosts.delete(update.id);
@@ -480,10 +471,6 @@ class BuildingFactory {
                     city.canBuild[unlockKey] = CAN_BUILD;
                 }
             });
-        }
-
-        if (this.game.persistence && typeof this.game.persistence.saveCityState === 'function') {
-            this.game.persistence.saveCityState(cityIndex);
         }
     }
 
@@ -528,7 +515,6 @@ class BuildingFactory {
         }
         building.itemsLeft = (building.itemsLeft || 0) + 1;
         this.syncFactoryItems(building);
-        this.persistFactoryItems(building);
     }
 
     handleIconCollected(icon) {
@@ -540,7 +526,6 @@ class BuildingFactory {
             building.itemsLeft -= 1;
         }
         this.syncFactoryItems(building);
-        this.persistFactoryItems(building);
     }
 
     getFactoryDropPosition(building) {
@@ -562,30 +547,22 @@ class BuildingFactory {
         const expected = building.itemsLeft || 0;
         const itemType = building.type % 100;
         const drop = this.getFactoryDropPosition(building);
-        const existing = this.game.iconFactory.countUnownedIconsNear(drop.x, drop.y, itemType);
+        const teamId = building.city ?? building.cityId ?? null;
+        const existing = this.game.iconFactory.countUnownedIconsNear(drop.x, drop.y, itemType, 48, teamId);
         if (existing > expected) {
-            this.game.iconFactory.removeUnownedIconsNear(drop.x, drop.y, itemType, existing - expected);
+            this.game.iconFactory.removeUnownedIconsNear(drop.x, drop.y, itemType, existing - expected, 48, teamId);
         } else if (existing < expected) {
             const missing = expected - existing;
             for (let i = 0; i < missing; i++) {
                 this.game.iconFactory.newIcon(null, drop.x, drop.y, itemType, {
                     sourceBuildingId: building.id,
+                    teamId,
                     skipProductionUpdate: true,
                 });
             }
         }
     }
 
-    persistFactoryItems(building) {
-        if (!building || !isFactoryType(building.type)) {
-            return;
-        }
-        if (!this.game.persistence || typeof this.game.persistence.saveFactoryItems !== 'function') {
-            return;
-        }
-        const value = building.itemsLeft || 0;
-        this.game.persistence.saveFactoryItems(building.id, value);
-    }
 }
 
 

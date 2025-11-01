@@ -123,6 +123,12 @@ class ItemFactory {
             const shooterTeam = item.teamId ?? this.game.player.city ?? null;
 
             this.game.bulletFactory.newBullet(shooterId, x2, y2, 0, direction, shooterTeam);
+            this.emitItemBulletShot(item, {
+                x: x2,
+                y: y2,
+                angle: direction,
+                team: shooterTeam
+            });
         }
     }
 
@@ -267,6 +273,83 @@ class ItemFactory {
         }
 
         return item;
+    }
+
+    shouldNotifyServerForItem(item) {
+        if (!item || !this.game || !this.game.socketListener) {
+            return false;
+        }
+        if (typeof this.game.socketListener.sendBulletShot !== 'function') {
+            return false;
+        }
+        const localPlayerId = this.game.player?.id ?? null;
+        if (!localPlayerId) {
+            return false;
+        }
+        const ownerId = item.ownerId ?? item.owner ?? null;
+        if (item.isDefense) {
+            return true;
+        }
+        if (ownerId === null || ownerId === undefined) {
+            return true;
+        }
+        return ownerId === localPlayerId;
+    }
+
+    resolveItemSourceType(item) {
+        if (!item) {
+            return null;
+        }
+        if (item.type === ITEM_TYPE_TURRET) {
+            return 'turret';
+        }
+        if (item.type === ITEM_TYPE_PLASMA) {
+            return 'plasma';
+        }
+        if (item.type === ITEM_TYPE_SLEEPER) {
+            return 'sleeper';
+        }
+        return null;
+    }
+
+    resolveItemTeam(item, fallback = null) {
+        if (!item) {
+            return fallback;
+        }
+        const teamId = item.teamId ?? item.city ?? null;
+        if (Number.isFinite(teamId)) {
+            return teamId;
+        }
+        if (Number.isFinite(fallback)) {
+            return fallback;
+        }
+        return this.game.player?.city ?? null;
+    }
+
+    emitItemBulletShot(item, shot) {
+        if (!this.shouldNotifyServerForItem(item)) {
+            return;
+        }
+        const socketListener = this.game.socketListener;
+        if (!socketListener) {
+            return;
+        }
+        const localPlayerId = this.game.player?.id ?? null;
+        if (!localPlayerId) {
+            return;
+        }
+        const payload = {
+            shooter: localPlayerId,
+            x: shot?.x ?? item.x,
+            y: shot?.y ?? item.y,
+            type: shot?.type ?? 0,
+            angle: shot?.angle ?? 0,
+            team: this.resolveItemTeam(item, shot?.team ?? null),
+            sourceId: item.id ?? null,
+            sourceType: this.resolveItemSourceType(item) || undefined,
+            targetId: item.target ?? null
+        };
+        socketListener.sendBulletShot(payload);
     }
 
 
@@ -504,6 +587,22 @@ class ItemFactory {
 
     getHead() {
         return this.itemListHead;
+    }
+
+    getItemById(id) {
+        if (!id) {
+            return null;
+        }
+        return this.itemsById.get(id) || null;
+    }
+
+    removeItemById(id) {
+        const item = this.getItemById(id);
+        if (!item) {
+            return false;
+        }
+        this.deleteItem(item);
+        return true;
     }
 }
 

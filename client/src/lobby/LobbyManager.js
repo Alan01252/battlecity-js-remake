@@ -450,9 +450,6 @@ class LobbyManager {
         this.setStatus('Assignment confirmed. Entering city...', { type: 'success' });
         this.renderCityList();
         this.hide();
-        if (this.game && this.game.persistence && typeof this.game.persistence.restoreInventory === 'function') {
-            this.game.persistence.restoreInventory();
-        }
     }
 
     handleEviction(details) {
@@ -461,6 +458,7 @@ class LobbyManager {
         this.waitingRole = null;
         this.inGame = false;
 
+        const reason = typeof details?.reason === 'string' ? details.reason : 'orb';
         const cityId = Number.isFinite(details?.city) ? Number(details.city) : null;
         const attackerId = Number.isFinite(details?.attackerCity) ? Number(details.attackerCity) : null;
         const points = Number.isFinite(details?.points) ? Number(details.points) : null;
@@ -469,12 +467,18 @@ class LobbyManager {
         const attackerName = attackerId !== null ? getCityDisplayName(attackerId) : null;
 
         const fragments = [];
-        if (attackerName) {
+        if (reason === 'death') {
+            if (attackerName) {
+                fragments.push(`${attackerName} eliminated you.`);
+            } else {
+                fragments.push('You were eliminated in combat.');
+            }
+        } else if (attackerName) {
             fragments.push(`${attackerName} destroyed ${cityName}.`);
         } else {
             fragments.push(`An enemy orb destroyed ${cityName}.`);
         }
-        if (points !== null && points > 0) {
+        if (reason !== 'death' && points !== null && points > 0) {
             fragments.push(`They earned ${points} points.`);
         }
 

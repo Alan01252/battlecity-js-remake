@@ -37,17 +37,20 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Bomb icons snap to the tile grid when placed; armed bombs start a 5-second detonation timer, while unarmed bombs remain inert until dropped while armed. (client/src/factories/ItemFactory.js:135, client/src/draw/draw-items.js:14)
 - Cities become *orbable* once they either (a) reach a historical maximum of at least 21 constructed buildings, or (b) have ever operated a Bomb or Orb factory. (server/src/CityManager.js:129)
 - An Orb dropped on an enemy command center now triggers a full city wipe when the target meets the orbable criteria: the command center is destroyed, every building is demolished, all hazards are cleared, and the affected players are sent back to the lobby. (server/src/orb/OrbManager.js:47, server/src/PlayerFactory.js:658)
-- Factory output counts persist locally; on reload, stored `itemsLeft` values recreate the appropriate icons at each factory so players can pick up previously-produced stock. (client/src/factories/BuildingFactory.js:70, client/src/storage/persistence.js:71)
+- Factory output counts now come entirely from the server snapshot. Each `new_building` payload includes `itemsLeft`, and the client reconciles the expected drops through `syncFactoryItems`. (client/src/SocketListener.js:140, client/src/factories/BuildingFactory.js:538)
 - Inventory stacks repeatable items (bombs, mines, turrets) and shows a count overlay; selecting a bomb arms the stack so drops inherit the armed state. (client/src/factories/IconFactory.js:20, client/src/draw/draw-panel-interface.js:37)
 - Item pickups respect the classic per-city caps (e.g., Cloaks 4, Bombs 20, Turrets 10, Plasma 5, Orb 1); excess inventory is trimmed during restore and additional pickups are blocked once a cap is reached. (client/src/constants.js:90, client/src/factories/IconFactory.js:18)
+- Factory drops now carry their producing city’s team flag; only members of that city can collect the items, preventing players from looting rival (or AI) production lines. (server/src/FactoryBuilding.js:41, client/src/SocketListener.js:131, client/src/factories/IconFactory.js:239)
 
 ## AI Opposition
 - When the human roster slips below 16 players the server fabricates up to six AI fortress cities from the shared blueprint, wiring in bomb, orb, and turret factories so they’re immediately orbable and large enough to draw rogue tank patrols. (server/src/FakeCityManager.js, shared/fakeCities.json)
 - These synthetic strongholds carry an `isFake` marker, so the lobby assignment flow skips them while they are active. (server/src/PlayerFactory.js)
+- AI fortress templates now include a command center at the city spawn, so they can be orbed like player cities and feel like full bases. (shared/fakeCities.json:5, server/src/FakeCityManager.js:90)
+- Default fortresses pre-seed minefields and autonomous turrets/plasma/sleeper emplacements, all team-locked so only the owning city can interact with them; the layout mirrors `defaultDefenses` and is streamed to clients along with hazard snapshots. (shared/fakeCities.json:17, server/src/FakeCityManager.js:110, server/src/hazards/HazardManager.js:74, client/src/SocketListener.js:129)
 
 ## Build Tree
 - Housing is available immediately and permits launching the two starting research lines.
-- Bazooka Research (→ Bazooka Factory) is unlocked from the start and, once completed, enables Cloak Research, MedKit Research, and their factories.
+- Lazer Research (→ Lazer Factory) is unlocked from the start and, once completed, enables Cloak Research, MedKit Research, and their factories.
 - Turret Research (→ Turret Factory) is also granted at the start and unlocks Plasma Turret Research and Mine Research.
 - Cloak Research unlocks Cloak Factory plus Orb Research and Time Bomb Research, which then unlock their matching factories.
 - MedKit Research unlocks MedKit Factory and allows the city to construct Hospitals.

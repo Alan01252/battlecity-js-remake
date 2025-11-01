@@ -127,6 +127,60 @@ class HazardManager {
         return hazard;
     }
 
+    spawnSystemHazard(payload) {
+        if (!payload) {
+            return null;
+        }
+        const typeInput = payload.type ?? payload.hazardType ?? payload.itemType;
+        let type = null;
+        if (typeof typeInput === "string") {
+            const normalised = typeInput.toLowerCase();
+            if (normalised === HAZARD_TYPES.MINE) {
+                type = HAZARD_TYPES.MINE;
+            } else if (normalised === HAZARD_TYPES.BOMB) {
+                type = HAZARD_TYPES.BOMB;
+            }
+        } else {
+            type = this.getHazardTypeFromItem(typeInput);
+        }
+        if (!type) {
+            return null;
+        }
+        const x = Number(payload.x);
+        const y = Number(payload.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            return null;
+        }
+        const hazard = {
+            id: (typeof payload.id === "string" && payload.id.length > 0)
+                ? payload.id
+                : `system_${type}_${Date.now()}_${Math.random().toString(16).slice(-6)}`,
+            ownerId: payload.ownerId || 'system',
+            teamId: payload.teamId ?? null,
+            type,
+            x,
+            y,
+            createdAt: Date.now(),
+            active: type === HAZARD_TYPES.MINE ? true : !!payload.active,
+            armed: type === HAZARD_TYPES.MINE ? true : !!payload.armed,
+            detonateAt: null
+        };
+
+        if (type === HAZARD_TYPES.BOMB) {
+            const armed = hazard.armed;
+            hazard.active = armed;
+            hazard.detonateAt = armed ? hazard.createdAt + BOMB_TIMER_MS : null;
+        }
+
+        if (this.hazards.has(hazard.id)) {
+            return this.hazards.get(hazard.id);
+        }
+
+        this.hazards.set(hazard.id, hazard);
+        this.broadcastHazard("hazard:spawn", hazard);
+        return hazard;
+    }
+
     handleArm(socket, payload) {
         if (!payload || !payload.id) {
             return;

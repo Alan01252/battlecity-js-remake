@@ -123,8 +123,18 @@ class SocketListener extends EventEmitter2 {
         });
 
         this.io.on("new_icon", (icon) => {
-            var icon = JSON.parse(icon);
-            this.game.iconFactory.newIcon(null, icon.x, icon.y, icon.type)
+            const payload = typeof icon === 'string' ? JSON.parse(icon) : icon;
+            if (!payload) {
+                return;
+            }
+            const ownerId = payload.ownerId ?? payload.owner ?? null;
+            this.game.iconFactory.newIcon(ownerId, payload.x, payload.y, payload.type, {
+                sourceBuildingId: payload.buildingId ?? payload.sourceBuildingId ?? null,
+                city: payload.cityId ?? null,
+                teamId: payload.teamId ?? payload.cityId ?? null,
+                quantity: payload.quantity ?? 1,
+                armed: !!payload.armed,
+            });
         });
 
         this.io.on("new_building", (payload) => {
@@ -186,6 +196,35 @@ class SocketListener extends EventEmitter2 {
                 data.cityId = this.toFiniteNumber(data.cityId, data.cityId);
             }
             this.emit('city:info', data);
+        });
+
+        this.io.on("city:defenses", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data || data.cityId === undefined) {
+                return;
+            }
+            const cityId = this.toFiniteNumber(data.cityId, data.cityId);
+            if (cityId === null || cityId === undefined) {
+                return;
+            }
+            const items = Array.isArray(data.items) ? data.items : [];
+            if (this.game && typeof this.game.applyDefenseSnapshot === 'function') {
+                this.game.applyDefenseSnapshot(cityId, items);
+            }
+        });
+
+        this.io.on("city:defenses:clear", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data || data.cityId === undefined) {
+                return;
+            }
+            const cityId = this.toFiniteNumber(data.cityId, data.cityId);
+            if (cityId === null || cityId === undefined) {
+                return;
+            }
+            if (this.game && typeof this.game.clearDefenseItems === 'function') {
+                this.game.clearDefenseItems(cityId);
+            }
         });
 
         this.io.on("build:denied", (payload) => {
@@ -416,7 +455,7 @@ class SocketListener extends EventEmitter2 {
         };
     }
 
-    applyPlayerUpdate(player, context) {
+    applyPlayerUpdate(player, context = {}) {
         if (!player || !player.id) {
             return;
         }
@@ -434,7 +473,7 @@ class SocketListener extends EventEmitter2 {
         this.game.otherPlayers[player.id] = player;
     }
 
-    syncLocalPlayer(player) {
+    syncLocalPlayer(player, context = {}) {
         if (!player || !this.game || !this.game.player) {
             return;
         }
@@ -510,6 +549,10 @@ class SocketListener extends EventEmitter2 {
         }
         if (player.sequence !== undefined) {
             me.sequence = player.sequence;
+        }
+        if (this.game && typeof this.game.updateOrbHint === 'function') {
+            const shouldForce = context && context.source === 'enter_game';
+            this.game.updateOrbHint({ force: shouldForce });
         }
     }
 

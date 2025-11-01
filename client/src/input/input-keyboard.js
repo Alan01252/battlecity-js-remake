@@ -117,7 +117,11 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             }
             // It's not been converted to an item and so is able to be picked up again
             if (!item) {
-                game.iconFactory.newIcon(null, parseInt(x2), parseInt(y2), dropInfo.type, {skipProductionUpdate: true})
+                game.iconFactory.newIcon(null, parseInt(x2), parseInt(y2), dropInfo.type, {
+                    skipProductionUpdate: true,
+                    teamId: game.player.city ?? null,
+                    city: game.player.city ?? null,
+                })
             }
         }
 
@@ -132,9 +136,6 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
                     selectedIcon.selected = true;
                 }
                 game.player.bombsArmed = selectedIcon.armed;
-                if (game.persistence && typeof game.persistence.saveInventory === 'function') {
-                    game.persistence.saveInventory();
-                }
                 game.forceDraw = true;
                 console.log(`Bombs ${selectedIcon.armed ? 'activated' : 'deactivated'}`);
                 return;

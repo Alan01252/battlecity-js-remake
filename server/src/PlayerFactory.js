@@ -250,6 +250,20 @@ class PlayerFactory {
         return this.game.players[socketId] || null;
     }
 
+    getSocket(socketId) {
+        const sockets = this.io && this.io.sockets && this.io.sockets.sockets;
+        if (!sockets) {
+            return null;
+        }
+        if (typeof sockets.get === 'function') {
+            return sockets.get(socketId) || null;
+        }
+        if (typeof sockets[socketId] !== 'undefined') {
+            return sockets[socketId];
+        }
+        return null;
+    }
+
     evictCityPlayers(cityId, options = {}) {
         const numericCity = Number(cityId);
         if (!Number.isFinite(numericCity)) {
@@ -324,13 +338,54 @@ class PlayerFactory {
         }
 
         if (player.health <= 0) {
-            debug("Player " + socketId + " eliminated by " + JSON.stringify(meta));
-            if (this.io) {
-                this.io.emit('player:dead', JSON.stringify({
-                    id: player.id,
-                    reason: meta || null
-                }));
+            this.handlePlayerDeath(socketId, player, meta);
+        }
+    }
+
+    handlePlayerDeath(socketId, player, meta) {
+        debug("Player " + socketId + " eliminated by " + JSON.stringify(meta));
+        if (this.io) {
+            this.io.emit('player:dead', JSON.stringify({
+                id: player.id,
+                reason: meta || null
+            }));
+        }
+
+        const socket = this.getSocket(socketId);
+        const attackerId = meta && typeof meta === 'object' ? meta.shooterId ?? null : null;
+        let attackerCity = null;
+        if (attackerId) {
+            const attacker = this.game.players[attackerId];
+            if (attacker) {
+                const attackerCityNumeric = Number(attacker.city);
+                if (Number.isFinite(attackerCityNumeric)) {
+                    attackerCity = Math.floor(attackerCityNumeric);
+                }
             }
+        }
+        if (attackerCity === null && meta && typeof meta === 'object') {
+            const metaTeam = Number(meta.teamId);
+            if (Number.isFinite(metaTeam)) {
+                attackerCity = Math.floor(metaTeam);
+            }
+        }
+        const playerCityNumeric = Number(player.city);
+        const playerCityId = Number.isFinite(playerCityNumeric) ? Math.floor(playerCityNumeric) : null;
+
+        this.releaseSlot(player);
+        delete this.game.players[socketId];
+
+        if (this.io) {
+            this.io.emit('player:removed', JSON.stringify({ id: player.id }));
+        }
+
+        if (socket) {
+            socket.emit('lobby:evicted', JSON.stringify({
+                city: playerCityId,
+                reason: 'death',
+                attackerCity,
+                points: null
+            }));
         }
     }
 

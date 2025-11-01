@@ -28,7 +28,6 @@ import {drawBuilding} from "./src/draw/draw-building-interface";
 import {drawItems} from "./src/draw/draw-items";
 import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
-import {initPersistence} from "./src/storage/persistence";
 import {getCitySpawn, getCityDisplayName} from "./src/utils/citySpawns";
 import LobbyManager from "./src/lobby/LobbyManager";
 
@@ -37,6 +36,7 @@ const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Reso
 const LOAD_TYPE = LoaderResource ? LoaderResource.LOAD_TYPE : {};
 const XHR_RESPONSE_TYPE = LoaderResource ? LoaderResource.XHR_RESPONSE_TYPE : {};
 const COLOR_KEY_MAGENTA = { r: 255, g: 0, b: 255 };
+const TILE_SIZE_PX = 48;
 const DEFAULT_PANEL_MESSAGE = {
     heading: 'Intel',
     lines: ['Right-click a city building to inspect.']
@@ -197,10 +197,239 @@ const game = {
         heading: DEFAULT_PANEL_MESSAGE.heading,
         lines: [...DEFAULT_PANEL_MESSAGE.lines],
     },
+    defenseItems: new Map(),
     lobby: null,
     app: app,
     stage: app.stage,
-    objectContainer: objectContainer
+    objectContainer: objectContainer,
+    orbHintElement: null,
+    lastOrbHintMessage: '',
+    nextOrbHintUpdate: 0,
+};
+
+const orbHintElement = document.createElement('div');
+orbHintElement.id = 'orb-hint';
+const orbHintStyle = orbHintElement.style;
+orbHintStyle.position = 'fixed';
+orbHintStyle.top = '24px';
+orbHintStyle.right = '24px';
+orbHintStyle.padding = '10px 14px';
+orbHintStyle.borderRadius = '12px';
+orbHintStyle.background = 'rgba(10, 18, 52, 0.82)';
+orbHintStyle.border = '1px solid rgba(123, 152, 255, 0.35)';
+orbHintStyle.boxShadow = '0 18px 36px rgba(0, 0, 0, 0.45)';
+orbHintStyle.fontFamily = '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+orbHintStyle.fontSize = '14px';
+orbHintStyle.color = '#f0f6ff';
+orbHintStyle.letterSpacing = '0.3px';
+orbHintStyle.maxWidth = '320px';
+orbHintStyle.zIndex = '1000';
+orbHintStyle.pointerEvents = 'none';
+orbHintStyle.display = 'none';
+document.body.appendChild(orbHintElement);
+game.orbHintElement = orbHintElement;
+game.lastOrbHintMessage = '';
+
+const describeDirection = (dx, dy, threshold = TILE_SIZE_PX) => {
+    let horizontal = '';
+    let vertical = '';
+    if (Math.abs(dx) > threshold) {
+        horizontal = dx > 0 ? 'east' : 'west';
+    }
+    if (Math.abs(dy) > threshold) {
+        vertical = dy > 0 ? 'south' : 'north';
+    }
+    if (horizontal && vertical) {
+        return `${vertical}-${horizontal}`;
+    }
+    if (vertical) {
+        return vertical;
+    }
+    if (horizontal) {
+        return horizontal;
+    }
+    return 'nearby';
+};
+
+const formatDirectionLabel = (label) => {
+    if (!label || typeof label !== 'string') {
+        return '';
+    }
+    return label.split('-').map((part) => {
+        if (!part) {
+            return part;
+        }
+        return part.charAt(0).toUpperCase() + part.slice(1);
+    }).join('-');
+};
+
+const getCityCenter = (city) => {
+    if (!city) {
+        return null;
+    }
+    const baseX = Number.isFinite(city.x)
+        ? city.x
+        : TILE_SIZE_PX * toFiniteNumber(city.tileX, 0);
+    const baseY = Number.isFinite(city.y)
+        ? city.y
+        : TILE_SIZE_PX * toFiniteNumber(city.tileY, 0);
+    return {
+        x: baseX + (1.5 * TILE_SIZE_PX),
+        y: baseY + (1 * TILE_SIZE_PX),
+    };
+};
+
+const resolveCityName = (city, index) => {
+    if (city && typeof city.name === 'string' && city.name.trim().length) {
+        return city.name;
+    }
+    return getCityDisplayName(index);
+};
+
+game.updateOrbHint = (options = {}) => {
+    const { force = false } = options;
+    const element = game.orbHintElement;
+    if (!element) {
+        return;
+    }
+
+    const lobby = game.lobby;
+    const inGame = lobby && typeof lobby.isInGame === 'function' ? lobby.isInGame() : false;
+    if (!inGame) {
+        if (element.style.display !== 'none') {
+            element.style.display = 'none';
+            game.lastOrbHintMessage = '';
+        }
+        return;
+    }
+
+    const player = game.player;
+    const offset = player?.offset;
+    const px = toFiniteNumber(offset?.x, NaN);
+    const py = toFiniteNumber(offset?.y, NaN);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) {
+        if (element.style.display !== 'none') {
+            element.style.display = 'none';
+            game.lastOrbHintMessage = '';
+        }
+        return;
+    }
+
+    const playerCity = normaliseCityId(player?.city, null);
+    let bestMatch = null;
+    const cities = Array.isArray(game.cities) ? game.cities : [];
+    cities.forEach((city, index) => {
+        if (!city || index === playerCity || !city.isOrbable) {
+            return;
+        }
+        const center = getCityCenter(city);
+        if (!center) {
+            return;
+        }
+        const dx = center.x - px;
+        const dy = center.y - py;
+        const distanceSq = (dx * dx) + (dy * dy);
+        if (!Number.isFinite(distanceSq)) {
+            return;
+        }
+        if (!bestMatch || distanceSq < bestMatch.distanceSq) {
+            bestMatch = { city, index, dx, dy, distanceSq };
+        }
+    });
+
+    let message;
+    if (!bestMatch) {
+        message = 'No orbable cities detected yet.';
+    } else {
+        const cityName = resolveCityName(bestMatch.city, bestMatch.index);
+        const directionLabel = formatDirectionLabel(describeDirection(bestMatch.dx, bestMatch.dy));
+        const distance = Math.sqrt(bestMatch.distanceSq);
+        const distanceTiles = Math.round(distance / TILE_SIZE_PX);
+        const distanceLabel = distanceTiles > 1 ? ` (~${distanceTiles} tiles)` : '';
+        message = `Nearest orbable city: ${cityName} — ${directionLabel}${distanceLabel}`;
+    }
+
+    if (!force && message === game.lastOrbHintMessage) {
+        return;
+    }
+
+    element.textContent = message || '';
+    element.style.display = message ? 'block' : 'none';
+    game.lastOrbHintMessage = message || '';
+};
+
+game.updateOrbHint({ force: true });
+
+game.clearDefenseItems = (cityId) => {
+    const normalisedId = normaliseCityId(cityId, null);
+    if (normalisedId === null) {
+        return;
+    }
+    const stored = game.defenseItems.get(normalisedId);
+    if (Array.isArray(stored) && game.itemFactory && typeof game.itemFactory.removeItemById === 'function') {
+        stored.forEach((itemId) => {
+            game.itemFactory.removeItemById(itemId);
+        });
+    }
+    game.defenseItems.delete(normalisedId);
+    game.forceDraw = true;
+};
+
+game.applyDefenseSnapshot = (cityId, items) => {
+    const normalisedId = normaliseCityId(cityId, null);
+    if (normalisedId === null) {
+        return;
+    }
+    if (!game.itemFactory || typeof game.itemFactory.newItem !== 'function') {
+        return;
+    }
+    game.clearDefenseItems(normalisedId);
+    if (!Array.isArray(items) || !items.length) {
+        return;
+    }
+
+    const createdIds = [];
+    items.forEach((entry, index) => {
+        const type = toFiniteNumber(entry?.type, null);
+        const x = toFiniteNumber(entry?.x, null);
+        const y = toFiniteNumber(entry?.y, null);
+        if (!Number.isFinite(type) || !Number.isFinite(x) || !Number.isFinite(y)) {
+            return;
+        }
+        const teamId = toFiniteNumber(entry?.teamId, normalisedId);
+        const itemId = (typeof entry?.id === 'string' && entry.id.length > 0)
+            ? entry.id
+            : `defense_${normalisedId}_${index}`;
+        if (typeof game.itemFactory.removeItemById === 'function') {
+            game.itemFactory.removeItemById(itemId);
+        }
+        const ownerId = (typeof entry?.ownerId === 'string' && entry.ownerId.length > 0)
+            ? entry.ownerId
+            : `fake_city_${normalisedId}`;
+        const owner = { id: ownerId, city: normalisedId };
+        const item = game.itemFactory.newItem(owner, x, y, type, {
+            id: itemId,
+            notifyServer: false,
+            teamId,
+            city: teamId,
+        });
+        if (!item) {
+            return;
+        }
+        item.isDefense = true;
+        if (entry?.angle !== undefined) {
+            const angle = toFiniteNumber(entry.angle, null);
+            if (Number.isFinite(angle)) {
+                item.angle = angle;
+            }
+        }
+        createdIds.push(item.id);
+    });
+
+    if (createdIds.length) {
+        game.defenseItems.set(normalisedId, createdIds);
+        game.forceDraw = true;
+    }
 };
 
 const applyPanelMessage = (message) => {
@@ -443,7 +672,6 @@ function setup() {
     var mapData = resources.mapData.data;
     mapBuilder.build(game, mapData);
     cityBuilder.build(game);
-    initPersistence(game);
 
     const initialSpawn = getCitySpawn(game.player.city);
     if (initialSpawn) {
@@ -597,6 +825,9 @@ function setup() {
             city.maxBuildings = toFiniteNumber(data.maxBuildings, city.maxBuildings ?? 0);
         }
         city.updatedAt = data.updatedAt ? toFiniteNumber(data.updatedAt, Date.now()) : Date.now();
+        if (typeof game.updateOrbHint === 'function') {
+            game.updateOrbHint({ force: true });
+        }
         game.forceDraw = true;
     });
     game.socketListener.on('city:info', (info) => {
@@ -754,6 +985,14 @@ function gameLoop() {
     drawIcons(game, iconTiles);
     drawPanelInterface(game, panelContainer);
     play(game);
+
+    if (typeof game.updateOrbHint === 'function') {
+        const nextTick = Number.isFinite(game.nextOrbHintUpdate) ? game.nextOrbHintUpdate : 0;
+        if (!nextTick || game.tick >= nextTick) {
+            game.updateOrbHint();
+            game.nextOrbHintUpdate = game.tick + 500;
+        }
+    }
 
     app.renderer.plugins.tilemap.tileAnim[0] = tileAnim * 144;
 

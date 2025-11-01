@@ -2,6 +2,18 @@
 
 const citySpawns = require('../../shared/citySpawns.json');
 const fakeCityConfig = require('../../shared/fakeCities.json');
+const { TILE_SIZE } = require('./gameplay/constants');
+
+const DEFENSE_ITEM_TYPES = Object.freeze({
+    turret: 9,
+    turrets: 9,
+    plasma: 11,
+    'plasma_cannon': 11,
+    'plasma cannon': 11,
+    sleeper: 10,
+    sleepers: 10,
+    'sleeper_turret': 10,
+});
 
 const toFiniteNumber = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -17,13 +29,20 @@ const toFiniteNumber = (value, fallback = 0) => {
 };
 
 class FakeCityManager {
-    constructor({ game, buildingFactory, playerFactory }) {
+    constructor({ game, buildingFactory, playerFactory, hazardManager }) {
         this.game = game;
         this.buildingFactory = buildingFactory;
         this.playerFactory = playerFactory;
+        this.hazardManager = hazardManager || null;
         this.config = fakeCityConfig || {};
         this.activeCities = new Map();
         this.nextEvaluation = 0;
+        this.io = null;
+        this.defenseSequence = 0;
+    }
+
+    setIo(io) {
+        this.io = io;
     }
 
     update(now = Date.now()) {
@@ -67,6 +86,173 @@ class FakeCityManager {
     getConfiguredCities() {
         const entries = Array.isArray(this.config.cities) ? this.config.cities : [];
         return entries.filter((entry) => Number.isFinite(toFiniteNumber(entry?.cityId, NaN)));
+    }
+
+    sendSnapshot(target) {
+        if (!target) {
+            return;
+        }
+        for (const [cityId, record] of this.activeCities.entries()) {
+            if (record && Array.isArray(record.defenseItems) && record.defenseItems.length) {
+                this.emitDefenseSnapshot(cityId, record.defenseItems, target);
+            }
+        }
+    }
+
+    emitDefenseSnapshot(cityId, items, target = null) {
+        if (!Array.isArray(items) || !items.length) {
+            return;
+        }
+        const payload = {
+            cityId,
+            items: items.map((item) => {
+                const snapshot = {
+                    id: item.id,
+                    type: item.type,
+                    x: item.x,
+                    y: item.y,
+                    teamId: item.teamId,
+                };
+                if (item.ownerId !== undefined) {
+                    snapshot.ownerId = item.ownerId;
+                }
+                if (item.angle !== undefined) {
+                    snapshot.angle = item.angle;
+                }
+                return snapshot;
+            })
+        };
+        const emitter = target ?? this.io;
+        if (!emitter) {
+            return;
+        }
+        emitter.emit('city:defenses', payload);
+    }
+
+    emitDefenseClear(cityId, target = null) {
+        const payload = { cityId };
+        const emitter = target ?? this.io;
+        if (!emitter) {
+            return;
+        }
+        emitter.emit('city:defenses:clear', payload);
+    }
+
+    resolveDefenseItemType(type) {
+        if (type === null || type === undefined) {
+            return null;
+        }
+        if (typeof type === 'number' && Number.isFinite(type)) {
+            return type;
+        }
+        const key = String(type).toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(DEFENSE_ITEM_TYPES, key)) {
+            return DEFENSE_ITEM_TYPES[key];
+        }
+        return null;
+    }
+
+    deployDefenses(cityId, entry, baseX, baseY, layout, ownerId) {
+        const result = {
+            items: [],
+            hazardIds: []
+        };
+        const defenses = Array.isArray(entry?.defenses) && entry.defenses.length
+            ? entry.defenses
+            : (Array.isArray(this.config.defaultDefenses) ? this.config.defaultDefenses : []);
+        if (!defenses.length) {
+            return result;
+        }
+
+        const layoutOccupied = new Set();
+        if (Array.isArray(layout)) {
+            for (const blueprint of layout) {
+                const dx = toFiniteNumber(blueprint?.dx, 0);
+                const dy = toFiniteNumber(blueprint?.dy, 0);
+                const tileX = Math.floor(baseX + dx);
+                const tileY = Math.floor(baseY + dy);
+                if (Number.isFinite(tileX) && Number.isFinite(tileY)) {
+                    layoutOccupied.add(`${tileX}_${tileY}`);
+                }
+            }
+        }
+
+        const placedTiles = new Set();
+        const maxTileIndex = 512;
+
+        for (const defense of defenses) {
+            const rawType = defense?.type;
+            if (rawType === undefined || rawType === null) {
+                continue;
+            }
+            const dx = toFiniteNumber(defense?.dx, null);
+            const dy = toFiniteNumber(defense?.dy, null);
+            if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+                continue;
+            }
+            const tileX = baseX + dx;
+            const tileY = baseY + dy;
+            if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) {
+                continue;
+            }
+            if (tileX < 0 || tileY < 0 || tileX >= maxTileIndex || tileY >= maxTileIndex) {
+                continue;
+            }
+            const column = Math.floor(tileX);
+            const row = Math.floor(tileY);
+            const tileKey = `${column}_${row}`;
+            if (defense.allowOverlap !== true) {
+                if (layoutOccupied.has(tileKey) || placedTiles.has(tileKey)) {
+                    continue;
+                }
+            }
+
+            const worldX = tileX * TILE_SIZE;
+            const worldY = tileY * TILE_SIZE;
+            const typeKey = typeof rawType === 'string' ? rawType.toLowerCase() : rawType;
+
+            if (typeKey === 'mine' || typeKey === 'mines' || typeKey === 'minefield') {
+                if (!this.hazardManager || typeof this.hazardManager.spawnSystemHazard !== 'function') {
+                    continue;
+                }
+                const hazardId = defense.id || `fake_mine_${cityId}_${++this.defenseSequence}`;
+                const hazard = this.hazardManager.spawnSystemHazard({
+                    id: hazardId,
+                    type: 'mine',
+                    x: worldX,
+                    y: worldY,
+                    teamId: cityId,
+                    ownerId,
+                });
+                if (hazard) {
+                    result.hazardIds.push(hazard.id);
+                    placedTiles.add(tileKey);
+                }
+                continue;
+            }
+
+            const itemType = this.resolveDefenseItemType(typeKey);
+            if (itemType === null) {
+                continue;
+            }
+
+            const item = {
+                id: defense.id || `fake_defense_${cityId}_${++this.defenseSequence}`,
+                type: itemType,
+                x: worldX,
+                y: worldY,
+                ownerId,
+                teamId: cityId,
+            };
+            const angle = toFiniteNumber(defense?.angle, null);
+            if (Number.isFinite(angle)) {
+                item.angle = angle;
+            }
+            result.items.push(item);
+            placedTiles.add(tileKey);
+        }
+
+        return result;
     }
 
     spawnFakeCities(count, configured = this.getConfiguredCities()) {
@@ -158,14 +344,24 @@ class FakeCityManager {
             return false;
         }
 
+        const defenses = this.deployDefenses(cityId, entry, baseX, baseY, layout, ownerId);
+        const defenseItemsSnapshot = defenses.items.map((item) => ({ ...item }));
+        const hazardIdsSnapshot = Array.isArray(defenses.hazardIds) ? [...defenses.hazardIds] : [];
+
         this.activeCities.set(cityId, {
             ownerId,
             config: entry,
             buildingIds: spawnedIds,
+            defenseItems: defenseItemsSnapshot,
+            hazardIds: hazardIdsSnapshot,
         });
 
         if (this.playerFactory?.emitLobbySnapshot) {
             this.playerFactory.emitLobbySnapshot();
+        }
+
+        if (defenseItemsSnapshot.length) {
+            this.emitDefenseSnapshot(cityId, defenseItemsSnapshot);
         }
 
         return true;
@@ -190,6 +386,17 @@ class FakeCityManager {
     despawnFakeCity(cityId) {
         if (!this.activeCities.has(cityId)) {
             return false;
+        }
+        const record = this.activeCities.get(cityId);
+        if (record && Array.isArray(record.hazardIds) && this.hazardManager) {
+            record.hazardIds.forEach((hazardId) => {
+                this.hazardManager.removeHazard(hazardId, 'city_removed');
+            });
+            record.hazardIds = [];
+        }
+        if (record && Array.isArray(record.defenseItems) && record.defenseItems.length) {
+            this.emitDefenseClear(cityId);
+            record.defenseItems = [];
         }
         if (this.buildingFactory) {
             this.buildingFactory.destroyCity(cityId);

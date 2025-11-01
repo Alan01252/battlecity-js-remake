@@ -64,6 +64,11 @@ class IconFactory {
             : ((owner !== null && owner !== undefined && owner === this.game.player?.id)
                 ? this.game.player.city ?? null
                 : null);
+        const resolvedTeam = (options.teamId !== undefined)
+            ? options.teamId
+            : ((owner !== null && owner !== undefined && owner === this.game.player?.id)
+                ? this.game.player.city ?? null
+                : null);
 
         var icon = {
             "owner": owner,
@@ -76,7 +81,8 @@ class IconFactory {
             "quantity": quantity,
             "selected": !!options.selected,
             "armed": !!options.armed,
-            "city": resolvedCity
+            "city": resolvedCity,
+            "teamId": resolvedTeam
 
         };
 
@@ -103,9 +109,6 @@ class IconFactory {
             if (!options.skipProductionUpdate && typeof this.game.buildingFactory.handleIconProduced === 'function') {
                 this.game.buildingFactory.handleIconProduced(icon);
             }
-        }
-        if (this.game.player && icon.owner === this.game.player.id && this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
-            this.game.persistence.saveInventory();
         }
         if (icon.owner === this.game.player?.id && icon.selected) {
             let node = this.iconListHead;
@@ -141,6 +144,7 @@ class IconFactory {
 
             icon.owner = ownerId;
             icon.city = this.game.player.city ?? null;
+            icon.teamId = this.game.player.city ?? null;
             icon.quantity = quantityToAdd;
             icon.selected = false;
             icon.armed = false;
@@ -159,9 +163,6 @@ class IconFactory {
             }
 
             this.game.forceDraw = true;
-            if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
-                this.game.persistence.saveInventory();
-            }
         }
     }
 
@@ -205,9 +206,6 @@ class IconFactory {
         }
 
         this.game.forceDraw = true;
-        if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
-            this.game.persistence.saveInventory();
-        }
         return dropInfo;
     }
 
@@ -232,9 +230,6 @@ class IconFactory {
         } else if (selectedIcon.selected) {
             this.game.player.bombsArmed = false;
         }
-        if (this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
-            this.game.persistence.saveInventory();
-        }
     }
 
     findIconByLocation() {
@@ -242,9 +237,11 @@ class IconFactory {
         var icon = this.getHead();
         var range = 24;
 
+        const playerCity = this.game.player?.city ?? null;
         while (icon) {
-
+            const allowedTeam = icon.teamId === null || icon.teamId === undefined || icon.teamId === playerCity;
             if (icon.owner == null &&
+                allowedTeam &&
                 icon.x >= (this.game.player.offset.x - range)
                 && icon.x <= (this.game.player.offset.x + range)
                 && icon.y >= (this.game.player.offset.y - range)
@@ -294,9 +291,8 @@ class IconFactory {
             this.iconListHead = icon.next;
         }
 
-        if (this.game.player && icon.owner === this.game.player.id &&
-            this.game.persistence && typeof this.game.persistence.saveInventory === 'function') {
-            this.game.persistence.saveInventory();
+        if (this.game.player && this.game.player.id === icon.owner && icon.type === ITEM_TYPE_BOMB) {
+            this.game.player.bombsArmed = icon.armed;
         }
 
         return returnIcon;
@@ -307,11 +303,14 @@ class IconFactory {
         return this.iconListHead;
     }
 
-    countUnownedIconsNear(x, y, type, radius = 48) {
+    countUnownedIconsNear(x, y, type, radius = 48, teamId = null) {
         let count = 0;
         let icon = this.getHead();
         while (icon) {
-            if (icon.owner == null && icon.type === type) {
+            const matchesTeam = teamId === null || teamId === undefined
+                || icon.teamId === null || icon.teamId === undefined
+                || icon.teamId === teamId;
+            if (icon.owner == null && icon.type === type && matchesTeam) {
                 const dx = Math.abs(icon.x - x);
                 const dy = Math.abs(icon.y - y);
                 if (dx <= radius && dy <= radius) {
@@ -323,12 +322,15 @@ class IconFactory {
         return count;
     }
 
-    removeUnownedIconsNear(x, y, type, amount, radius = 48) {
+    removeUnownedIconsNear(x, y, type, amount, radius = 48, teamId = null) {
         let removed = 0;
         let icon = this.getHead();
         while (icon && removed < amount) {
             const next = icon.next;
-            if (icon.owner == null && icon.type === type) {
+            const matchesTeam = teamId === null || teamId === undefined
+                || icon.teamId === null || icon.teamId === undefined
+                || icon.teamId === teamId;
+            if (icon.owner == null && icon.type === type && matchesTeam) {
                 const dx = Math.abs(icon.x - x);
                 const dy = Math.abs(icon.y - y);
                 if (dx <= radius && dy <= radius) {

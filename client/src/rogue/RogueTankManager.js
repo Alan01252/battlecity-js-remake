@@ -90,6 +90,52 @@ class RogueTankManager {
         this.tanks = [];
         this.nextId = 1;
         this.nextSpawnCheck = 0;
+        this.instancePrefix = `local_${Math.random().toString(16).slice(-6)}`;
+    }
+
+    sanitizeIdComponent(value) {
+        if (!value || typeof value !== 'string') {
+            return null;
+        }
+        return value.replace(/[^a-zA-Z0-9_-]/g, '');
+    }
+
+    getClientInstanceId() {
+        const socketId = this.game?.socketListener?.io?.id;
+        const cleaned = this.sanitizeIdComponent(socketId);
+        if (cleaned && cleaned.length) {
+            return cleaned;
+        }
+        return this.instancePrefix;
+    }
+
+    createTankId() {
+        const prefix = this.getClientInstanceId();
+        const id = `rogue_${prefix}_${this.nextId}`;
+        this.nextId += 1;
+        return id;
+    }
+
+    emitTankShot(tank, originX, originY, direction) {
+        const socketListener = this.game?.socketListener;
+        if (!socketListener || typeof socketListener.sendBulletShot !== 'function') {
+            return;
+        }
+        const shooterId = this.game.player?.id ?? null;
+        if (!shooterId) {
+            return;
+        }
+        socketListener.sendBulletShot({
+            shooter: shooterId,
+            x: originX,
+            y: originY,
+            type: 0,
+            angle: -direction,
+            team: null,
+            sourceId: tank?.id ?? null,
+            sourceType: 'rogue_tank',
+            targetId: typeof tank?.target === 'object' ? tank.target.id ?? null : null
+        });
     }
 
     update() {
@@ -188,8 +234,7 @@ class RogueTankManager {
                 continue;
             }
 
-            const tankId = `rogue_${this.nextId}`;
-            this.nextId += 1;
+            const tankId = this.createTankId();
             const now = this.game.tick || Date.now();
             const tank = {
                 id: tankId,
@@ -376,6 +421,7 @@ class RogueTankManager {
         const originY = (tank.offset.y + HALF_TILE) + (vec.dy * 30);
 
         this.game.bulletFactory.newBullet(tank.id, originX, originY, 0, -direction, null);
+        this.emitTankShot(tank, originX, originY, direction);
         tank.fireCooldown = now + SHOOT_INTERVAL + Math.random() * 800;
     }
 

@@ -58,7 +58,9 @@ const fakeCityManager = new FakeCityManager({
     game,
     buildingFactory,
     playerFactory,
+    hazardManager,
 });
+fakeCityManager.setIo(io);
 
 const toFiniteNumber = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -223,6 +225,7 @@ io.on('connection', (socket) => {
         hazardManager.onDisconnect(socket.id);
     });
     hazardManager.sendSnapshot(socket);
+    fakeCityManager.sendSnapshot(socket);
 });
 
 const BUILDING_UPDATE_INTERVAL = 100;
