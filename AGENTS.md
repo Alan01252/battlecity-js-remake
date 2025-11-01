@@ -18,6 +18,7 @@
 - `client/src/play.js` advances player movement/rotation, enforces map-edge clamps, and handles death resets; relies on `checkPlayerCollision` and constants.
 - Input handling lives in `client/src/input/`, mapping keyboard/mouse to `game.player` flags and factory actions (shooting, item drop, build menu).
 - Rendering pipeline split into modules under `client/src/draw/` (`drawGround`, `drawTiles`, `drawChanging`, etc.) and executed each animation frame by `gameLoop()`.
+- The panel overlay (`drawPanelInterface`) now builds the radar each frame, using `imgRadarColors`/`imgMiniMapColors` to plot nearby tanks while skipping cloaked players and anything outside the 2,400px range window.
 - Factories (`client/src/factories/`) maintain linked-list structures (`next`/`previous`) to manage dynamic entities (buildings, bullets, icons, items). They coordinate with collision helpers under `client/src/collision/`.
 - Networking via `client/src/SocketListener.js` wraps `socket.io-client`; emits local state (`player`, `bullet_shot`, `new_building`) and applies server broadcasts to `game.otherPlayers`, factories, etc.
 

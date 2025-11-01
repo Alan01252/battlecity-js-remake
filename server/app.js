@@ -54,7 +54,8 @@ const orbManager = new OrbManager({
     cityManager: buildingFactory.cityManager,
     playerFactory,
     buildingFactory,
-    hazardManager
+    hazardManager,
+    defenseManager,
 });
 orbManager.setIo(io);
 const fakeCityManager = new FakeCityManager({

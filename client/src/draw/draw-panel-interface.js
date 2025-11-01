@@ -14,6 +14,15 @@ import {ITEM_TYPE_WALL} from "../constants";
 import {ITEM_TYPE_SLEEPER} from "../constants";
 import {ITEM_TYPE_PLASMA} from "../constants";
 import {ITEM_TYPE_FLARE} from "../constants";
+import {
+    RADAR_RANGE_PX,
+    RADAR_RATIO,
+    RADAR_CENTER_OFFSET_X,
+    RADAR_CENTER_Y,
+    RADAR_BOUNDS,
+    RADAR_OFFSET_ADJUST_X,
+    RADAR_OFFSET_ADJUST_Y
+} from "../constants";
 
 const INVENTORY_SLOTS = {
     [ITEM_TYPE_LASER]: {x: 7, y: 267},
@@ -54,6 +63,219 @@ const getGrossIncome = (city) => {
     const income = Number(city.income || 0);
     const expenses = Number(city.itemProduction || 0) + Number(city.research || 0) + Number(city.hospital || 0) + Number(city.construction || 0);
     return income - expenses;
+};
+
+const RADAR_STATE_KEY = '__radarState';
+const RADAR_SPRITE_SCALE = 2;
+const RADAR_TEXTURE_SIZE = 2;
+
+const toFiniteNumber = (value, fallback = null) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+    return fallback;
+};
+
+const createTextureSlice = (texture, column) => {
+    if (!texture || !texture.baseTexture) {
+        return null;
+    }
+    return new PIXI.Texture(texture.baseTexture, new PIXI.Rectangle(column * RADAR_TEXTURE_SIZE, 0, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE));
+};
+
+const buildRadarTextures = (game) => {
+    if (!game || !game.textures) {
+        return null;
+    }
+    const base = game.textures.imgRadarColors;
+    if (!base) {
+        return null;
+    }
+    const textures = {
+        neutral: createTextureSlice(base, 0),
+        admin: createTextureSlice(base, 1),
+        enemy: createTextureSlice(base, 2),
+        ally: createTextureSlice(base, 3),
+    };
+    const mini = game.textures.imgMiniMapColors;
+    if (mini && mini.baseTexture) {
+        textures.dead = new PIXI.Texture(mini.baseTexture, new PIXI.Rectangle(15 * RADAR_TEXTURE_SIZE, 0, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE));
+    }
+    return textures;
+};
+
+const ensureRadarState = (game, stage) => {
+    if (!game || !stage || !game.textures || !game.textures.imgRadarColors) {
+        return null;
+    }
+
+    let state = stage[RADAR_STATE_KEY];
+    if (!state) {
+        const container = new PIXI.Container();
+        container.name = 'radar-container';
+        const pointsLayer = new PIXI.Container();
+        pointsLayer.name = 'radar-points';
+        container.addChild(pointsLayer);
+        state = {
+            container,
+            pointsLayer,
+            pool: [],
+            spriteScale: RADAR_SPRITE_SCALE,
+            textures: null,
+            bounds: null,
+        };
+        stage[RADAR_STATE_KEY] = state;
+    }
+
+    if (!state.textures) {
+        state.textures = buildRadarTextures(game);
+    }
+    if (!state.textures) {
+        return null;
+    }
+
+    const panelLeft = game.maxMapX || 0;
+    const { offsetX, offsetY, width, height } = RADAR_BOUNDS;
+    const left = panelLeft + offsetX;
+    const top = offsetY;
+    state.bounds = {
+        left,
+        top,
+        right: left + width,
+        bottom: top + height,
+        width,
+        height,
+    };
+    state.container.position.set(left, top);
+
+    if (!state.container.parent || state.container.parent !== stage) {
+        stage.addChild(state.container);
+    }
+
+    return state;
+};
+
+const updateRadar = (game, radarState) => {
+    if (!game || !radarState || !radarState.pointsLayer || !radarState.textures) {
+        return;
+    }
+
+    const me = game.player;
+    if (!me || !me.offset) {
+        radarState.pointsLayer.visible = false;
+        return;
+    }
+
+    const myX = toFiniteNumber(me.offset.x, null);
+    const myY = toFiniteNumber(me.offset.y, null);
+    if (!Number.isFinite(myX) || !Number.isFinite(myY)) {
+        radarState.pointsLayer.visible = false;
+        return;
+    }
+
+    const bounds = radarState.bounds;
+    if (!bounds) {
+        radarState.pointsLayer.visible = false;
+        return;
+    }
+
+    const pool = radarState.pool;
+    const textures = radarState.textures;
+    const usedSprites = [];
+    const baseX = (game.maxMapX || 0) + RADAR_CENTER_OFFSET_X;
+    const baseY = RADAR_CENTER_Y;
+    const range = RADAR_RANGE_PX;
+    const myCity = toFiniteNumber(me.city, null);
+
+    const pushSprite = (playerData) => {
+        const dx = playerData.offsetX - myX;
+        const dy = playerData.offsetY - myY;
+        if (Math.abs(dx) > range || Math.abs(dy) > range) {
+            return;
+        }
+        const globalX = baseX - ((dx + RADAR_OFFSET_ADJUST_X) / RADAR_RATIO);
+        const globalY = baseY - ((dy + RADAR_OFFSET_ADJUST_Y) / RADAR_RATIO);
+        if (globalX < bounds.left || globalX > bounds.right || globalY < bounds.top || globalY > bounds.bottom) {
+            return;
+        }
+
+        let texture = textures.enemy;
+        const sameCity = Number.isFinite(playerData.city) && Number.isFinite(myCity) && playerData.city === myCity;
+        if (playerData.isSelf || sameCity) {
+            texture = textures.ally || textures.neutral || texture;
+        } else if (playerData.isAdmin && textures.admin) {
+            texture = textures.admin;
+        } else if (!Number.isFinite(playerData.city) && textures.neutral) {
+            texture = textures.neutral;
+        }
+        if (playerData.health !== undefined && playerData.health <= 0 && textures.dead) {
+            texture = textures.dead;
+        }
+        if (!texture) {
+            return;
+        }
+
+        let sprite = pool[usedSprites.length];
+        if (!sprite) {
+            sprite = new PIXI.Sprite(texture);
+            sprite.anchor.set(0.5);
+            sprite.scale.set(radarState.spriteScale, radarState.spriteScale);
+            radarState.pointsLayer.addChild(sprite);
+            pool[usedSprites.length] = sprite;
+        }
+
+        sprite.texture = texture;
+        sprite.visible = true;
+        sprite.position.set(globalX - bounds.left, globalY - bounds.top);
+        usedSprites.push(sprite);
+    };
+
+    if (!me.isCloaked) {
+        pushSprite({
+            id: me.id || '__self__',
+            city: myCity,
+            offsetX: myX,
+            offsetY: myY,
+            health: me.health,
+            isSelf: true,
+            isAdmin: false,
+        });
+    }
+
+    const others = game.otherPlayers || {};
+    Object.keys(others).forEach((key) => {
+        const other = others[key];
+        if (!other || !other.offset || other.isCloaked) {
+            return;
+        }
+        const otherX = toFiniteNumber(other.offset.x, null);
+        const otherY = toFiniteNumber(other.offset.y, null);
+        if (!Number.isFinite(otherX) || !Number.isFinite(otherY)) {
+            return;
+        }
+        const otherCity = toFiniteNumber(other.city, null);
+        pushSprite({
+            id: other.id || key,
+            city: otherCity,
+            offsetX: otherX,
+            offsetY: otherY,
+            health: toFiniteNumber(other.health, null),
+            isSelf: false,
+            isAdmin: !!other.isAdmin,
+        });
+    });
+
+    for (let i = usedSprites.length; i < pool.length; i += 1) {
+        pool[i].visible = false;
+    }
+
+    radarState.pointsLayer.visible = usedSprites.length > 0;
 };
 
 var drawPanel = (game, stage) => {
@@ -206,44 +428,6 @@ var drawItems = (game, stage) => {
     }
 };
 
-var drawMayorIndicator = (game, stage) => {
-    if (!game.player.isMayor) {
-        return;
-    }
-
-    const badgeContainer = new PIXI.Container();
-    const badge = new PIXI.Graphics();
-    badge.beginFill(0xF1C40F)
-        .lineStyle(2, 0x9C6400)
-        .drawCircle(0, 0, 18)
-        .endFill();
-    badgeContainer.addChild(badge);
-
-    const innerText = new PIXI.Text('M', {
-        fontFamily: 'Arial',
-        fontWeight: 'bold',
-        fontSize: 18,
-        fill: 0x1B2631,
-    });
-    innerText.anchor.set(0.5);
-    badgeContainer.addChild(innerText);
-
-    badgeContainer.x = game.maxMapX + 155;
-    badgeContainer.y = 80;
-    stage.addChild(badgeContainer);
-
-    const label = new PIXI.Text('Mayor', {
-        fontFamily: 'Arial',
-        fontSize: 12,
-        fill: 0xFDFEFE,
-        fontWeight: 'bold',
-    });
-    label.anchor.set(0.5, 0);
-    label.x = badgeContainer.x;
-    label.y = badgeContainer.y + 20;
-    stage.addChild(label);
-};
-
 const drawPanelMessages = (game, stage) => {
     if (!game || !stage) {
         return;
@@ -322,7 +506,9 @@ export const drawPanelInterface = (game, panelContainer) => {
         drawFinance(game, panelContainer);
         drawHealth(game, panelContainer);
         drawItems(game, panelContainer);
-        drawMayorIndicator(game, panelContainer);
         drawPanelMessages(game, panelContainer);
     }
+
+    const radarState = ensureRadarState(game, panelContainer);
+    updateRadar(game, radarState);
 };

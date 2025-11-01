@@ -24,12 +24,13 @@ const toNumber = (value, fallback = null) => {
 };
 
 class OrbManager {
-    constructor({ game, cityManager, playerFactory, buildingFactory, hazardManager }) {
+    constructor({ game, cityManager, playerFactory, buildingFactory, hazardManager, defenseManager }) {
         this.game = game;
         this.cityManager = cityManager;
         this.playerFactory = playerFactory;
         this.buildingFactory = buildingFactory;
         this.hazardManager = hazardManager;
+        this.defenseManager = defenseManager;
         this.io = null;
     }
 
@@ -101,6 +102,10 @@ class OrbManager {
 
         if (this.hazardManager) {
             this.hazardManager.removeHazardsForTeam(targetCity, 'city_destroyed');
+        }
+
+        if (this.defenseManager && typeof this.defenseManager.clearCity === 'function') {
+            this.defenseManager.clearCity(targetCity);
         }
 
         if (this.cityManager) {

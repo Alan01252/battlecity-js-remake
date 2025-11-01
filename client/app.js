@@ -631,6 +631,8 @@ const resourcesToLoad = [
     { name: 'imgBuildIcons', url: assetUrl('imgBuildIcons.png') },
     { name: 'imgItems', url: assetUrl('imgItems.png') },
     { name: 'imgInventorySelection', url: assetUrl('imgInventorySelection.png') },
+    { name: 'imgRadarColors', url: assetUrl('imgRadarColors.png') },
+    { name: 'imgMiniMapColors', url: assetUrl('imgMiniMapColors.png') },
     { name: 'imgPopulation', url: assetUrl('imgPopulation.png') },
     { name: 'imgBlackNumbers', url: assetUrl('imgBlackNumbers.png') },
     { name: 'imgMoneyBox', url: assetUrl('skins/BattleCity3.1/imgMoneyBox.png') },
@@ -705,6 +707,8 @@ function setup() {
         resources.imgInventorySelection,
         resources.imgInterfaceTop,
         resources.imgInterfaceBottom,
+        resources.imgRadarColors,
+        resources.imgMiniMapColors,
         resources.imgTurretBase,
         resources.imgTurretHead,
         resources.imgPopulation,
@@ -726,6 +730,8 @@ function setup() {
     game.textures['bulletTexture'] = resources.imgBullets.texture;
     game.textures['interfaceTop'] = resources.imgInterfaceTop.texture;
     game.textures['interfaceBottom'] = resources.imgInterfaceBottom.texture;
+    game.textures['imgRadarColors'] = resources.imgRadarColors.texture;
+    game.textures['imgMiniMapColors'] = resources.imgMiniMapColors.texture;
     game.textures['health'] = resources.imgHealth.texture;
     game.textures['buildings'] = resources.imgBuildings.texture;
     game.textures['buildingIcons'] = resources.imgBuildIcons.texture;

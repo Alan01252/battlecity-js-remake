@@ -26,6 +26,7 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Client handles bullet physics; server currently trusts reported positions and broadcasts them to peers.
 - Mines detonate when an opposing-city tank overlaps their tile, dealing `DAMAGE_MINE` (19) and clearing the mine from the field while leaving allies unaffected. (client/src/collision/collision-helpers.js:54, client/src/play.js:11)
 - Bombs dropped while armed (`B` toggles arming) explode after 5 seconds, wiping nearby items, demolishing buildings within two tiles, and inflicting lethal damage on tanks in the blast radius. (client/src/factories/ItemFactory.js:215, client/src/input/input-keyboard.js:128)
+- The radar UI plots tanks within ~2,400px of the local player, colour-coding friendlies vs enemies; cloaked players stay hidden and dots disappear once targets leave the radar window. (client/src/draw/draw-panel-interface.js:164, client/src/constants.js:4)
 
 ## Buildings & Items
 - Building placement consumes the appropriate resources and links into the building factory's list (`next`/`previous` pointers must remain valid).

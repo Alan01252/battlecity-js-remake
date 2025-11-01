@@ -1,6 +1,19 @@
 export const RESOLUTION_X = 1024;
 export const RESOLUTION_Y = 768;
 
+export const RADAR_RANGE_PX = 2400;
+export const RADAR_RATIO = 24;
+export const RADAR_CENTER_OFFSET_X = 100;
+export const RADAR_CENTER_Y = 80;
+export const RADAR_BOUNDS = Object.freeze({
+    offsetX: 28,
+    offsetY: 8,
+    width: 138,
+    height: 138,
+});
+export const RADAR_OFFSET_ADJUST_X = 70;
+export const RADAR_OFFSET_ADJUST_Y = 69;
+
 
 export const MOVEMENT_SPEED_PLAYER = 0.50;
 export const MOVEMENT_SPEED_BULLET = 0.80;
