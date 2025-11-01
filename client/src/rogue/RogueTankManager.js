@@ -12,9 +12,9 @@ const MAX_TANKS_PER_CITY = 2;
 const CITY_SIZE_THRESHOLD = 18;
 const CITY_SECOND_TANK_THRESHOLD = 32;
 const SPAWN_EVALUATION_INTERVAL = 5000;
-const MOVE_DECISION_INTERVAL = 1500;
+const MOVE_DECISION_INTERVAL = 1300;
 const TARGET_REFRESH_INTERVAL = 2200;
-const BASE_SPEED_MULTIPLIER = 0.35;
+const BASE_SPEED_MULTIPLIER = 0.55;
 const SHOOT_INTERVAL = 2800;
 const SHOOT_RANGE = TILE_SIZE * 10;
 const SHOOT_INACCURACY = 6;
@@ -24,10 +24,12 @@ const BOMB_FUSE = 2600;
 const BOMB_FUSE_JITTER = 1200;
 const BOMB_DROP_RADIUS = TILE_SIZE * 7;
 const MAX_LIFETIME = 240000;
-const WANDER_RADIUS = TILE_SIZE * 9;
-const ROGUE_MIN_SPAWN_RADIUS = TILE_SIZE * 18;
-const ROGUE_SPAWN_RADIUS_VARIANCE = TILE_SIZE * 10;
+const WANDER_RADIUS = TILE_SIZE * 7;
+const ROGUE_ENGAGE_RADIUS = TILE_SIZE * 11;
+const ROGUE_MIN_SPAWN_RADIUS = TILE_SIZE * 13;
+const ROGUE_SPAWN_RADIUS_VARIANCE = TILE_SIZE * 7;
 const ROGUE_SPAWN_MAX_ATTEMPTS = 20;
+const AVOIDANCE_ANGLES = Object.freeze([Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]);
 
 const toFinite = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -84,6 +86,17 @@ const normalizeVector = (dx, dy) => {
         dx: dx / length,
         dy: dy / length
     };
+};
+
+const rotateVector = (vector, angle) => {
+    if (!vector) {
+        return {dx: 0, dy: 0};
+    }
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const dx = (vector.dx * cos) - (vector.dy * sin);
+    const dy = (vector.dx * sin) + (vector.dy * cos);
+    return normalizeVector(dx, dy);
 };
 
 class RogueTankManager {
@@ -270,11 +283,39 @@ class RogueTankManager {
         return false;
     }
 
+    getCityCenter(cityId) {
+        const city = this.game.cities?.[cityId];
+        if (!city) {
+            return null;
+        }
+        const x = toFinite(city.x, 0) + (TILE_SIZE * 1.5);
+        const y = toFinite(city.y, 0) + (TILE_SIZE * 1.5);
+        return {x, y};
+    }
+
     refreshTarget(tank, now) {
         if (now < tank.nextTargetRefresh) {
             return;
         }
         tank.nextTargetRefresh = now + TARGET_REFRESH_INTERVAL + Math.random() * 1200;
+
+        const cityCenter = this.getCityCenter(tank.targetCityId);
+        if (cityCenter) {
+            const distSq = distanceSquared(
+                tank.offset.x + HALF_TILE,
+                tank.offset.y + HALF_TILE,
+                cityCenter.x,
+                cityCenter.y
+            );
+            if (distSq > (ROGUE_ENGAGE_RADIUS * ROGUE_ENGAGE_RADIUS)) {
+                tank.target = {
+                    kind: 'point',
+                    x: cityCenter.x,
+                    y: cityCenter.y
+                };
+                return;
+            }
+        }
 
         const turretTarget = this.pickNearestTurret(tank);
         if (turretTarget) {
@@ -330,7 +371,10 @@ class RogueTankManager {
 
     updateMovement(tank, now) {
         if (now < tank.nextDecisionAt) {
-            this.applyMovement(tank, now, tank.cachedVector);
+            const moved = this.applyMovement(tank, now, tank.cachedVector);
+            if (!moved) {
+                tank.nextDecisionAt = now;
+            }
             return;
         }
 
@@ -358,29 +402,77 @@ class RogueTankManager {
         const adjusted = normalizeVector(vector.dx + jitter, vector.dy + jitter);
         tank.cachedVector = adjusted;
         tank.direction = vectorToDirection(adjusted.dx, adjusted.dy, tank.direction);
-        tank.isMoving = 1;
-        this.applyMovement(tank, now, adjusted);
+        const moved = this.applyMovement(tank, now, adjusted);
+        if (!moved) {
+            tank.nextDecisionAt = now + 400 + Math.random() * 300;
+        }
     }
 
     applyMovement(tank, now, vector) {
-        if (!vector || (!vector.dx && !vector.dy)) {
+        if (!vector || !Number.isFinite(vector.dx) || !Number.isFinite(vector.dy)) {
             tank.isMoving = 0;
-            return;
+            return false;
+        }
+        if (Math.abs(vector.dx) < 1e-4 && Math.abs(vector.dy) < 1e-4) {
+            tank.isMoving = 0;
+            return false;
         }
         const delta = Math.min(this.game.timePassed || 0, 60);
         const step = delta * MOVEMENT_SPEED_PLAYER * BASE_SPEED_MULTIPLIER;
-        const nextX = tank.offset.x + (vector.dx * step);
-        const nextY = tank.offset.y + (vector.dy * step);
+        if (step <= 0) {
+            return false;
+        }
 
-        if (!this.isBlocked(nextX, nextY)) {
-            tank.offset.x = nextX;
-            tank.offset.y = nextY;
-            tank.lastSafeOffset = {x: nextX, y: nextY};
-            return;
+        if (this.tryStep(tank, vector, step)) {
+            tank.isMoving = 1;
+            return true;
+        }
+
+        const alternate = this.findAlternateVector(tank, vector, step);
+        if (alternate && this.tryStep(tank, alternate, step)) {
+            tank.cachedVector = alternate;
+            tank.direction = vectorToDirection(alternate.dx, alternate.dy, tank.direction);
+            tank.isMoving = 1;
+            return true;
         }
 
         tank.isMoving = 0;
         tank.cachedVector = null;
+        tank.nextDecisionAt = Math.min(tank.nextDecisionAt || (now + 400), now + 450 + Math.random() * 250);
+        return false;
+    }
+
+    tryStep(tank, vector, step) {
+        if (!vector) {
+            return false;
+        }
+        const nextX = tank.offset.x + (vector.dx * step);
+        const nextY = tank.offset.y + (vector.dy * step);
+        if (this.isBlocked(nextX, nextY)) {
+            return false;
+        }
+        tank.offset.x = nextX;
+        tank.offset.y = nextY;
+        tank.lastSafeOffset = {x: nextX, y: nextY};
+        return true;
+    }
+
+    findAlternateVector(tank, vector, step) {
+        if (!vector) {
+            return null;
+        }
+        for (let i = 0; i < AVOIDANCE_ANGLES.length; i += 1) {
+            const rotated = rotateVector(vector, AVOIDANCE_ANGLES[i]);
+            if (!rotated || (Math.abs(rotated.dx) < 1e-4 && Math.abs(rotated.dy) < 1e-4)) {
+                continue;
+            }
+            const nextX = tank.offset.x + (rotated.dx * step);
+            const nextY = tank.offset.y + (rotated.dy * step);
+            if (!this.isBlocked(nextX, nextY)) {
+                return rotated;
+            }
+        }
+        return null;
     }
 
     resolveTargetPosition(target) {

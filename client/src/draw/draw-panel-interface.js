@@ -289,20 +289,22 @@ const updateRadar = (game, radarState) => {
         if (Math.abs(dx) > range || Math.abs(dy) > range) {
             return;
         }
-        const globalX = baseX - ((dx + RADAR_OFFSET_ADJUST_X) / RADAR_RATIO);
-        const globalY = baseY - ((dy + RADAR_OFFSET_ADJUST_Y) / RADAR_RATIO);
+        const globalX = baseX + ((dx - RADAR_OFFSET_ADJUST_X) / RADAR_RATIO);
+        const globalY = baseY + ((dy - RADAR_OFFSET_ADJUST_Y) / RADAR_RATIO);
         if (globalX < bounds.left || globalX > bounds.right || globalY < bounds.top || globalY > bounds.bottom) {
             return;
         }
 
         let texture = textures.enemy;
         const sameCity = Number.isFinite(playerData.city) && Number.isFinite(myCity) && playerData.city === myCity;
-        if (playerData.isSelf || sameCity) {
-            texture = textures.ally || textures.neutral || texture;
-        } else if (playerData.isAdmin && textures.admin) {
-            texture = textures.admin;
-        } else if (!Number.isFinite(playerData.city) && textures.neutral) {
-            texture = textures.neutral;
+        if (playerData.radarType !== 'rogue') {
+            if (playerData.isSelf || sameCity) {
+                texture = textures.ally || textures.neutral || texture;
+            } else if (playerData.isAdmin && textures.admin) {
+                texture = textures.admin;
+            } else if (!Number.isFinite(playerData.city) && textures.neutral) {
+                texture = textures.neutral;
+            }
         }
         if (playerData.health !== undefined && playerData.health <= 0 && textures.dead) {
             texture = textures.dead;
@@ -360,6 +362,28 @@ const updateRadar = (game, radarState) => {
             isAdmin: !!other.isAdmin,
         });
     });
+
+    const rogueManager = game.rogueTankManager;
+    if (rogueManager && Array.isArray(rogueManager.tanks)) {
+        rogueManager.tanks.forEach((tank, index) => {
+            if (!tank || !tank.offset) {
+                return;
+            }
+            const rogueX = toFiniteNumber(tank.offset.x, null);
+            const rogueY = toFiniteNumber(tank.offset.y, null);
+            if (!Number.isFinite(rogueX) || !Number.isFinite(rogueY)) {
+                return;
+            }
+            pushSprite({
+                id: tank.id || `rogue_${index}`,
+                city: null,
+                offsetX: rogueX,
+                offsetY: rogueY,
+                health: toFiniteNumber(tank.health, null),
+                radarType: 'rogue',
+            });
+        });
+    }
 
     for (let i = usedSprites.length; i < pool.length; i += 1) {
         pool[i].visible = false;
