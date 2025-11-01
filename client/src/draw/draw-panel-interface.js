@@ -24,6 +24,10 @@ import {
     RADAR_OFFSET_ADJUST_Y
 } from "../constants";
 
+const TILE_SIZE = 48;
+const HALF_TILE = TILE_SIZE / 2;
+const CITY_CENTER_OFFSET = TILE_SIZE * 1.5;
+
 const INVENTORY_SLOTS = {
     [ITEM_TYPE_LASER]: {x: 7, y: 267},
     [ITEM_TYPE_ROCKET]: {x: 42, y: 267},
@@ -159,6 +163,11 @@ const RADAR_STATE_KEY = '__radarState';
 const RADAR_SPRITE_SCALE = 2;
 const RADAR_TEXTURE_SIZE = 2;
 
+const HOME_ARROW_STATE_KEY = '__homeArrowState';
+const HOME_ARROW_FRAME_SIZE = 40;
+const HOME_ARROW_OFFSET_X = 5;
+const HOME_ARROW_OFFSET_Y = 160;
+
 const toFiniteNumber = (value, fallback = null) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
         return value;
@@ -198,6 +207,126 @@ const buildRadarTextures = (game) => {
         textures.dead = new PIXI.Texture(mini.baseTexture, new PIXI.Rectangle(15 * RADAR_TEXTURE_SIZE, 0, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE));
     }
     return textures;
+};
+
+const buildHomeArrowTextures = (game) => {
+    const texture = game?.textures?.imgArrows;
+    if (!texture || !texture.baseTexture) {
+        return [];
+    }
+    const frames = [];
+    for (let i = 0; i < 8; i += 1) {
+        const rect = new PIXI.Rectangle(i * HOME_ARROW_FRAME_SIZE, 0, HOME_ARROW_FRAME_SIZE, HOME_ARROW_FRAME_SIZE);
+        frames.push(new PIXI.Texture(texture.baseTexture, rect));
+    }
+    return frames;
+};
+
+const ensureHomeArrowState = (game, stage) => {
+    if (!game || !stage || !game.textures?.imgArrows) {
+        return null;
+    }
+
+    let state = stage[HOME_ARROW_STATE_KEY];
+    if (!state) {
+        const textures = buildHomeArrowTextures(game);
+        if (!textures.length) {
+            return null;
+        }
+        const container = new PIXI.Container();
+        container.name = 'home-arrow';
+        container.position.set((game.maxMapX || 0) + HOME_ARROW_OFFSET_X, HOME_ARROW_OFFSET_Y);
+        const sprite = new PIXI.Sprite(textures[0]);
+        container.addChild(sprite);
+        stage.addChild(container);
+        state = {
+            container,
+            sprite,
+            textures,
+            lastIndex: -1
+        };
+        stage[HOME_ARROW_STATE_KEY] = state;
+        return state;
+    }
+
+    if (!state.container.parent || state.container.parent !== stage) {
+        stage.addChild(state.container);
+    }
+
+    if (!Array.isArray(state.textures) || state.textures.length !== 8) {
+        state.textures = buildHomeArrowTextures(game);
+        if (state.sprite && state.textures.length) {
+            state.sprite.texture = state.textures[0];
+            state.lastIndex = -1;
+        }
+    }
+
+    return state;
+};
+
+const updateHomeArrow = (game, stage) => {
+    const state = ensureHomeArrowState(game, stage);
+    if (!state || !state.sprite) {
+        return;
+    }
+
+    const container = state.container;
+    container.position.set((game.maxMapX || 0) + HOME_ARROW_OFFSET_X, HOME_ARROW_OFFSET_Y);
+
+    const player = game?.player;
+    const playerOffset = player?.offset;
+    const playerCityId = toFiniteNumber(player?.city, null);
+
+    if (!playerOffset || playerCityId === null) {
+        container.visible = false;
+        return;
+    }
+
+    const city = game.cities?.[playerCityId];
+    if (!city) {
+        container.visible = false;
+        return;
+    }
+
+    const cityX = toFiniteNumber(city.x, null);
+    const cityY = toFiniteNumber(city.y, null);
+    const playerX = toFiniteNumber(playerOffset.x, null);
+    const playerY = toFiniteNumber(playerOffset.y, null);
+
+    if (!Number.isFinite(cityX) || !Number.isFinite(cityY) || !Number.isFinite(playerX) || !Number.isFinite(playerY)) {
+        container.visible = false;
+        return;
+    }
+
+    const cityCenterX = cityX + CITY_CENTER_OFFSET;
+    const cityCenterY = cityY + CITY_CENTER_OFFSET;
+    const playerCenterX = playerX + HALF_TILE;
+    const playerCenterY = playerY + HALF_TILE;
+
+    const dx = cityCenterX - playerCenterX;
+    const dy = cityCenterY - playerCenterY;
+
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+        container.visible = false;
+        return;
+    }
+
+    const angle = Math.atan2(-dy, dx);
+    let index = Math.round(angle / (Math.PI / 4));
+    index = ((index % 8) + 8) % 8;
+
+    const textures = state.textures;
+    if (!textures || !textures[index]) {
+        container.visible = false;
+        return;
+    }
+
+    if (state.lastIndex !== index) {
+        state.sprite.texture = textures[index];
+        state.lastIndex = index;
+    }
+
+    container.visible = true;
 };
 
 const ensureRadarState = (game, stage) => {
@@ -626,4 +755,5 @@ export const drawPanelInterface = (game, panelContainer) => {
 
     const radarState = ensureRadarState(game, panelContainer);
     updateRadar(game, radarState);
+    updateHomeArrow(game, panelContainer);
 };

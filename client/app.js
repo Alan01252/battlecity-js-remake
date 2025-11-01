@@ -890,6 +890,8 @@ const resourcesToLoad = [
     { name: 'imgBuildIcons', url: assetUrl('imgBuildIcons.png') },
     { name: 'imgItems', url: assetUrl('imgItems.png') },
     { name: 'imgInventorySelection', url: assetUrl('imgInventorySelection.png') },
+    { name: 'imgArrows', url: assetUrl('imgArrows.png') },
+    { name: 'imgArrowsRed', url: assetUrl('imgArrowsRed.png') },
     { name: 'imgRadarColors', url: assetUrl('imgRadarColors.png') },
     { name: 'imgMiniMapColors', url: assetUrl('imgMiniMapColors.png') },
     { name: 'imgPopulation', url: assetUrl('imgPopulation.png') },
@@ -964,6 +966,8 @@ function setup() {
         resources.imgBuildIcons,
         resources.imgItems,
         resources.imgInventorySelection,
+        resources.imgArrows,
+        resources.imgArrowsRed,
         resources.imgInterfaceTop,
         resources.imgInterfaceBottom,
         resources.imgRadarColors,
@@ -997,6 +1001,8 @@ function setup() {
     game.textures['imageIcons'] = resources.imgItems.texture;
     game.textures['imageItems'] = resources.imgItems.texture;
     game.textures['imageInventorySelection'] = resources.imgInventorySelection.texture;
+    game.textures['imgArrows'] = resources.imgArrows.texture;
+    game.textures['imgArrowsRed'] = resources.imgArrowsRed.texture;
     game.textures['imageTurretBase'] = resources.imgTurretBase.texture;
     game.textures['imageTurretHead'] = resources.imgTurretHead.texture;
     game.textures['population'] = resources.imgPopulation.texture;
