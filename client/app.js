@@ -164,7 +164,8 @@ const game = {
         lastSafeOffset: {
             x: 0,
             y: 0,
-        }
+        },
+        sequence: 0
     },
     explosions: [],
     app: app,
