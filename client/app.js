@@ -29,6 +29,7 @@ import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 import {initPersistence} from "./src/storage/persistence";
 import {getCitySpawn, getCityDisplayName} from "./src/utils/citySpawns";
+import LobbyManager from "./src/lobby/LobbyManager";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -195,6 +196,7 @@ const game = {
         heading: DEFAULT_PANEL_MESSAGE.heading,
         lines: [...DEFAULT_PANEL_MESSAGE.lines],
     },
+    lobby: null,
     app: app,
     stage: app.stage,
     objectContainer: objectContainer
@@ -368,6 +370,8 @@ game.clearPanelMessage();
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
+game.lobby = new LobbyManager(game);
+game.lobby.attachSocket(game.socketListener);
 game.iconFactory = new IconFactory(game);
 game.itemFactory = new ItemFactory(game);
 
@@ -502,11 +506,7 @@ function setup() {
     game.socketListener.listen();
     game.itemFactory.bindSocketEvents(game.socketListener);
     game.socketListener.on("connected", () => {
-        game.player.id = game.socketListener.enterGame();
-        console.log("Connected starting game");
-        if (game.persistence && typeof game.persistence.restoreInventory === 'function') {
-            game.persistence.restoreInventory();
-        }
+        console.log("Connected to server");
     });
     game.socketListener.on('population:update', (update) => {
         game.buildingFactory.applyPopulationUpdate(update);
@@ -644,7 +644,9 @@ function gameLoop() {
     game.timePassed = (game.tick - game.lastTick);
 
     game.bulletFactory.cycle();
-    game.socketListener.cycle();
+    if (!game.lobby || game.lobby.isInGame()) {
+        game.socketListener.cycle();
+    }
     game.itemFactory.cycle();
 
     setupBuildingMenu(game);

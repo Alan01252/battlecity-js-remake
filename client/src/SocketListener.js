@@ -20,6 +20,7 @@ class SocketListener extends EventEmitter2 {
             this.sequenceCounter = 0;
             this.lastServerSequence = 0;
             this.emit("connected");
+            this.requestLobbySnapshot();
         });
         this.io.on("connect_error", (err) => {
             console.error("socket connect_error", err?.message ?? err);
@@ -27,6 +28,35 @@ class SocketListener extends EventEmitter2 {
         this.io.on("disconnect", (reason) => {
             console.warn("socket disconnected", reason);
             this.lastServerSequence = 0;
+            this.emit('disconnected', reason);
+        });
+
+        this.io.on('lobby:snapshot', (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('lobby:snapshot', data);
+        });
+
+        this.io.on('lobby:update', (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('lobby:update', data);
+        });
+
+        this.io.on('lobby:assignment', (payload) => {
+            const data = this.safeParse(payload);
+            if (data && this.game && this.game.player) {
+                if (data.city !== undefined && data.city !== null) {
+                    this.game.player.city = this.toFiniteNumber(data.city, this.game.player.city ?? 0);
+                }
+                if (data.role) {
+                    this.game.player.isMayor = (data.role === 'mayor');
+                }
+            }
+            this.emit('lobby:assignment', data);
+        });
+
+        this.io.on('lobby:denied', (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('lobby:denied', data);
         });
 
         this.io.on("enter_game", (player) => {
@@ -252,16 +282,65 @@ class SocketListener extends EventEmitter2 {
         }
     }
 
-    enterGame() {
+    enterGame(options = {}) {
         console.log("Telling server we've entered the game");
         if (this.io && !this.io.disconnected) {
             this.sequenceCounter = 0;
             this.game.player.sequence = 0;
             const payload = this.createPlayerPayload();
+            const assignmentPayload = this.buildEntryAssignment(options);
+            Object.assign(payload, assignmentPayload);
             this.io.emit("enter_game", JSON.stringify(payload));
             return this.io.id;
         }
         return null;
+    }
+
+    requestLobbySnapshot() {
+        if (this.io && !this.io.disconnected) {
+            this.io.emit('lobby:refresh');
+        }
+    }
+
+    buildEntryAssignment(options) {
+        if (!options || typeof options !== 'object') {
+            return {};
+        }
+        const payload = {};
+        const assignment = {};
+        let hasAssignment = false;
+
+        if (options.city !== undefined && options.city !== null) {
+            const numericCity = this.toFiniteNumber(options.city, null);
+            if (Number.isFinite(numericCity)) {
+                const cityId = Math.max(0, Math.floor(numericCity));
+                payload.requestedCity = cityId;
+                assignment.city = cityId;
+                assignment.cityId = cityId;
+                hasAssignment = true;
+            }
+        }
+
+        if (options.role) {
+            const role = `${options.role}`.trim().toLowerCase();
+            if (role === 'mayor' || role === 'recruit' || role === 'auto') {
+                payload.requestedRole = role;
+                assignment.role = role;
+                hasAssignment = true;
+            }
+        }
+
+        if (options.auto === true) {
+            payload.autoAssign = true;
+        } else if (options.auto === false) {
+            payload.autoAssign = false;
+        }
+
+        if (hasAssignment) {
+            payload.assignment = assignment;
+        }
+
+        return payload;
     }
 
     cycle() {

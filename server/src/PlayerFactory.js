@@ -17,6 +17,60 @@ const PLAYER_SPRITE_HALF = PLAYER_SPRITE_SIZE / 2;
 const PLAYER_SPAWN_ADJUST_X = 6.5;
 const PLAYER_SPAWN_ADJUST_Y = 5.5;
 
+const toFiniteNumber = (value, fallback = null) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+    return fallback;
+};
+
+const normaliseCityIdValue = (value, fallback = null) => {
+    const numeric = toFiniteNumber(value, fallback);
+    if (!Number.isFinite(numeric)) {
+        return fallback;
+    }
+    return Math.max(0, Math.floor(numeric));
+};
+
+const normaliseRoleValue = (value) => {
+    if (!value) {
+        return null;
+    }
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) {
+        return null;
+    }
+    if (trimmed === 'mayor' || trimmed === 'm') {
+        return 'mayor';
+    }
+    if (trimmed === 'recruit' || trimmed === 'commando' || trimmed === 'r') {
+        return 'recruit';
+    }
+    if (trimmed === 'auto' || trimmed === 'any') {
+        return 'auto';
+    }
+    return null;
+};
+
+const shortenId = (value) => {
+    if (!value || typeof value !== 'string') {
+        return null;
+    }
+    if (value.length <= 8) {
+        return value;
+    }
+    return `${value.slice(0, 4)}...${value.slice(-2)}`;
+};
+
 class PlayerFactory {
 
     constructor(game) {
@@ -32,6 +86,7 @@ class PlayerFactory {
             .sort((a, b) => a - b);
         this.defaultCityPool = spawnKeys.length ? spawnKeys : [0, 1];
         this.citySpawns = citySpawns || {};
+        this.lobbyVersion = 0;
     }
 
     listen(io) {
@@ -41,6 +96,11 @@ class PlayerFactory {
 
         io.on("connection", (socket) => {
 
+            this.emitLobbySnapshot(socket);
+
+            socket.on('lobby:refresh', () => {
+                this.emitLobbySnapshot(socket);
+            });
 
             socket.on('enter_game', (player) => {
                 debug("Player entered game " + socket.id);
@@ -51,12 +111,18 @@ class PlayerFactory {
                 }
 
                 const parsedPlayer = this.safeParse(player);
-                const assignment = this.assignCityAndRole(socket.id);
+                const preferences = this.extractAssignmentPreferences(parsedPlayer);
+                const assignment = this.assignCityAndRole(socket.id, preferences);
                 if (assignment.overflow) {
                     debug(`No available city slots for player ${socket.id}, rejecting entry`);
                     socket.emit('player:rejected', JSON.stringify({
                         reasons: ['cities_full'],
                         flags: ['wait_for_slot']
+                    }));
+                    socket.emit('lobby:denied', JSON.stringify({
+                        reason: 'cities_full',
+                        requestedCity: preferences.city,
+                        requestedRole: preferences.role
                     }));
                     return;
                 }
@@ -92,7 +158,21 @@ class PlayerFactory {
                 this.game.players[socket.id] = newPlayer;
                 this.registerAssignment(newPlayer, assignment);
 
-                debug(`Assigned player ${socket.id} -> city ${assignment.city} (${assignment.isMayor ? 'mayor' : 'recruit'})${assignment.overflow ? ' [overflow]' : ''}`);
+                debug(`Assigned player ${socket.id} -> city ${assignment.city} (${assignment.isMayor ? 'mayor' : 'recruit'})${assignment.overflow ? ' [overflow]' : ''} (${assignment.source || 'auto'})`);
+
+                if (preferences.requested && assignment.source === 'fallback') {
+                    socket.emit('lobby:denied', JSON.stringify({
+                        reason: 'slot_unavailable',
+                        requestedCity: preferences.city,
+                        requestedRole: preferences.role
+                    }));
+                }
+
+                socket.emit('lobby:assignment', JSON.stringify({
+                    city: assignment.city,
+                    role: assignment.isMayor ? 'mayor' : 'recruit',
+                    source: assignment.source
+                }));
 
                 socket.emit('player', JSON.stringify(newPlayer));
                 socket.emit('players:snapshot', JSON.stringify(this.serializePlayers(socket.id)));
@@ -291,36 +371,163 @@ class PlayerFactory {
         return computeFallbackSpawn(null);
     }
 
-    assignCityAndRole(socketId) {
-        const cityIds = this.getCityCandidates();
-        if (!cityIds.length) {
-            return { city: 0, isMayor: false, overflow: true };
+    extractAssignmentPreferences(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return { city: null, role: null, requested: false };
         }
 
-        const totalCities = cityIds.length;
+        const citySources = [
+            payload.requestedCity,
+            payload.desiredCity,
+            payload.cityPreference,
+            payload.cityId,
+            payload.city
+        ];
+
+        if (payload.assignment && typeof payload.assignment === 'object') {
+            citySources.push(payload.assignment.cityId);
+            citySources.push(payload.assignment.city);
+        }
+
+        let city = null;
+        for (const source of citySources) {
+            const id = normaliseCityIdValue(source, null);
+            if (Number.isFinite(id)) {
+                city = id;
+                break;
+            }
+        }
+
+        const roleSources = [
+            payload.requestedRole,
+            payload.desiredRole,
+            payload.role
+        ];
+
+        if (payload.assignment && typeof payload.assignment === 'object') {
+            roleSources.push(payload.assignment.role);
+        }
+
+        let role = null;
+        for (const source of roleSources) {
+            const normalised = normaliseRoleValue(source);
+            if (normalised) {
+                role = normalised;
+                break;
+            }
+        }
+
+        const requested = (city !== null && city !== undefined) || (role && role !== 'auto');
+        return {
+            city: city !== null ? city : null,
+            role,
+            requested
+        };
+    }
+
+    assignCityAndRole(socketId, preferences) {
+        const prefs = preferences || { city: null, role: null, requested: false };
+        const cityIds = this.getCityCandidates();
+        if (!cityIds.length) {
+            return { city: 0, isMayor: false, overflow: true, source: 'auto' };
+        }
+
+        const requested = this.resolveRequestedAssignment(prefs, cityIds);
+        if (requested) {
+            requested.overflow = false;
+            requested.source = prefs.requested ? 'requested' : 'auto';
+            return requested;
+        }
+
+        const assignment = this.assignCityAndRoleAuto(cityIds);
+        assignment.source = prefs.requested ? 'fallback' : 'auto';
+        return assignment;
+    }
+
+    assignCityAndRoleAuto(cityIds) {
+        const ids = Array.isArray(cityIds) && cityIds.length ? cityIds : this.getCityCandidates();
+        if (!ids.length) {
+            return { city: 0, isMayor: false, overflow: true, source: 'auto' };
+        }
+
+        const totalCities = ids.length;
         const startIndex = this.cityCursor % totalCities;
-        const maxPerCity = 1 + this.maxRecruitsPerCity;
 
         for (let offset = 0; offset < totalCities; offset += 1) {
             const index = (startIndex + offset) % totalCities;
-            const cityId = cityIds[index];
-            const roster = this.ensureCityRoster(cityId);
-            const rosterCount = roster.recruits.length + (roster.mayor ? 1 : 0);
+            const cityId = ids[index];
+            const state = this.computeCityState(cityId);
 
-            if (!roster.mayor) {
-                this.cityCursor = (index + 1) % totalCities;
+            if (state && state.openMayor) {
+                this.updateCityCursor(ids, cityId);
                 return { city: cityId, isMayor: true, overflow: false };
             }
 
-            if (rosterCount < maxPerCity) {
-                this.cityCursor = (index + 1) % totalCities;
+            if (state && state.openRecruits > 0) {
+                this.updateCityCursor(ids, cityId);
                 return { city: cityId, isMayor: false, overflow: false };
             }
         }
 
-        const overflowCity = cityIds[startIndex];
-        this.cityCursor = (startIndex + 1) % totalCities;
+        const overflowCity = ids[startIndex];
+        this.updateCityCursor(ids, overflowCity);
         return { city: overflowCity, isMayor: false, overflow: true };
+    }
+
+    resolveRequestedAssignment(preferences, cityIds) {
+        if (!preferences) {
+            return null;
+        }
+        const cityId = normaliseCityIdValue(preferences.city, null);
+        if (cityId === null || cityId === undefined) {
+            return null;
+        }
+        const ids = Array.isArray(cityIds) ? cityIds : this.getCityCandidates();
+        if (!ids.includes(cityId)) {
+            return null;
+        }
+        const state = this.computeCityState(cityId);
+        if (!state) {
+            return null;
+        }
+
+        const desiredRole = normaliseRoleValue(preferences.role);
+
+        if (desiredRole === 'mayor') {
+            if (!state.openMayor) {
+                return null;
+            }
+            this.updateCityCursor(ids, cityId);
+            return { city: cityId, isMayor: true };
+        }
+
+        if (desiredRole === 'recruit') {
+            if (state.openRecruits <= 0) {
+                return null;
+            }
+            this.updateCityCursor(ids, cityId);
+            return { city: cityId, isMayor: false };
+        }
+
+        if (!state.openMayor && state.openRecruits <= 0) {
+            return null;
+        }
+
+        const assignMayor = state.openMayor;
+        this.updateCityCursor(ids, cityId);
+        return { city: cityId, isMayor: assignMayor };
+    }
+
+    updateCityCursor(cityIds, selectedCityId) {
+        const ids = Array.isArray(cityIds) ? cityIds : this.getCityCandidates();
+        if (!ids.length) {
+            return;
+        }
+        const index = ids.indexOf(selectedCityId);
+        if (index === -1) {
+            return;
+        }
+        this.cityCursor = (index + 1) % ids.length;
     }
 
     getCityCandidates() {
@@ -359,6 +566,78 @@ class PlayerFactory {
         return this.cityRosters.get(id);
     }
 
+    computeCityState(cityId) {
+        const id = normaliseCityIdValue(cityId, null);
+        if (id === null || id === undefined) {
+            return null;
+        }
+        const roster = this.ensureCityRoster(id);
+        const players = Object.values(this.game.players || {}).filter((player) => normaliseCityIdValue(player && player.city, null) === id);
+        const mayorPlayer = players.find((player) => player && player.isMayor);
+        const mayorId = mayorPlayer ? mayorPlayer.id : (roster.mayor || null);
+        const hasMayor = !!mayorId;
+        const playerCount = players.length;
+        const capacity = 1 + this.maxRecruitsPerCity;
+        const recruitCount = hasMayor ? Math.max(0, playerCount - 1) : playerCount;
+        const openMayor = !hasMayor;
+        const openRecruits = Math.max(0, capacity - playerCount);
+        return {
+            cityId: id,
+            roster,
+            players,
+            mayorId,
+            playerCount,
+            recruitCount,
+            openMayor,
+            openRecruits,
+            capacity
+        };
+    }
+
+    buildLobbyEntry(cityId) {
+        const state = this.computeCityState(cityId);
+        if (!state) {
+            return null;
+        }
+        const spawn = this.citySpawns && this.citySpawns[String(state.cityId)];
+        return {
+            id: state.cityId,
+            name: (spawn && spawn.name) || `City ${state.cityId + 1}`,
+            mayorId: state.mayorId || null,
+            mayorLabel: shortenId(state.mayorId || null),
+            playerCount: state.playerCount,
+            recruitCount: state.recruitCount,
+            capacity: state.capacity,
+            openMayor: state.openMayor,
+            openRecruits: state.openRecruits,
+            hasRecruitVacancy: state.openRecruits > 0,
+            maxRecruits: this.maxRecruitsPerCity
+        };
+    }
+
+    buildLobbySnapshot() {
+        const cityIds = this.getCityCandidates();
+        const entries = cityIds.map((id) => this.buildLobbyEntry(id)).filter((entry) => !!entry);
+        return {
+            cities: entries,
+            maxRecruitsPerCity: this.maxRecruitsPerCity,
+            updatedAt: Date.now()
+        };
+    }
+
+    emitLobbySnapshot(targetSocket) {
+        const snapshot = this.buildLobbySnapshot();
+        this.lobbyVersion += 1;
+        snapshot.version = this.lobbyVersion;
+        if (targetSocket) {
+            targetSocket.emit('lobby:snapshot', JSON.stringify(snapshot));
+            return;
+        }
+        if (this.io) {
+            this.io.emit('lobby:update', JSON.stringify(snapshot));
+        }
+    }
+
     registerAssignment(player, assignment) {
         if (!player) {
             return;
@@ -373,6 +652,7 @@ class PlayerFactory {
                 roster.recruits.push(player.id);
             }
         }
+        this.emitLobbySnapshot();
     }
 
     releaseSlot(player) {
@@ -401,6 +681,7 @@ class PlayerFactory {
         } else {
             roster.recruits = roster.recruits.filter((id) => id !== player.id);
         }
+        this.emitLobbySnapshot();
     }
 }
 
