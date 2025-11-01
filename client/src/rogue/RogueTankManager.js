@@ -700,7 +700,8 @@ class RogueTankManager {
             x: tank.offset.x,
             y: tank.offset.y,
             frame: 0,
-            nextFrameTick: (this.game.tick || Date.now()) + 75
+            nextFrameTick: (this.game.tick || Date.now()) + 75,
+            variant: 'small'
         });
     }
 
