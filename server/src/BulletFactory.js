@@ -2,10 +2,43 @@
 "use strict";
 
 const debug = require('debug')('BattleCity:BulletFactory');
-const { BULLET_SPEED_UNITS_PER_MS, BULLET_MAX_RANGE, BULLET_DAMAGE } = require("./gameplay/constants");
+const {
+    BULLET_SPEED_UNITS_PER_MS,
+    BULLET_MAX_RANGE,
+    BULLET_DAMAGE,
+    DAMAGE_ROCKET,
+    DAMAGE_FLARE,
+    BULLET_FLARE_SPEED
+} = require("./gameplay/constants");
 const { createBulletRect, getPlayerRect, rectangleCollision } = require("./gameplay/geometry");
 
 let bulletCounter = 0;
+
+const BULLET_DAMAGE_BY_TYPE = {
+    0: BULLET_DAMAGE,
+    1: DAMAGE_ROCKET,
+    3: DAMAGE_FLARE,
+};
+
+const resolveBulletDamage = (type) => {
+    if (Object.prototype.hasOwnProperty.call(BULLET_DAMAGE_BY_TYPE, type)) {
+        return BULLET_DAMAGE_BY_TYPE[type];
+    }
+    return BULLET_DAMAGE;
+};
+
+const BULLET_SPEED_BY_TYPE = {
+    0: BULLET_SPEED_UNITS_PER_MS,
+    1: BULLET_SPEED_UNITS_PER_MS,
+    3: BULLET_FLARE_SPEED ?? BULLET_SPEED_UNITS_PER_MS,
+};
+
+const resolveBulletSpeed = (type) => {
+    if (Object.prototype.hasOwnProperty.call(BULLET_SPEED_BY_TYPE, type)) {
+        return BULLET_SPEED_BY_TYPE[type];
+    }
+    return BULLET_SPEED_UNITS_PER_MS;
+};
 
 class BulletFactory {
 
@@ -152,12 +185,7 @@ class BulletFactory {
         if (typeof data.sourceType === 'string' && data.sourceType.length > 0) {
             sourceType = data.sourceType.trim().toLowerCase();
         }
-        let damage = Number(data.damage);
-        if (!Number.isFinite(damage) || damage <= 0) {
-            damage = BULLET_DAMAGE;
-        } else {
-            damage = Math.floor(damage);
-        }
+        const damage = resolveBulletDamage(type);
         const reportedShooterId = (typeof data.shooter === 'string' && data.shooter.length > 0)
             ? data.shooter
             : null;
@@ -176,7 +204,7 @@ class BulletFactory {
             y,
             angle,
             type,
-            speed: BULLET_SPEED_UNITS_PER_MS,
+            speed: resolveBulletSpeed(type),
             teamId,
             sourceId,
             sourceType,

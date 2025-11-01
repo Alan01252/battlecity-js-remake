@@ -6,6 +6,7 @@ import {ITEM_TYPE_WALL} from "../constants";
 import {ITEM_TYPE_SLEEPER} from "../constants";
 import {ITEM_TYPE_MINE} from "../constants";
 import {ITEM_TYPE_BOMB} from "../constants";
+import {ITEM_TYPE_DFG} from "../constants";
 
 var drawTick = 0;
 
@@ -63,6 +64,25 @@ var drawMine = (game, itemTiles, item, offTileX, offTileY) => {
     var drawX = item.x - game.player.offset.x + offTileX + 8;
     var drawY = item.y - game.player.offset.y + offTileY + 8;
     itemTiles.addFrame(tmpText, drawX, drawY);
+};
+
+var drawDFG = (game, itemTiles, item, offTileX, offTileY) => {
+    const dfgTeam = item.city ?? item.teamId ?? null;
+    const playerTeam = game.player?.city ?? null;
+    if (item.active && dfgTeam !== null && dfgTeam !== playerTeam) {
+        return;
+    }
+    const baseTexture = game.textures['imageItems']?.baseTexture;
+    if (!baseTexture) {
+        return;
+    }
+    const texture = new PIXI.Texture(
+        baseTexture,
+        new PIXI.Rectangle(ITEM_TYPE_DFG * 48, 42, 48, 48)
+    );
+    const drawX = item.x - game.player.offset.x + offTileX;
+    const drawY = item.y - game.player.offset.y + offTileY;
+    itemTiles.addFrame(texture, drawX, drawY);
 };
 
 var drawBomb = (game, itemTiles, item, offTileX, offTileY) => {
@@ -127,6 +147,7 @@ const rendererMap = {
     [ITEM_TYPE_SLEEPER]: drawSleeper,
     [ITEM_TYPE_WALL]: drawWall,
     [ITEM_TYPE_MINE]: drawMine,
+    [ITEM_TYPE_DFG]: drawDFG,
     [ITEM_TYPE_BOMB]: drawBomb,
 };
 

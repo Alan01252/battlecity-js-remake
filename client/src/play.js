@@ -7,6 +7,7 @@ import {COLLISION_MAP_EDGE_TOP} from "./constants";
 import {COLLISION_MAP_EDGE_BOTTOM} from "./constants";
 import {COLLISION_BLOCKING} from "./constants";
 import {COLLISION_MINE} from "./constants";
+import {COLLISION_DFG} from "./constants";
 import {getCitySpawn} from "./utils/citySpawns";
 
 const TILE_SIZE = 48;
@@ -54,6 +55,18 @@ const handleMineCollision = (game, item) => {
     game.itemFactory.triggerMine(item);
 
     game.forceDraw = true;
+    game.player.collidedItem = null;
+};
+
+const handleDFGCollision = (game, item) => {
+    if (!item) {
+        return;
+    }
+
+    if (typeof game.itemFactory?.triggerDFG === 'function') {
+        game.itemFactory.triggerDFG(item);
+    }
+
     game.player.collidedItem = null;
 };
 
@@ -109,6 +122,9 @@ var movePlayer = (game) => {
         case COLLISION_MINE:
             handleMineCollision(game, game.player.collidedItem);
             break;
+        case COLLISION_DFG:
+            handleDFGCollision(game, game.player.collidedItem);
+            break;
         case 0:
             break;
     }
@@ -139,6 +155,9 @@ var movePlayer = (game) => {
             break;
         case COLLISION_MINE:
             handleMineCollision(game, game.player.collidedItem);
+            break;
+        case COLLISION_DFG:
+            handleDFGCollision(game, game.player.collidedItem);
             break;
         case 0:
             break;
@@ -268,6 +287,10 @@ const ensurePlayerUnstuck = (game) => {
         handleMineCollision(game, game.player.collidedItem);
         return;
     }
+    if (collision === COLLISION_DFG) {
+        handleDFGCollision(game, game.player.collidedItem);
+        return;
+    }
 
     if (!isBlockingCollision(collision)) {
         updateLastSafeOffset(game);
@@ -293,6 +316,10 @@ const ensurePlayerUnstuck = (game) => {
             handleMineCollision(game, game.player.collidedItem);
             return;
         }
+        if (collisionAfterNearest === COLLISION_DFG) {
+            handleDFGCollision(game, game.player.collidedItem);
+            return;
+        }
         if (!isBlockingCollision(collisionAfterNearest)) {
             updateLastSafeOffset(game);
             return;
@@ -305,6 +332,11 @@ const ensurePlayerUnstuck = (game) => {
         const postFallbackCollision = checkPlayerCollision(game);
         if (postFallbackCollision === COLLISION_MINE) {
             handleMineCollision(game, game.player.collidedItem);
+            updateLastSafeOffset(game);
+            return;
+        }
+        if (postFallbackCollision === COLLISION_DFG) {
+            handleDFGCollision(game, game.player.collidedItem);
             updateLastSafeOffset(game);
             return;
         }
@@ -324,6 +356,10 @@ const ensurePlayerUnstuck = (game) => {
         handleMineCollision(game, game.player.collidedItem);
         return;
     }
+    if (collisionAtSpawn === COLLISION_DFG) {
+        handleDFGCollision(game, game.player.collidedItem);
+        return;
+    }
     if (!isBlockingCollision(collisionAtSpawn)) {
         updateLastSafeOffset(game);
         return;
@@ -336,6 +372,10 @@ const ensurePlayerUnstuck = (game) => {
         const postSpawnCollision = checkPlayerCollision(game);
         if (postSpawnCollision === COLLISION_MINE) {
             handleMineCollision(game, game.player.collidedItem);
+            return;
+        }
+        if (postSpawnCollision === COLLISION_DFG) {
+            handleDFGCollision(game, game.player.collidedItem);
             return;
         }
         if (!isBlockingCollision(postSpawnCollision)) {
@@ -354,15 +394,38 @@ var killPlayer = (game) => {
 };
 
 export const play = (game) => {
+    const now = game.tick || Date.now();
+
+    if (game.player.isCloaked && game.player.cloakExpiresAt && now >= game.player.cloakExpiresAt) {
+        game.player.isCloaked = false;
+        game.player.cloakExpiresAt = 0;
+        game.forceDraw = true;
+    }
+
+    let isFrozen = false;
+    if (game.player.isFrozen) {
+        if (!game.player.frozenUntil || now >= game.player.frozenUntil) {
+            game.player.isFrozen = false;
+            game.player.frozenUntil = 0;
+            game.player.frozenBy = null;
+        } else {
+            isFrozen = true;
+        }
+    }
+
     if (game.player.isTurning) {
         turnPlayer(game)
     }
 
-    if (game.player.isMoving) {
+    if (!isFrozen && game.player.isMoving) {
         movePlayer(game);
+    } else if (isFrozen) {
+        game.player.isMoving = 0;
     }
 
-    ensurePlayerUnstuck(game);
+    if (!isFrozen) {
+        ensurePlayerUnstuck(game);
+    }
 
     if (game.player.health === 0) {
         killPlayer(game);

@@ -1,12 +1,43 @@
-import {TIMER_SHOOT_LASER} from "../constants";
-import {ITEM_TYPE_BOMB} from "../constants";
-import {ITEM_TYPE_LASER} from "../constants";
+import {
+    TIMER_SHOOT_LASER,
+    TIMER_SHOOT_ROCKET,
+    TIMER_SHOOT_FLARE,
+    ITEM_TYPE_BOMB,
+    ITEM_TYPE_LASER,
+    ITEM_TYPE_ROCKET,
+    ITEM_TYPE_FLARE,
+    ITEM_TYPE_MEDKIT,
+    ITEM_TYPE_CLOAK
+} from "../constants";
 /**
  * Created by alan on 27/03/17.
  */
 
 
 var lastShot = 0;
+
+const hasEquippedItem = (game, type) => {
+    if (!game || !game.player || game.player.id === undefined || game.player.id === null) {
+        return false;
+    }
+    if (!game.iconFactory || typeof game.iconFactory.findOwnedIconByType !== 'function') {
+        return false;
+    }
+    const icon = game.iconFactory.findOwnedIconByType(game.player.id, type);
+    if (!icon) {
+        return false;
+    }
+    if (icon.quantity === undefined || icon.quantity === null) {
+        return true;
+    }
+    const quantity = Number.isFinite(icon.quantity)
+        ? icon.quantity
+        : parseInt(icon.quantity, 10);
+    if (!Number.isFinite(quantity)) {
+        return true;
+    }
+    return quantity > 0;
+};
 
 var keyboard = (keyCode) => {
     var key = {};
@@ -52,11 +83,14 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         right = keyboard(39),
         down = keyboard(40),
         shift = keyboard(16),
+        ctrl = keyboard(17),
         u = keyboard(85),
         o = keyboard(79),
         d = keyboard(68),
         s = keyboard(83),
-        b = keyboard(66);
+        b = keyboard(66),
+        h = keyboard(72),
+        c = keyboard(67);
 
 
     left.press = function () {
@@ -145,35 +179,89 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         console.log(`Bombs ${game.player.bombsArmed ? 'activated' : 'deactivated'}`);
     };
 
-    shift.press = function () {
-        const hasLaserEquipped = (() => {
-            if (!game || !game.player || game.player.id === undefined || game.player.id === null) {
-                return false;
-            }
-            if (!game.iconFactory || typeof game.iconFactory.findOwnedIconByType !== 'function') {
-                return false;
-            }
-            const laserIcon = game.iconFactory.findOwnedIconByType(game.player.id, ITEM_TYPE_LASER);
-            if (!laserIcon) {
-                return false;
-            }
-            if (laserIcon.quantity === undefined || laserIcon.quantity === null) {
-                return true;
-            }
-            const quantity = Number.isFinite(laserIcon.quantity)
-                ? laserIcon.quantity
-                : parseInt(laserIcon.quantity, 10);
-            return Number.isFinite(quantity) ? quantity > 0 : false;
-        })();
+    h.press = function () {
+        if (!game?.itemFactory || typeof game.itemFactory.useMedkit !== 'function') {
+            return;
+        }
+        game.itemFactory.useMedkit();
+    };
 
-        if (!hasLaserEquipped) {
-            console.log("Laser unavailable: cannot fire.");
+    c.press = function () {
+        if (!game?.itemFactory || typeof game.itemFactory.activateCloak !== 'function') {
+            return;
+        }
+        game.itemFactory.activateCloak();
+    };
+
+    ctrl.press = function () {
+        if (!hasEquippedItem(game, ITEM_TYPE_FLARE)) {
+            return;
+        }
+        if (game.tick <= lastShot) {
+            return;
+        }
+        if (!game || !game.player) {
+            return;
+        }
+        if (game.player.isFrozen && (game.player.frozenUntil ?? 0) > game.tick) {
             return;
         }
 
+        const direction = Math.round(game.player.direction) % 32;
+        const reverseCenter = (direction + 16 + 32) % 32;
+        const reverseLeft = (direction + 20 + 32) % 32;
+        const reverseRight = (direction + 12 + 32) % 32;
+        const angles = [reverseLeft, reverseCenter, reverseRight];
+
+        const angleDegrees = (reverseCenter / 32) * 360;
+        const radians = (angleDegrees * Math.PI) / 180;
+        const xComponent = Math.sin(radians);
+        const yComponent = Math.cos(radians) * -1;
+
+        const originX = ((game.player.offset.x) + 24) + (xComponent * 30);
+        const originY = ((game.player.offset.y) + 24) + (yComponent * 30);
+        const teamId = game.player.city ?? null;
+
+        lastShot = game.tick + TIMER_SHOOT_FLARE;
+
+        angles.forEach((dir) => {
+            const packet = {
+                shooter: game.player.id,
+                x: originX,
+                y: originY,
+                type: 3,
+                angle: -dir,
+                team: teamId
+            };
+            game.bulletFactory.newBullet(game.player.id, originX, originY, 3, -dir, teamId);
+            game.socketListener.sendBulletShot(packet);
+        });
+    };
+
+    shift.press = function () {
+        if (game?.player?.isFrozen && (game.player.frozenUntil ?? 0) > (game.tick || Date.now())) {
+            return;
+        }
+        const hasRocketEquipped = hasEquippedItem(game, ITEM_TYPE_ROCKET);
+        const hasLaserEquipped = hasEquippedItem(game, ITEM_TYPE_LASER);
+        const isStationary = (game?.player?.isMoving ?? 0) === 0;
+        const canFireRocket = hasRocketEquipped && isStationary;
+
+        if (!canFireRocket && !hasLaserEquipped) {
+            if (hasRocketEquipped && !isStationary) {
+                console.log("Cougar Missiles only fire while stationary.");
+            } else {
+                console.log("Weapon unavailable: pick up a Laser or Cougar Missile.");
+            }
+            return;
+        }
+
+        const cooldown = canFireRocket ? TIMER_SHOOT_ROCKET : TIMER_SHOOT_LASER;
+        const bulletType = canFireRocket ? 1 : 0;
+
         console.log("shift key pressed");
         if (game.tick > lastShot) {
-            lastShot = game.tick + TIMER_SHOOT_LASER;
+            lastShot = game.tick + cooldown;
 
             var angle = game.player.direction;
             var angleInDegrees = (angle / 32) * 360;
@@ -185,9 +273,15 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             var y2 = ((game.player.offset.y) + 24) + (y * 30);
 
             const teamId = game.player.city ?? null;
-            game.bulletFactory.newBullet(game.player.id, x2, y2, 0, -angle, teamId);
-            game.socketListener.sendBulletShot({shooter: game.player.id, x: x2, y: y2, type: 0, angle: -angle, team: teamId});
-
+            game.bulletFactory.newBullet(game.player.id, x2, y2, bulletType, -angle, teamId);
+            game.socketListener.sendBulletShot({
+                shooter: game.player.id,
+                x: x2,
+                y: y2,
+                type: bulletType,
+                angle: -angle,
+                team: teamId
+            });
         }
 
     }

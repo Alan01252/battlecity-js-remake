@@ -1,13 +1,41 @@
-import {MOVEMENT_SPEED_BULLET} from "../constants";
+import {MOVEMENT_SPEED_BULLET, MOVEMENT_SPEED_FLARE} from "../constants";
 import {BULLET_ALIVE} from "../constants";
 import {BULLET_DEAD} from "../constants";
 import {DAMAGE_LASER} from "../constants";
+import {DAMAGE_ROCKET} from "../constants";
+import {DAMAGE_FLARE} from "../constants";
 
 import {collidedWithRock} from "../collision/collision-bullet";
 import {collidedWithCurrentPlayer} from "../collision/collision-bullet";
 import {collidedWithAnotherPlayer} from "../collision/collision-bullet";
 import {collidedWithBuilding} from "../collision/collision-bullet";
 import {collidedWithItem} from "../collision/collision-bullet";
+
+const BULLET_DAMAGE_BY_TYPE = {
+    0: DAMAGE_LASER,
+    1: DAMAGE_ROCKET,
+    3: DAMAGE_FLARE,
+};
+
+const BULLET_SPEED_BY_TYPE = {
+    0: MOVEMENT_SPEED_BULLET,
+    1: MOVEMENT_SPEED_BULLET,
+    3: MOVEMENT_SPEED_FLARE,
+};
+
+const getBulletDamage = (type) => {
+    if (Object.prototype.hasOwnProperty.call(BULLET_DAMAGE_BY_TYPE, type)) {
+        return BULLET_DAMAGE_BY_TYPE[type];
+    }
+    return DAMAGE_LASER;
+};
+
+const getBulletSpeed = (type) => {
+    if (Object.prototype.hasOwnProperty.call(BULLET_SPEED_BY_TYPE, type)) {
+        return BULLET_SPEED_BY_TYPE[type];
+    }
+    return MOVEMENT_SPEED_BULLET;
+};
 
 class BulletFactory {
 
@@ -22,9 +50,10 @@ class BulletFactory {
 
             var fDir = bullet.angle;
 
+            const speed = bullet.speed ?? getBulletSpeed(bullet.type);
 
-            var x = (Math.sin((fDir / 16) * 3.14) * -1 ) * this.game.timePassed * MOVEMENT_SPEED_BULLET;
-            var y = (Math.cos((fDir / 16) * 3.14) * -1) * this.game.timePassed * MOVEMENT_SPEED_BULLET;
+            var x = (Math.sin((fDir / 16) * 3.14) * -1 ) * this.game.timePassed * speed;
+            var y = (Math.cos((fDir / 16) * 3.14) * -1) * this.game.timePassed * speed;
 
             bullet.x += x;
             bullet.y += y;
@@ -84,17 +113,19 @@ class BulletFactory {
     }
 
     newBullet(shooter, x, y, type, angle, team = null) {
+        const bulletType = Number.isFinite(type) ? type : 0;
 
         var bullet = {
             "shooter": shooter,
             "x": x,
             "y": y,
             "life": BULLET_ALIVE,
-            "damage": DAMAGE_LASER,
+            "damage": getBulletDamage(bulletType),
             "animation": 0,
-            "type": type,
+            "type": bulletType,
             "angle": angle,
             "team": team,
+            "speed": getBulletSpeed(bulletType),
             "next": null,
             "previous": null
         };

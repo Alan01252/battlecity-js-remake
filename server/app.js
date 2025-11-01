@@ -248,6 +248,7 @@ var loop = () => {
 
     bulletFactory.cycle(delta);
     hazardManager.update(delta);
+    playerFactory.cycle(now);
     fakeCityManager.update(now);
 
     buildingAccumulator += delta;

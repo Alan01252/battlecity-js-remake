@@ -190,7 +190,12 @@ const game = {
             x: 0,
             y: 0,
         },
-        sequence: 0
+        sequence: 0,
+        isCloaked: false,
+        cloakExpiresAt: 0,
+        isFrozen: false,
+        frozenUntil: 0,
+        frozenBy: null
     },
     explosions: [],
     panelState: {

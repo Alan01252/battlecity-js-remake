@@ -11,16 +11,23 @@ export const COLLISION_MAP_EDGE_LEFT = 200;
 export const COLLISION_MAP_EDGE_RIGHT = 201;
 export const COLLISION_MAP_EDGE_TOP = 202;
 export const COLLISION_MAP_EDGE_BOTTOM = 203;
+export const COLLISION_DFG = 103;
 
 
 export const BULLET_ALIVE = 1;
 export const BULLET_DEAD = -1;
 export const TIMER_SHOOT_LASER = 650;
+export const TIMER_SHOOT_ROCKET = 650;
+export const TIMER_SHOOT_FLARE = 500;
 export const TIMER_BOMB = 5000;
+export const TIMER_CLOAK = 5000;
+export const TIMER_DFG = 5000;
 
 export const DAMAGE_LASER = 5;
+export const DAMAGE_ROCKET = 8;
 export const DAMAGE_MINE = 19;
 export const DAMAGE_BOMB = 40;
+export const DAMAGE_FLARE = 5;
 
 export const MAX_HEALTH = 40;
 export const MONEY_STARTING_VALUE = 95000000;
@@ -36,6 +43,7 @@ export const BOMB_ITEM_TILE_RADIUS = 1;
 export const MAP_SQUARE_LAVA = 1;
 export const MAP_SQUARE_ROCK = 2;
 export const MAP_SQUARE_BUILDING = 3;
+export const MOVEMENT_SPEED_FLARE = 0.10;
 
 export const BUILDING_COMMAND_CENTER = 0;
 export const BUILDING_FACTORY = 1;

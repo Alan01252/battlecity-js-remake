@@ -18,6 +18,11 @@ class Player {
             y: 0
         };
         this.sequence = 0;
+        this.isCloaked = false;
+        this.cloakExpiresAt = 0;
+        this.isFrozen = false;
+        this.frozenUntil = 0;
+        this.frozenBy = null;
         this.lastUpdateAt = now || Date.now();
         this.update(player, this.lastUpdateAt);
     }
@@ -26,6 +31,11 @@ class Player {
         if (!player) {
             return;
         }
+
+        const previousOffset = {
+            x: this.offset?.x ?? 0,
+            y: this.offset?.y ?? 0
+        };
 
         if (player.offset && typeof player.offset === 'object') {
             const x = this._toFiniteNumber(player.offset.x, this.offset.x);
@@ -61,6 +71,22 @@ class Player {
         }
 
         this.lastUpdateAt = now || Date.now();
+
+        if (this.isFrozen) {
+            if (!this.frozenUntil || this.lastUpdateAt >= this.frozenUntil) {
+                this.isFrozen = false;
+                this.frozenUntil = 0;
+                this.frozenBy = null;
+            } else {
+                this.offset = previousOffset;
+                this.isMoving = 0;
+            }
+        }
+
+        if (this.isCloaked && this.cloakExpiresAt && this.lastUpdateAt >= this.cloakExpiresAt) {
+            this.isCloaked = false;
+            this.cloakExpiresAt = 0;
+        }
     }
 
     cycle() {
@@ -76,6 +102,10 @@ class Player {
             direction: this.direction,
             isTurning: this.isTurning,
             isMoving: this.isMoving,
+            isCloaked: this.isCloaked,
+            cloakExpiresAt: this.cloakExpiresAt,
+            isFrozen: this.isFrozen,
+            frozenUntil: this.frozenUntil,
             sequence: this.sequence,
             offset: {
                 x: this.offset.x,

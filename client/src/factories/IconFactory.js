@@ -266,6 +266,25 @@ class IconFactory {
         return null;
     }
 
+    consumeOwnedIcon(ownerId, type, amount = 1) {
+        if (ownerId === null || ownerId === undefined) {
+            return null;
+        }
+        const icon = this.findOwnedIconByType(ownerId, type);
+        if (!icon) {
+            return null;
+        }
+        const quantity = Number.isFinite(icon.quantity) ? icon.quantity : parseInt(icon.quantity, 10) || 1;
+        const consumeAmount = Math.max(1, parseInt(amount, 10) || 1);
+        if (quantity <= consumeAmount) {
+            this.deleteIcon(icon);
+        } else {
+            icon.quantity = quantity - consumeAmount;
+        }
+        this.game.forceDraw = true;
+        return icon;
+    }
+
     getSelectedIcon(ownerId) {
         var icon = this.getHead();
         while (icon) {

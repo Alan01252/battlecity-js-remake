@@ -265,6 +265,14 @@ class SocketListener extends EventEmitter2 {
             this.applyHealthUpdate({ id: data.id, health: 0, source: data.reason });
         });
 
+        this.io.on("player:status", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data || !data.id) {
+                return;
+            }
+            this.applyStatusUpdate(data);
+        });
+
         this.io.on("hazard:spawn", (payload) => {
             const hazard = this.normaliseHazardPayload(payload);
             if (!hazard) {
@@ -410,6 +418,14 @@ class SocketListener extends EventEmitter2 {
         this.io.emit('hazard:spawn', JSON.stringify(hazard));
     }
 
+    useItem(type, data = {}) {
+        if (!this.io || this.io.disconnected || !type) {
+            return;
+        }
+        const payload = Object.assign({}, data, { type });
+        this.io.emit('item:use', JSON.stringify(payload));
+    }
+
     updateHazard(hazard) {
         if (!this.io || this.io.disconnected) {
             return;
@@ -447,6 +463,10 @@ class SocketListener extends EventEmitter2 {
             isTurning: normalizedTurning,
             isMoving: normalizedMoving,
             bombsArmed: !!player.bombsArmed,
+             isCloaked: !!player.isCloaked,
+             cloakExpiresAt: player.cloakExpiresAt ?? 0,
+             isFrozen: !!player.isFrozen,
+             frozenUntil: player.frozenUntil ?? 0,
             sequence: player.sequence,
             offset: {
                 x: player.offset?.x ?? 0,
@@ -535,6 +555,23 @@ class SocketListener extends EventEmitter2 {
         }
         me.isMayor = !!player.isMayor;
         me.health = this.toFiniteNumber(player.health, me.health);
+        if (player.isCloaked !== undefined) {
+            me.isCloaked = !!player.isCloaked;
+        }
+        if (player.cloakExpiresAt !== undefined) {
+            const expires = this.toFiniteNumber(player.cloakExpiresAt, me.cloakExpiresAt ?? 0);
+            me.cloakExpiresAt = Number.isFinite(expires) ? Math.max(0, expires) : 0;
+        }
+        if (player.isFrozen !== undefined) {
+            me.isFrozen = !!player.isFrozen;
+        }
+        if (player.frozenUntil !== undefined) {
+            const until = this.toFiniteNumber(player.frozenUntil, me.frozenUntil ?? 0);
+            me.frozenUntil = Number.isFinite(until) ? Math.max(0, until) : 0;
+            if (!me.isFrozen || me.frozenUntil === 0) {
+                me.frozenBy = null;
+            }
+        }
         const serverDirection = Math.round(this.toFiniteNumber(player.direction, me.direction));
         if (Number.isFinite(serverDirection)) {
             const normalizedDirection = ((serverDirection % 32) + 32) % 32;
@@ -599,6 +636,17 @@ class SocketListener extends EventEmitter2 {
             player.isMoving = movingValue;
         }
         player.sequence = Math.max(0, Math.round(this.toFiniteNumber(player.sequence, 0)));
+        player.isCloaked = !!player.isCloaked;
+        const cloakExpires = this.toFiniteNumber(player.cloakExpiresAt, player.isCloaked ? (player.cloakExpiresAt ?? 0) : 0);
+        player.cloakExpiresAt = Number.isFinite(cloakExpires) ? Math.max(0, cloakExpires) : 0;
+        player.isFrozen = !!player.isFrozen;
+        const frozenUntil = this.toFiniteNumber(player.frozenUntil, player.isFrozen ? (player.frozenUntil ?? 0) : 0);
+        player.frozenUntil = Number.isFinite(frozenUntil) ? Math.max(0, frozenUntil) : 0;
+        if (player.isFrozen) {
+            player.frozenBy = player.frozenBy ?? null;
+        } else {
+            player.frozenBy = null;
+        }
 
         return player;
     }
@@ -636,6 +684,39 @@ class SocketListener extends EventEmitter2 {
             this.game.otherPlayers[update.id] = { id: update.id };
         }
         this.game.otherPlayers[update.id].health = Math.max(0, healthValue);
+    }
+
+    applyStatusUpdate(update) {
+        const myId = this.io?.id;
+        const target = (myId && update.id === myId)
+            ? this.game.player
+            : (this.game.otherPlayers[update.id] ?? (this.game.otherPlayers[update.id] = { id: update.id }));
+        if (!target) {
+            return;
+        }
+        if (update.isCloaked !== undefined) {
+            target.isCloaked = !!update.isCloaked;
+        }
+        if (update.cloakExpiresAt !== undefined) {
+            const expires = this.toFiniteNumber(update.cloakExpiresAt, target.cloakExpiresAt ?? 0);
+            target.cloakExpiresAt = Number.isFinite(expires) ? Math.max(0, expires) : 0;
+        }
+        if (update.isFrozen !== undefined) {
+            target.isFrozen = !!update.isFrozen;
+            if (!target.isFrozen) {
+                target.frozenBy = null;
+            }
+        }
+        if (update.frozenUntil !== undefined) {
+            const until = this.toFiniteNumber(update.frozenUntil, target.frozenUntil ?? 0);
+            target.frozenUntil = Number.isFinite(until) ? Math.max(0, until) : 0;
+        }
+        if (update.frozenBy !== undefined && update.frozenBy !== null) {
+            target.frozenBy = update.frozenBy;
+        }
+        if (myId && update.id === myId) {
+            this.game.forceDraw = true;
+        }
     }
 
     safeParse(payload) {

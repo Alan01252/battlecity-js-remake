@@ -5,7 +5,7 @@ var Player = require("./Player");
 var PlayerStateValidator = require("./validation/PlayerStateValidator");
 
 var debug = require('debug')('BattleCity:PlayerFactory');
-var { TILE_SIZE } = require('./gameplay/constants');
+var { TILE_SIZE, MAX_HEALTH, TIMER_CLOAK, TIMER_DFG } = require('./gameplay/constants');
 var citySpawns = require('../../shared/citySpawns.json');
 
 const HALF_TILE = TILE_SIZE / 2;
@@ -220,6 +220,10 @@ class PlayerFactory {
                 io.emit('player', JSON.stringify(existingPlayer));
             });
 
+            socket.on('item:use', (payload) => {
+                this.handleItemUse(socket, payload);
+            });
+
             socket.on('disconnect', () => {
                 var removedPlayer = this.game.players[socket.id];
                 if (!removedPlayer) {
@@ -323,6 +327,10 @@ class PlayerFactory {
             return;
         }
 
+        if (player.isCloaked) {
+            this.clearCloak(socketId);
+        }
+
         const previousHealth = player.health;
         player.health = Math.max(0, previousHealth - Math.floor(amount));
 
@@ -342,8 +350,115 @@ class PlayerFactory {
         }
     }
 
+    handleItemUse(socket, payload) {
+        if (!socket) {
+            return;
+        }
+        const data = this.safeParse(payload);
+        if (!data) {
+            return;
+        }
+        const typeRaw = data.type;
+        const type = (typeof typeRaw === 'string') ? typeRaw.trim().toLowerCase() : typeRaw;
+        if (!type) {
+            return;
+        }
+        const socketId = socket.id;
+        if (!this.game.players[socketId]) {
+            return;
+        }
+
+        switch (type) {
+            case 'medkit':
+                this.applyHealing(socketId, MAX_HEALTH, { type: 'medkit', iconId: data.iconId ?? null });
+                break;
+            case 'cloak':
+                this.applyCloak(socketId, Number.isFinite(data.duration) ? data.duration : TIMER_CLOAK);
+                break;
+            default:
+                break;
+        }
+    }
+
+    applyHealing(socketId, targetHealth, meta) {
+        const player = this.game.players[socketId];
+        if (!player) {
+            return;
+        }
+        const previousHealth = player.health;
+        const resolvedHealth = Number.isFinite(targetHealth) ? targetHealth : MAX_HEALTH;
+        const clamped = Math.min(MAX_HEALTH, Math.max(previousHealth, Math.floor(resolvedHealth)));
+        if (clamped <= previousHealth) {
+            return;
+        }
+        player.health = clamped;
+        if (this.io) {
+            this.io.emit('player:health', JSON.stringify({
+                id: player.id,
+                health: player.health,
+                previousHealth,
+                source: meta || null
+            }));
+        }
+    }
+
+    applyCloak(socketId, durationMs = TIMER_CLOAK) {
+        const player = this.game.players[socketId];
+        if (!player) {
+            return;
+        }
+        const duration = Number.isFinite(durationMs) ? Math.max(0, durationMs) : TIMER_CLOAK;
+        player.isCloaked = true;
+        player.cloakExpiresAt = Date.now() + duration;
+        this.emitStatusUpdate(player);
+    }
+
+    clearCloak(socketId) {
+        const player = this.game.players[socketId];
+        if (!player || !player.isCloaked) {
+            return;
+        }
+        player.isCloaked = false;
+        player.cloakExpiresAt = 0;
+        this.emitStatusUpdate(player);
+    }
+
+    applyFreeze(socketId, durationMs = TIMER_DFG, options = {}) {
+        const player = this.game.players[socketId];
+        if (!player) {
+            return;
+        }
+        const duration = Number.isFinite(durationMs) ? Math.max(0, durationMs) : TIMER_DFG;
+        player.isFrozen = true;
+        player.frozenUntil = Date.now() + duration;
+        player.frozenBy = options.source ?? null;
+        this.emitStatusUpdate(player);
+    }
+
+    emitStatusUpdate(player, extra = {}) {
+        if (!player || !this.io) {
+            return;
+        }
+        const payload = Object.assign({
+            id: player.id,
+            isCloaked: !!player.isCloaked,
+            cloakExpiresAt: player.cloakExpiresAt || 0,
+            isFrozen: !!player.isFrozen,
+            frozenUntil: player.frozenUntil || 0,
+            frozenBy: player.frozenBy || null
+        }, extra || {});
+        this.io.emit('player:status', JSON.stringify(payload));
+    }
+
     handlePlayerDeath(socketId, player, meta) {
         debug("Player " + socketId + " eliminated by " + JSON.stringify(meta));
+        this.clearCloak(socketId);
+        if (player.isFrozen) {
+            player.isFrozen = false;
+            player.frozenUntil = 0;
+            player.frozenBy = null;
+            this.emitStatusUpdate(player);
+        }
         if (this.io) {
             this.io.emit('player:dead', JSON.stringify({
                 id: player.id,
@@ -416,6 +531,29 @@ class PlayerFactory {
             }
         });
         return players;
+    }
+
+    cycle(now = Date.now()) {
+        Object.values(this.game.players).forEach((player) => {
+            if (!player) {
+                return;
+            }
+            let statusChanged = false;
+            if (player.isCloaked && player.cloakExpiresAt && now >= player.cloakExpiresAt) {
+                player.isCloaked = false;
+                player.cloakExpiresAt = 0;
+                statusChanged = true;
+            }
+            if (player.isFrozen && player.frozenUntil && now >= player.frozenUntil) {
+                player.isFrozen = false;
+                player.frozenUntil = 0;
+                player.frozenBy = null;
+                statusChanged = true;
+            }
+            if (statusChanged) {
+                this.emitStatusUpdate(player);
+            }
+        });
     }
 
     getSpawnForCity(cityId) {

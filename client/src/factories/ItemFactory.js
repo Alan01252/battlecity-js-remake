@@ -4,9 +4,15 @@ import {ITEM_TYPE_WALL} from "../constants";
 import {ITEM_TYPE_SLEEPER} from "../constants";
 import {ITEM_TYPE_MINE} from "../constants";
 import {ITEM_TYPE_BOMB} from "../constants";
+import {ITEM_TYPE_DFG} from "../constants";
+import {ITEM_TYPE_MEDKIT} from "../constants";
+import {ITEM_TYPE_CLOAK} from "../constants";
 import {BOMB_EXPLOSION_TILE_RADIUS} from "../constants";
 import {BOMB_ITEM_TILE_RADIUS} from "../constants";
 import {ITEM_TYPE_ORB} from "../constants";
+import {MAX_HEALTH} from "../constants";
+import {TIMER_DFG} from "../constants";
+import {TIMER_CLOAK} from "../constants";
 
 class ItemFactory {
 
@@ -26,6 +32,7 @@ class ItemFactory {
             ITEM_TYPE_WALL,
             ITEM_TYPE_MINE,
             ITEM_TYPE_BOMB,
+            ITEM_TYPE_DFG,
             ITEM_TYPE_ORB
         ];
 
@@ -132,6 +139,91 @@ class ItemFactory {
         }
     }
 
+    useMedkit() {
+        const playerId = this.game?.player?.id;
+        if (playerId === null || playerId === undefined) {
+            return false;
+        }
+        if (this.game?.player?.health >= MAX_HEALTH) {
+            console.log("Health already full; medkit not consumed.");
+            return false;
+        }
+        if (!this.game.iconFactory || typeof this.game.iconFactory.findOwnedIconByType !== 'function') {
+            return false;
+        }
+        const icon = this.game.iconFactory.findOwnedIconByType(playerId, ITEM_TYPE_MEDKIT);
+        if (!icon) {
+            console.log("No MedKit available to use.");
+            return false;
+        }
+        const iconId = icon.id ?? null;
+        this.game.iconFactory.consumeOwnedIcon(playerId, ITEM_TYPE_MEDKIT, 1);
+        if (this.game.player) {
+            this.game.player.health = MAX_HEALTH;
+            this.game.forceDraw = true;
+        }
+        if (this.game.socketListener && typeof this.game.socketListener.useItem === 'function') {
+            this.game.socketListener.useItem('medkit', {
+                iconId,
+                type: ITEM_TYPE_MEDKIT
+            });
+        }
+        return true;
+    }
+
+    activateCloak() {
+        const playerId = this.game?.player?.id;
+        if (playerId === null || playerId === undefined) {
+            return false;
+        }
+        if (!this.game.iconFactory || typeof this.game.iconFactory.findOwnedIconByType !== 'function') {
+            return false;
+        }
+        const icon = this.game.iconFactory.findOwnedIconByType(playerId, ITEM_TYPE_CLOAK);
+        if (!icon) {
+            console.log("Cloak unavailable.");
+            return false;
+        }
+        const now = this.game.tick || Date.now();
+        const expiresAt = now + TIMER_CLOAK;
+        if (this.game.player) {
+            this.game.player.isCloaked = true;
+            this.game.player.cloakExpiresAt = expiresAt;
+            this.game.forceDraw = true;
+        }
+        if (this.game.socketListener && typeof this.game.socketListener.useItem === 'function') {
+            this.game.socketListener.useItem('cloak', {
+                iconId: icon.id ?? null,
+                type: ITEM_TYPE_CLOAK,
+                duration: TIMER_CLOAK
+            });
+        }
+        return true;
+    }
+
+    freezeCurrentPlayer(duration = TIMER_DFG, source = 'dfg') {
+        if (!this.game || !this.game.player) {
+            return;
+        }
+        const now = this.game.tick || Date.now();
+        this.game.player.isFrozen = true;
+        this.game.player.frozenUntil = now + Math.max(0, duration);
+        this.game.player.frozenBy = source;
+        this.game.player.isMoving = 0;
+        this.game.player.isTurning = 0;
+        this.game.forceDraw = true;
+    }
+
+    triggerDFG(item) {
+        if (!item || item.type !== ITEM_TYPE_DFG) {
+            return;
+        }
+        item.active = false;
+        item.hidden = true;
+        this.freezeCurrentPlayer();
+        this.game.forceDraw = true;
+    }
+
     targetNearestPlayer(item) {
         var nearest = null;
         const itemTeam = item.teamId ?? null;
@@ -217,7 +309,7 @@ class ItemFactory {
             adjustedY = Math.floor(y / 48) * 48;
         }
 
-        const hazardTypes = [ITEM_TYPE_MINE, ITEM_TYPE_BOMB];
+        const hazardTypes = [ITEM_TYPE_MINE, ITEM_TYPE_BOMB, ITEM_TYPE_DFG];
         const isHazard = hazardTypes.includes(type);
         const notifyServer = options.notifyServer !== false && isHazard;
         const hazardId = options.id || (isHazard ? this.generateHazardId() : null);
@@ -511,6 +603,12 @@ class ItemFactory {
         if (hazard.reason === 'bomb_detonated') {
             this.spawnExplosion(hazard.x ?? item.x, hazard.y ?? item.y);
         }
+        if (hazard.reason === 'dfg_triggered' && hazard.triggeredBy) {
+            const myId = this.game.player?.id;
+            if (hazard.triggeredBy === myId) {
+                this.freezeCurrentPlayer();
+            }
+        }
         this.deleteItem(item);
         this.game.forceDraw = true;
     }
@@ -555,6 +653,9 @@ class ItemFactory {
         }
         if (hazardType === 'bomb' || hazardType === ITEM_TYPE_BOMB || hazardType === 3) {
             return ITEM_TYPE_BOMB;
+        }
+        if (hazardType === 'dfg' || hazardType === ITEM_TYPE_DFG || hazardType === 7) {
+            return ITEM_TYPE_DFG;
         }
         return ITEM_TYPE_MINE;
     }

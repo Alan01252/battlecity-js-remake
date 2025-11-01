@@ -58,6 +58,21 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Mine Research unlocks Mine Factory and DFG Research (and then DFG Factory).
 - Orb Research grants Orb Factory production and unlocks Flare Gun Research (and the Flare Gun Factory).
 
+## Items
+- **Cloak** – Press `C` to activate a 5-second cloak as long as you own the icon; enemies stop drawing your tank while allied players still see you. The server tracks the timer so taking damage or timeout automatically broadcasts a status update. (client/src/input/input-keyboard.js:150, client/src/factories/ItemFactory.js:208, server/src/PlayerFactory.js:318)
+- **Laser** – Owning a Laser icon enables the default SHIFT shot; the input handler falls back to bullet type `0` (5 damage) whenever no bazooka is available. (client/src/input/input-keyboard.js:175, client/src/factories/BulletFactory.js:13)
+- **Cougar Missile (Bazooka)** – When you hold still with Cougar Missiles in your inventory, SHIFT fires rocket shots (type `1`) that reuse the classic damage boost, now enforced on both client and server. (client/src/input/input-keyboard.js:175, client/src/factories/BulletFactory.js:13, server/src/BulletFactory.js:10)
+- **MedKit** – Press `H` to consume one MedKit from your inventory and instantly restore your tank to full health; the server clamps the heal and rebroadcasts the new value. (client/src/input/input-keyboard.js:168, client/src/factories/ItemFactory.js:200, server/src/PlayerFactory.js:299)
+- **Bomb** – Pressing `B` arms/disarms the selected stack, and dropping an armed bomb spawns a synced hazard that later clears items, buildings, and players inside the detonation radius. (client/src/input/input-keyboard.js:157, client/src/factories/ItemFactory.js:215, client/src/factories/ItemFactory.js:376)
+- **Mine** – Mines snap to the tile grid, hide from enemies once deployed, and flag themselves for removal the moment an opposing tank trips the collision handler. (client/src/play.js:49, client/src/factories/ItemFactory.js:546, server/src/hazards/HazardManager.js:268)
+- **DFG** – Deep Freeze Generators work like invisible mines: an enemy that rolls over one is frozen in place for 5 seconds while friends pass through harmlessly. Freeze state is driven server-side so everyone sees the status change. (client/src/play.js:105, client/src/factories/ItemFactory.js:242, server/src/hazards/HazardManager.js:303)
+- **Flare Gun** – Holding `CTRL` fires three slow flare shots behind your tank (bullet type `3`) using the classic spread; both client and server honour the lower projectile speed and damage. (client/src/input/input-keyboard.js:95, client/src/factories/BulletFactory.js:13, server/src/BulletFactory.js:13)
+- **Orb** – Dropping an Orb queues a server validation; on success the server wipes the target city, resets its economy, and broadcasts the destruction event. (client/src/factories/ItemFactory.js:431, server/src/orb/OrbManager.js:57)
+- **Wall** – Wall icons place a 48×48 blocking tile that behaves like the legacy barricades, including collision and visibility rules. (client/src/draw/draw-items.js:92, client/src/collision/collision-helpers.js:23)
+- **Turret** – Auto-turrets track targets every 200 ticks and fire standard bullets whenever a hostile tank strays within range. (client/src/factories/ItemFactory.js:33, client/src/factories/ItemFactory.js:105)
+- **Sleeper Turret** – Sleeper turrets reuse the autonomous firing logic but stay hidden unless they have a target or belong to your city. (client/src/factories/ItemFactory.js:33, client/src/draw/draw-items.js:116)
+- **Plasma Turret** – Plasma turrets share the automated targeting loop, providing the higher-tier factory defense once population is available. (client/src/factories/ItemFactory.js:33, client/src/draw/draw-items.js:20)
+
 ## Networking
 - Socket.IO server runs on port 8021 and rebroadcasts player, bullet, and building updates it receives from clients.
 - Client emits `player`, `bullet_shot`, and `new_building` events when local state changes; listeners reconcile remote entities under `game.otherPlayers`.

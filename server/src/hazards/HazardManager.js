@@ -1,16 +1,18 @@
 "use strict";
 
-const { TILE_SIZE, DAMAGE_MINE, DAMAGE_BOMB, BOMB_TIMER_MS, BOMB_EXPLOSION_TILE_RADIUS } = require("../gameplay/constants");
+const { TILE_SIZE, DAMAGE_MINE, DAMAGE_BOMB, BOMB_TIMER_MS, BOMB_EXPLOSION_TILE_RADIUS, TIMER_DFG } = require("../gameplay/constants");
 const { rectangleCollision } = require("../gameplay/geometry");
 
 const HAZARD_TYPES = {
     MINE: "mine",
-    BOMB: "bomb"
+    BOMB: "bomb",
+    DFG: "dfg"
 };
 
 const ITEM_TYPE_MAP = {
     3: HAZARD_TYPES.BOMB,
-    4: HAZARD_TYPES.MINE
+    4: HAZARD_TYPES.MINE,
+    7: HAZARD_TYPES.DFG
 };
 
 class HazardManager {
@@ -98,6 +100,9 @@ class HazardManager {
             hazard.armed = armed;
             hazard.active = armed;
             hazard.detonateAt = armed ? hazard.createdAt + BOMB_TIMER_MS : null;
+        } else if (type === HAZARD_TYPES.DFG) {
+            hazard.active = true;
+            hazard.armed = true;
         }
         return hazard;
     }
@@ -139,6 +144,8 @@ class HazardManager {
                 type = HAZARD_TYPES.MINE;
             } else if (normalised === HAZARD_TYPES.BOMB) {
                 type = HAZARD_TYPES.BOMB;
+            } else if (normalised === HAZARD_TYPES.DFG) {
+                type = HAZARD_TYPES.DFG;
             }
         } else {
             type = this.getHazardTypeFromItem(typeInput);
@@ -170,6 +177,9 @@ class HazardManager {
             const armed = hazard.armed;
             hazard.active = armed;
             hazard.detonateAt = armed ? hazard.createdAt + BOMB_TIMER_MS : null;
+        } else if (type === HAZARD_TYPES.DFG) {
+            hazard.active = true;
+            hazard.armed = true;
         }
 
         if (this.hazards.has(hazard.id)) {
@@ -261,6 +271,8 @@ class HazardManager {
                 this.updateBomb(hazard, now);
             } else if (hazard.type === HAZARD_TYPES.MINE) {
                 this.updateMine(hazard);
+            } else if (hazard.type === HAZARD_TYPES.DFG) {
+                this.updateDFG(hazard);
             }
         }
     }
@@ -340,6 +352,39 @@ class HazardManager {
             return false;
         }
         return true;
+    }
+
+    updateDFG(hazard) {
+        if (!hazard.active) {
+            return;
+        }
+
+        const players = this.game.players;
+        const hazardRect = {
+            x: hazard.x,
+            y: hazard.y,
+            w: TILE_SIZE,
+            h: TILE_SIZE
+        };
+
+        for (const [socketId, player] of Object.entries(players)) {
+            if (!this.shouldDamagePlayer(hazard, socketId, player)) {
+                continue;
+            }
+            if (this.playerIntersectsRect(player, hazardRect)) {
+                if (this.playerFactory && typeof this.playerFactory.applyFreeze === 'function') {
+                    this.playerFactory.applyFreeze(socketId, TIMER_DFG, {
+                        source: 'dfg',
+                        hazardId: hazard.id,
+                        ownerId: hazard.ownerId
+                    });
+                }
+                hazard.triggeredBy = player.id;
+                hazard.triggeredTeam = this.playerFactory?.getPlayerTeam(socketId) ?? null;
+                this.removeHazard(hazard.id, "dfg_triggered");
+                break;
+            }
+        }
     }
 
     playerIntersectsRect(player, rect) {

@@ -89,6 +89,18 @@ var drawOtherPlayers = (game, stage) => {
 
         var player = game.otherPlayers[id];
 
+        if (!player) {
+            return;
+        }
+
+        if (player.isCloaked) {
+            const myId = game.player?.id;
+            const sameCity = (player.city ?? null) === (game.player?.city ?? null);
+            if (id !== myId && !sameCity) {
+                return;
+            }
+        }
+
         var playerTank = createTankSprite(game, player, game.player);
 
 
@@ -128,7 +140,11 @@ var drawBullets = (game, stage) => {
     while (bullet) {
 
         var tmpText = game.textures['bulletTexture'].clone();
-        var bulletRect = new PIXI.Rectangle(bullet.animation * 8, 0, 8, 8);
+        var spriteRow = bullet && Number.isFinite(bullet.type) ? bullet.type : 0;
+        if (spriteRow < 0) {
+            spriteRow = 0;
+        }
+        var bulletRect = new PIXI.Rectangle(bullet.animation * 8, spriteRow * 8, 8, 8);
         tmpText.frame = bulletRect;
 
         var sprite = new PIXI.Sprite(tmpText);
