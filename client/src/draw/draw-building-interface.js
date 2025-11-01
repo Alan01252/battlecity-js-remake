@@ -117,13 +117,30 @@ const startGhostBuilding = (game, buildingType, pointerData) => {
 
 export const setupBuildingMenu = (game) => {
 
+    if (!game || !game.stage) {
+        return;
+    }
+
+    const playerCity = Number.isFinite(game?.player?.city) ? game.player.city : null;
+    const cityState = (playerCity !== null && Array.isArray(game?.cities))
+        ? game.cities[playerCity]
+        : null;
+    const canBuild = cityState?.canBuild;
+
+    if (!canBuild) {
+        clearGhostBuilding(game);
+        menuContainer.visible = false;
+        if (!menuContainer.parent) {
+            game.stage.addChild(menuContainer);
+        }
+        return;
+    }
 
     if (game.forceDraw) {
 
         menuContainer.removeChildren();
 
 
-        var canBuild = game.cities[game.player.city].canBuild;
         var canBuildList = Object.keys(canBuild);
 
 
@@ -189,7 +206,9 @@ export const setupBuildingMenu = (game) => {
     }
 
 
-    game.stage.addChild(menuContainer);
+    if (!menuContainer.parent) {
+        game.stage.addChild(menuContainer);
+    }
     game.clearGhostBuilding = () => clearGhostBuilding(game);
     game.startGhostBuilding = (type, data) => startGhostBuilding(game, type, data);
 };
