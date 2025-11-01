@@ -1,0 +1,43 @@
+{
+  "minPlayers": 16,
+  "maxActive": 6,
+  "evaluationIntervalMs": 10000,
+  "layout": [
+    { "type": 300, "dx": 3, "dy": 12 },
+    { "type": 300, "dx": 0, "dy": 7 },
+    { "type": 300, "dx": 3, "dy": 4 },
+    { "type": 300, "dx": 7, "dy": 12 },
+    { "type": 300, "dx": 3, "dy": 1 },
+    { "type": 300, "dx": 7, "dy": 0 },
+    { "type": 300, "dx": 10, "dy": 0 },
+    { "type": 105, "dx": 7, "dy": 3 },
+    { "type": 104, "dx": 7, "dy": 9 },
+    { "type": 102, "dx": 7, "dy": 6 },
+    { "type": 103, "dx": 10, "dy": 9 },
+    { "type": 109, "dx": 10, "dy": 6 },
+    { "type": 112, "dx": 10, "dy": 3 },
+    { "type": 300, "dx": 13, "dy": 0 },
+    { "type": 300, "dx": 16, "dy": 0 },
+    { "type": 300, "dx": 19, "dy": 0 },
+    { "type": 300, "dx": 22, "dy": 0 },
+    { "type": 300, "dx": 22, "dy": 10 },
+    { "type": 300, "dx": 10, "dy": 12 },
+    { "type": 405, "dx": 22, "dy": 7 },
+    { "type": 404, "dx": 13, "dy": 3 },
+    { "type": 401, "dx": 16, "dy": 3 },
+    { "type": 402, "dx": 19, "dy": 3 },
+    { "type": 403, "dx": 19, "dy": 6 },
+    { "type": 409, "dx": 19, "dy": 9 },
+    { "type": 412, "dx": 13, "dy": 9 },
+    { "type": 300, "dx": 16, "dy": 9 },
+    { "type": 300, "dx": 13, "dy": 6 }
+  ],
+  "cities": [
+    { "cityId": 55, "name": "Sentinel Anchorage" },
+    { "cityId": 56, "name": "Bastion Ridge" },
+    { "cityId": 57, "name": "Citadel Spire" },
+    { "cityId": 58, "name": "Rampart Cove" },
+    { "cityId": 59, "name": "Bulwark Flats" },
+    { "cityId": 60, "name": "Outrider Yard" }
+  ]
+}

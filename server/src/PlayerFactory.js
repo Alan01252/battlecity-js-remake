@@ -597,6 +597,9 @@ class PlayerFactory {
                 if (!entry && entry !== 0) {
                     continue;
                 }
+                if (entry && entry.isFake) {
+                    continue;
+                }
                 const id = Number.isFinite(entry?.id) ? entry.id : index;
                 if (!candidates.includes(id)) {
                     candidates.push(id);
@@ -657,9 +660,13 @@ class PlayerFactory {
             return null;
         }
         const spawn = this.citySpawns && this.citySpawns[String(state.cityId)];
+        const cityState = this.game.cities ? this.game.cities[state.cityId] : null;
+        const displayName = (cityState && (cityState.nameOverride || cityState.name))
+            || (spawn && spawn.name)
+            || `City ${state.cityId + 1}`;
         return {
             id: state.cityId,
-            name: (spawn && spawn.name) || `City ${state.cityId + 1}`,
+            name: displayName,
             mayorId: state.mayorId || null,
             mayorLabel: shortenId(state.mayorId || null),
             playerCount: state.playerCount,

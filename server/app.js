@@ -19,6 +19,7 @@ var BulletFactory = require('./src/BulletFactory');
 var BuildingFactory = require('./src/BuildingFactory');
 var HazardManager = require('./src/hazards/HazardManager');
 var OrbManager = require('./src/orb/OrbManager');
+var FakeCityManager = require('./src/FakeCityManager');
 
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -53,6 +54,11 @@ const orbManager = new OrbManager({
     hazardManager
 });
 orbManager.setIo(io);
+const fakeCityManager = new FakeCityManager({
+    game,
+    buildingFactory,
+    playerFactory,
+});
 
 const toFiniteNumber = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -157,6 +163,9 @@ const collectCityInfo = (cityId) => {
     const cityState = cityManager
         ? cityManager.getCity(id)
         : (game.cities && game.cities[id]) || null;
+    const cityName = (cityState && (cityState.nameOverride || cityState.name))
+        ? (cityState.nameOverride || cityState.name)
+        : getCityDisplayName(id);
 
     const orbPoints = cityState && cityManager
         ? cityManager.getOrbValue(cityState)
@@ -174,7 +183,7 @@ const collectCityInfo = (cityId) => {
 
     return {
         cityId: id,
-        cityName: getCityDisplayName(id),
+        cityName,
         mayorId: mayorId || null,
         mayorLabel: mayorLabel,
         playerCount: players.length,
@@ -236,6 +245,7 @@ var loop = () => {
 
     bulletFactory.cycle(delta);
     hazardManager.update(delta);
+    fakeCityManager.update(now);
 
     buildingAccumulator += delta;
     if (buildingAccumulator >= BUILDING_UPDATE_INTERVAL) {

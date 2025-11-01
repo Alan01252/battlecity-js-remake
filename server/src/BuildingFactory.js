@@ -177,6 +177,53 @@ class BuildingFactory {
         this.removeBuilding(building.id);
     }
 
+    spawnStaticBuilding(data) {
+        if (!data || data.x === undefined || data.y === undefined || data.type === undefined) {
+            return null;
+        }
+        const cityId = data.city !== undefined ? data.city : (data.cityId !== undefined ? data.cityId : 0);
+        const ownerId = data.ownerId || `fake_city_${cityId}`;
+        const buildingId = data.id || `fake_${cityId}_${data.x}_${data.y}`;
+        if (this.buildings.has(buildingId)) {
+            return this.buildings.get(buildingId);
+        }
+
+        const buildingPayload = {
+            id: buildingId,
+            x: data.x,
+            y: data.y,
+            type: data.type,
+            city: cityId,
+            itemsLeft: data.itemsLeft || 0,
+        };
+
+        const newBuilding = new Building(ownerId, buildingPayload, null);
+
+        if (isFactory(newBuilding.type)) {
+            const factory = new FactoryBuilding(this.game, newBuilding);
+            newBuilding.injectType(factory);
+        }
+
+        this.registerBuilding(ownerId, newBuilding);
+        if (this.cityManager) {
+            this.cityManager.registerBuilding(newBuilding);
+        }
+
+        if (isHouse(newBuilding.type)) {
+            this.backfillAttachmentsForHouse(newBuilding);
+        } else {
+            this.ensureAttachment(newBuilding);
+        }
+
+        if (this.io) {
+            const snapshot = this.serializeBuilding(newBuilding);
+            this.io.emit('new_building', JSON.stringify(snapshot));
+            this.emitPopulationUpdate(newBuilding);
+        }
+
+        return newBuilding;
+    }
+
     registerBuilding(socketId, building) {
         this.buildings.set(building.id, building);
         if (!this.buildingsBySocket.has(socketId)) {

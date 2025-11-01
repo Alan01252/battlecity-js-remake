@@ -1,6 +1,7 @@
 import {DEFAULT_CITY_CAN_BUILD} from "./constants";
 import {MONEY_STARTING_VALUE} from "./constants";
 import citySpawns from '@shared/citySpawns.json';
+import fakeCityConfig from '@shared/fakeCities.json';
 import {getCityDisplayName, getCitySpawn} from "./utils/citySpawns";
 
 const createDefaultCanBuild = () => ({ ...DEFAULT_CITY_CAN_BUILD });
@@ -17,29 +18,24 @@ const createCityTemplate = () => ({
 });
 
 function createFakeCity(game) {
-    /*
-    var cityData = PIXI.loader.resources["data/cities/7/demo.city"].data;
-    console.log(cityData);
-    var lines = cityData.split('\n');
-    console.log(lines);
-    for(var i = 0;i < lines.length;i++){
-        //code here using lines[i] which will give you each line
-        var data = lines[i].split(" ");
-        game.buildingFactory.newBuilding(null, data[1], data[2], data[0])
-
-        console.log(data[0]);
-        try {
-            game.tiles[data[1]][data[2]] = data[0];
-            game.map[data[1]][data[2]] = MAP_SQUARE_BUILDING;
-        }catch (e) {
-
-        }
-
-        console.log(data[1] * 48);
-        console.log(data[2] * 48);
+    if (!game || !Array.isArray(game.cities)) {
+        return;
     }
-    */
-
+    const fakeCities = Array.isArray(fakeCityConfig?.cities) ? fakeCityConfig.cities : [];
+    fakeCities.forEach((entry) => {
+        const cityId = Number(entry?.cityId);
+        if (!Number.isFinite(cityId)) {
+            return;
+        }
+        const city = game.cities[cityId];
+        if (!city) {
+            return;
+        }
+        if (entry?.name) {
+            city.name = entry.name;
+        }
+        city.isFakeCandidate = true;
+    });
 }
 
 function createCities(game) {

@@ -41,6 +41,10 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Inventory stacks repeatable items (bombs, mines, turrets) and shows a count overlay; selecting a bomb arms the stack so drops inherit the armed state. (client/src/factories/IconFactory.js:20, client/src/draw/draw-panel-interface.js:37)
 - Item pickups respect the classic per-city caps (e.g., Cloaks 4, Bombs 20, Turrets 10, Plasma 5, Orb 1); excess inventory is trimmed during restore and additional pickups are blocked once a cap is reached. (client/src/constants.js:90, client/src/factories/IconFactory.js:18)
 
+## AI Opposition
+- When the human roster slips below 16 players the server fabricates up to six AI fortress cities from the shared blueprint, wiring in bomb, orb, and turret factories so they’re immediately orbable and large enough to draw rogue tank patrols. (server/src/FakeCityManager.js, shared/fakeCities.json)
+- These synthetic strongholds carry an `isFake` marker, so the lobby assignment flow skips them while they are active. (server/src/PlayerFactory.js)
+
 ## Build Tree
 - Housing is available immediately and permits launching the two starting research lines.
 - Bazooka Research (→ Bazooka Factory) is unlocked from the start and, once completed, enables Cloak Research, MedKit Research, and their factories.
