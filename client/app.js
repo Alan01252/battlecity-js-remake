@@ -373,7 +373,7 @@ game.clearDefenseItems = (cityId) => {
     const stored = game.defenseItems.get(normalisedId);
     if (Array.isArray(stored) && game.itemFactory && typeof game.itemFactory.removeItemById === 'function') {
         stored.forEach((itemId) => {
-            game.itemFactory.removeItemById(itemId);
+            game.itemFactory.removeItemById(itemId, { notifyServer: false });
         });
     }
     game.defenseItems.delete(normalisedId);
@@ -406,7 +406,7 @@ game.applyDefenseSnapshot = (cityId, items) => {
             ? entry.id
             : `defense_${normalisedId}_${index}`;
         if (typeof game.itemFactory.removeItemById === 'function') {
-            game.itemFactory.removeItemById(itemId);
+            game.itemFactory.removeItemById(itemId, { notifyServer: false });
         }
         const ownerId = (typeof entry?.ownerId === 'string' && entry.ownerId.length > 0)
             ? entry.ownerId

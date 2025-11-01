@@ -459,6 +459,25 @@ class SocketListener extends EventEmitter2 {
         this.io.emit('hazard:remove', JSON.stringify({ id }));
     }
 
+    spawnDefense(defense) {
+        if (!this.io || this.io.disconnected || !defense) {
+            return;
+        }
+        const payload = (typeof defense === 'string') ? defense : JSON.stringify(defense);
+        this.io.emit('defense:spawn', payload);
+    }
+
+    removeDefense(id) {
+        if (!this.io || this.io.disconnected || !id) {
+            return;
+        }
+        const identifier = typeof id === 'object' ? (id.id ?? null) : id;
+        if (!identifier) {
+            return;
+        }
+        this.io.emit('defense:remove', JSON.stringify({ id: identifier }));
+    }
+
     sendOrbDrop(drop) {
         if (!this.io || this.io.disconnected || drop === null || drop === undefined) {
             return;

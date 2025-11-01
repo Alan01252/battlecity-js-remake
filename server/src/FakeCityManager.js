@@ -29,11 +29,12 @@ const toFiniteNumber = (value, fallback = 0) => {
 };
 
 class FakeCityManager {
-    constructor({ game, buildingFactory, playerFactory, hazardManager }) {
+    constructor({ game, buildingFactory, playerFactory, hazardManager, defenseManager }) {
         this.game = game;
         this.buildingFactory = buildingFactory;
         this.playerFactory = playerFactory;
         this.hazardManager = hazardManager || null;
+        this.defenseManager = defenseManager || null;
         this.config = fakeCityConfig || {};
         this.activeCities = new Map();
         this.nextEvaluation = 0;
@@ -90,6 +91,10 @@ class FakeCityManager {
 
     sendSnapshot(target) {
         if (!target) {
+            return;
+        }
+        if (this.defenseManager) {
+            this.defenseManager.sendSnapshot(target);
             return;
         }
         for (const [cityId, record] of this.activeCities.entries()) {
@@ -252,6 +257,13 @@ class FakeCityManager {
             placedTiles.add(tileKey);
         }
 
+        if (this.defenseManager) {
+            const sanitized = this.defenseManager.replaceSystemDefenses(cityId, result.items, { ownerId });
+            if (Array.isArray(sanitized)) {
+                result.items = sanitized;
+            }
+        }
+
         return result;
     }
 
@@ -360,7 +372,7 @@ class FakeCityManager {
             this.playerFactory.emitLobbySnapshot();
         }
 
-        if (defenseItemsSnapshot.length) {
+        if (!this.defenseManager && defenseItemsSnapshot.length) {
             this.emitDefenseSnapshot(cityId, defenseItemsSnapshot);
         }
 
@@ -394,8 +406,12 @@ class FakeCityManager {
             });
             record.hazardIds = [];
         }
-        if (record && Array.isArray(record.defenseItems) && record.defenseItems.length) {
+        if (this.defenseManager) {
+            this.defenseManager.removeDefensesBySource(cityId, 'system');
+        } else if (record && Array.isArray(record.defenseItems) && record.defenseItems.length) {
             this.emitDefenseClear(cityId);
+        }
+        if (record) {
             record.defenseItems = [];
         }
         if (this.buildingFactory) {

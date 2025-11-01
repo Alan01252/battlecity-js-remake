@@ -26,6 +26,13 @@ const STRUCTURE_ITEM_TYPES = new Set([
     ITEM_TYPE_PLASMA,
 ]);
 
+const DEFENSE_ITEM_TYPES = new Set([
+    ITEM_TYPE_TURRET,
+    ITEM_TYPE_SLEEPER,
+    ITEM_TYPE_PLASMA,
+    ITEM_TYPE_WALL,
+]);
+
 const INSTANT_REMOVAL_ITEM_TYPES = new Set([
     ITEM_TYPE_CLOAK,
     ITEM_TYPE_ROCKET,
@@ -65,8 +72,10 @@ class ItemFactory {
         this.calculateTick = 0;
         this.itemsById = new Map();
         this.pendingHazards = new Set();
+        this.pendingDefenseIds = new Set();
         this.socketBound = false;
         this.nextLocalId = 0;
+        this.nextDefenseId = 0;
 
         this.validIcons = [
             ITEM_TYPE_TURRET,
@@ -107,6 +116,12 @@ class ItemFactory {
         this.nextLocalId += 1;
         const base = this.game.socketListener?.io?.id ?? 'local';
         return `hazard_${base}_${Date.now()}_${this.nextLocalId}`;
+    }
+
+    generateDefenseId() {
+        this.nextDefenseId += 1;
+        const base = this.game.socketListener?.io?.id ?? 'local';
+        return `defense_${base}_${Date.now()}_${this.nextDefenseId}`;
     }
 
     insertItem(item) {
@@ -405,22 +420,14 @@ class ItemFactory {
         }
         const impactX = Number.isFinite(options.impactX) ? options.impactX : item.x;
         const impactY = Number.isFinite(options.impactY) ? options.impactY : item.y;
-        const notifyServer = options.notifyServer !== false;
-        const spawnExplosion = options.spawnExplosion !== false;
-
-        if (spawnExplosion) {
+        if (options.spawnExplosion !== false) {
             this.spawnExplosion(impactX, impactY);
         }
 
-        if (notifyServer && this.isHazardType(item.type) && this.game.socketListener && typeof this.game.socketListener.removeHazard === 'function') {
-            try {
-                this.game.socketListener.removeHazard(item.id);
-            } catch (error) {
-                console.debug("Failed to notify server about hazard removal", error);
-            }
-        }
-
-        this.deleteItem(item);
+        this.deleteItem(item, {
+            notifyServer: options.notifyServer,
+            reason: options.reason || 'destroyed'
+        });
         this.game.forceDraw = true;
     }
 
@@ -493,6 +500,19 @@ class ItemFactory {
             ownerTeam = this.game.player?.city ?? null;
         }
 
+        if (options.teamId !== undefined && options.teamId !== null) {
+            const override = Number(options.teamId);
+            if (Number.isFinite(override)) {
+                ownerTeam = Math.floor(override);
+            }
+        }
+        if (!Number.isFinite(ownerTeam) && options.city !== undefined && options.city !== null) {
+            const overrideCity = Number(options.city);
+            if (Number.isFinite(overrideCity)) {
+                ownerTeam = Math.floor(overrideCity);
+            }
+        }
+
         let adjustedX = x;
         let adjustedY = y;
         if (type === ITEM_TYPE_BOMB || type === ITEM_TYPE_MINE) {
@@ -501,15 +521,20 @@ class ItemFactory {
         }
 
         const isHazard = HAZARD_ITEM_TYPES.has(type);
-        const notifyServer = options.notifyServer !== false && isHazard;
-        const hazardId = options.id || (isHazard ? this.generateHazardId() : null);
+        const isDefense = DEFENSE_ITEM_TYPES.has(type);
+        const shouldNotifyHazard = options.notifyServer !== false && isHazard;
+        const shouldNotifyDefense = options.notifyServer !== false && !isHazard && isDefense;
+        const generatedId = shouldNotifyHazard
+            ? this.generateHazardId()
+            : (shouldNotifyDefense ? this.generateDefenseId() : null);
+        const itemId = options.id || generatedId || `item_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
         const bombArmed = owner && typeof owner === 'object' && owner.armed !== undefined
             ? !!owner.armed
             : (this.game.player?.bombsArmed ?? false);
 
         const item = {
-            id: hazardId || `item_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+            id: itemId,
             owner: ownerId,
             ownerId,
             teamId: ownerTeam,
@@ -525,21 +550,27 @@ class ItemFactory {
             detonateTick: options.detonateTick || null,
             next: null,
             previous: null,
-            synced: !notifyServer
+            synced: !(shouldNotifyHazard || shouldNotifyDefense)
         };
+
+        item.isDefense = isDefense;
 
         this.ensureItemDurability(item, type);
 
         this.insertItem(item);
 
-        if (type === ITEM_TYPE_ORB && notifyServer !== false) {
+        if (isDefense && !shouldNotifyDefense) {
+            this.pendingDefenseIds.delete(item.id);
+        }
+
+        if (type === ITEM_TYPE_ORB && options.notifyServer !== false) {
             this.queueOrbDrop(item, {
                 ownerId,
                 teamId: ownerTeam
             });
         }
 
-        if (notifyServer && this.game.socketListener) {
+        if (shouldNotifyHazard && this.game.socketListener) {
             this.pendingHazards.add(item.id);
             this.game.socketListener.spawnHazard({
                 id: item.id,
@@ -549,6 +580,20 @@ class ItemFactory {
                 armed: item.active,
                 ownerId: ownerId,
                 teamId: ownerTeam
+            });
+        }
+
+        if (shouldNotifyDefense && this.game.socketListener && typeof this.game.socketListener.spawnDefense === 'function') {
+            this.pendingDefenseIds.add(item.id);
+            this.game.socketListener.spawnDefense({
+                id: item.id,
+                type,
+                x: item.x,
+                y: item.y,
+                ownerId: ownerId,
+                teamId: ownerTeam,
+                cityId: ownerTeam,
+                angle: item.angle ?? 0
             });
         }
 
@@ -637,10 +682,11 @@ class ItemFactory {
     }
 
 
-    deleteItem(item) {
+    deleteItem(item, options = {}) {
         if (!item) {
             return null;
         }
+        const notifyServer = options.notifyServer !== false;
         const returnItem = item.next;
         if (Array.isArray(this.pendingOrbItems)) {
             const index = this.pendingOrbItems.indexOf(item);
@@ -648,8 +694,25 @@ class ItemFactory {
                 this.pendingOrbItems.splice(index, 1);
             }
         }
+        if (notifyServer && this.isHazardType(item.type) && this.game.socketListener && typeof this.game.socketListener.removeHazard === 'function') {
+            try {
+                this.game.socketListener.removeHazard(item.id);
+            } catch (error) {
+                console.debug("Failed to notify server about hazard removal", error);
+            }
+        }
+        if (notifyServer && item.isDefense && this.game.socketListener && typeof this.game.socketListener.removeDefense === 'function') {
+            try {
+                this.game.socketListener.removeDefense(item.id);
+            } catch (error) {
+                console.debug("Failed to notify server about defense removal", error);
+            }
+        }
         this.detachItem(item);
         this.pendingHazards.delete(item.id);
+        if (this.pendingDefenseIds) {
+            this.pendingDefenseIds.delete(item.id);
+        }
         return returnItem;
     }
 
@@ -675,7 +738,7 @@ class ItemFactory {
 
         console.log(`Bomb detonated at tile ${centerTileX}, ${centerTileY}`);
 
-        let nextItem = this.deleteItem(item);
+        let nextItem = this.deleteItem(item, { notifyServer });
 
         // Remove nearby items
         let node = this.getHead();
@@ -685,7 +748,7 @@ class ItemFactory {
             const tileY = Math.floor((node.y + 24) / 48);
             if (Math.abs(tileX - centerTileX) <= BOMB_ITEM_TILE_RADIUS &&
                 Math.abs(tileY - centerTileY) <= BOMB_ITEM_TILE_RADIUS) {
-                this.deleteItem(node);
+                this.deleteItem(node, { notifyServer });
             }
             node = next;
         }
@@ -805,7 +868,7 @@ class ItemFactory {
                 this.freezeCurrentPlayer();
             }
         }
-        this.deleteItem(item);
+        this.deleteItem(item, { notifyServer: false });
         this.game.forceDraw = true;
     }
 
@@ -825,7 +888,7 @@ class ItemFactory {
         }
 
         this.spawnExplosion(item.x, item.y);
-        this.deleteItem(item);
+        this.deleteItem(item, { notifyServer: false });
         this.game.forceDraw = true;
     }
 
@@ -900,12 +963,12 @@ class ItemFactory {
         return this.itemsById.get(id) || null;
     }
 
-    removeItemById(id) {
+    removeItemById(id, options = {}) {
         const item = this.getItemById(id);
         if (!item) {
             return false;
         }
-        this.deleteItem(item);
+        this.deleteItem(item, options);
         return true;
     }
 }

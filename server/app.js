@@ -20,6 +20,7 @@ var BuildingFactory = require('./src/BuildingFactory');
 var HazardManager = require('./src/hazards/HazardManager');
 var OrbManager = require('./src/orb/OrbManager');
 var FakeCityManager = require('./src/FakeCityManager');
+var DefenseManager = require('./src/DefenseManager');
 
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -46,6 +47,8 @@ const buildingFactory = new BuildingFactory(game);
 buildingFactory.listen(io);
 const hazardManager = new HazardManager(game, playerFactory);
 hazardManager.setIo(io);
+const defenseManager = new DefenseManager({ game, playerFactory });
+defenseManager.setIo(io);
 const orbManager = new OrbManager({
     game,
     cityManager: buildingFactory.cityManager,
@@ -59,6 +62,7 @@ const fakeCityManager = new FakeCityManager({
     buildingFactory,
     playerFactory,
     hazardManager,
+    defenseManager,
 });
 fakeCityManager.setIo(io);
 
@@ -220,6 +224,12 @@ io.on('connection', (socket) => {
     });
     socket.on('orb:drop', (payload) => {
         orbManager.handleDrop(socket, payload);
+    });
+    socket.on('defense:spawn', (payload) => {
+        defenseManager.handleSpawn(socket, payload);
+    });
+    socket.on('defense:remove', (payload) => {
+        defenseManager.handleRemove(socket, payload);
     });
     socket.on('disconnect', () => {
         hazardManager.onDisconnect(socket.id);
