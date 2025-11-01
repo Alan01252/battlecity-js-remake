@@ -7,12 +7,55 @@ import {ITEM_TYPE_BOMB} from "../constants";
 import {ITEM_TYPE_DFG} from "../constants";
 import {ITEM_TYPE_MEDKIT} from "../constants";
 import {ITEM_TYPE_CLOAK} from "../constants";
+import {ITEM_TYPE_ROCKET} from "../constants";
 import {BOMB_EXPLOSION_TILE_RADIUS} from "../constants";
 import {BOMB_ITEM_TILE_RADIUS} from "../constants";
 import {ITEM_TYPE_ORB} from "../constants";
+import {ITEM_TYPE_FLARE} from "../constants";
+import {BUILDING_COMMAND_CENTER} from "../constants";
 import {MAX_HEALTH} from "../constants";
 import {TIMER_DFG} from "../constants";
 import {TIMER_CLOAK} from "../constants";
+import {ITEM_INITIAL_LIFE} from "../constants";
+import {ITEM_BURN_THRESHOLDS} from "../constants";
+
+const STRUCTURE_ITEM_TYPES = new Set([
+    ITEM_TYPE_WALL,
+    ITEM_TYPE_TURRET,
+    ITEM_TYPE_SLEEPER,
+    ITEM_TYPE_PLASMA,
+]);
+
+const INSTANT_REMOVAL_ITEM_TYPES = new Set([
+    ITEM_TYPE_CLOAK,
+    ITEM_TYPE_ROCKET,
+    ITEM_TYPE_MEDKIT,
+    ITEM_TYPE_BOMB,
+    ITEM_TYPE_MINE,
+    ITEM_TYPE_ORB,
+    ITEM_TYPE_FLARE,
+    ITEM_TYPE_DFG,
+]);
+
+const HAZARD_ITEM_TYPES = new Set([
+    ITEM_TYPE_MINE,
+    ITEM_TYPE_BOMB,
+    ITEM_TYPE_DFG,
+]);
+
+const getInitialLife = (type) => {
+    if (Object.prototype.hasOwnProperty.call(ITEM_INITIAL_LIFE, type)) {
+        return ITEM_INITIAL_LIFE[type];
+    }
+    return null;
+};
+
+const getBurnThreshold = (type) => {
+    if (Object.prototype.hasOwnProperty.call(ITEM_BURN_THRESHOLDS, type)) {
+        return ITEM_BURN_THRESHOLDS[type];
+    }
+    return null;
+};
 
 class ItemFactory {
 
@@ -129,7 +172,11 @@ class ItemFactory {
             const shooterId = item.ownerId ?? item.owner ?? this.game.player.id;
             const shooterTeam = item.teamId ?? this.game.player.city ?? null;
 
-            this.game.bulletFactory.newBullet(shooterId, x2, y2, 0, direction, shooterTeam);
+            this.game.bulletFactory.newBullet(shooterId, x2, y2, 0, direction, shooterTeam, {
+                sourceId: item.id ?? null,
+                sourceType: this.resolveItemSourceType(item),
+                targetId: item.target ?? null
+            });
             this.emitItemBulletShot(item, {
                 x: x2,
                 y: y2,
@@ -261,6 +308,14 @@ class ItemFactory {
         Object.keys(this.game.otherPlayers).forEach((id) => {
             considerPlayer(this.game.otherPlayers[id], id);
         });
+        if (this.game.rogueTankManager && Array.isArray(this.game.rogueTankManager.tanks)) {
+            this.game.rogueTankManager.tanks.forEach((tank) => {
+                if (!tank || !tank.offset) {
+                    return;
+                }
+                considerPlayer(tank, tank.id || `rogue_${tank.offset.x}_${tank.offset.y}`);
+            });
+        }
 
         if (nearest) {
             item.target = nearest.id;
@@ -280,6 +335,142 @@ class ItemFactory {
             item.target = null;
             item.targetTeam = null;
         }
+    }
+
+    ensureItemDurability(item, explicitType = null) {
+        if (!item) {
+            return;
+        }
+        const type = Number.isFinite(explicitType) ? explicitType : item.type;
+        const initialLife = getInitialLife(type);
+        if (initialLife !== null && initialLife !== undefined) {
+            if (!Number.isFinite(item.maxLife)) {
+                item.maxLife = initialLife;
+            }
+            if (!Number.isFinite(item.life)) {
+                item.life = initialLife;
+            }
+        }
+        const burnThreshold = getBurnThreshold(type);
+        if (burnThreshold !== null && burnThreshold !== undefined) {
+            if (!Number.isFinite(item.burnThreshold)) {
+                item.burnThreshold = burnThreshold;
+            }
+        }
+        if (!Object.prototype.hasOwnProperty.call(item, 'isBurning')) {
+            item.isBurning = false;
+        }
+        if (
+            Number.isFinite(item.life) &&
+            Number.isFinite(item.burnThreshold) &&
+            Number.isFinite(item.maxLife) &&
+            item.life < item.maxLife &&
+            item.life <= item.burnThreshold
+        ) {
+            this.markItemBurning(item);
+        }
+    }
+
+    markItemBurning(item) {
+        if (!item) {
+            return;
+        }
+        if (item.isBurning) {
+            return;
+        }
+        item.isBurning = true;
+        item.lifeState = 'burning';
+        if (!Number.isFinite(item.animation)) {
+            item.animation = 1;
+        }
+        if (!Number.isFinite(item.animationTick)) {
+            item.animationTick = 0;
+        }
+    }
+
+    isHazardType(type) {
+        return HAZARD_ITEM_TYPES.has(type);
+    }
+
+    shouldRemoveOnHit(type) {
+        if (INSTANT_REMOVAL_ITEM_TYPES.has(type)) {
+            return true;
+        }
+        return !STRUCTURE_ITEM_TYPES.has(type);
+    }
+
+    destroyItem(item, options = {}) {
+        if (!item) {
+            return;
+        }
+        const impactX = Number.isFinite(options.impactX) ? options.impactX : item.x;
+        const impactY = Number.isFinite(options.impactY) ? options.impactY : item.y;
+        const notifyServer = options.notifyServer !== false;
+        const spawnExplosion = options.spawnExplosion !== false;
+
+        if (spawnExplosion) {
+            this.spawnExplosion(impactX, impactY);
+        }
+
+        if (notifyServer && this.isHazardType(item.type) && this.game.socketListener && typeof this.game.socketListener.removeHazard === 'function') {
+            try {
+                this.game.socketListener.removeHazard(item.id);
+            } catch (error) {
+                console.debug("Failed to notify server about hazard removal", error);
+            }
+        }
+
+        this.deleteItem(item);
+        this.game.forceDraw = true;
+    }
+
+    handleBulletHit(item, bullet) {
+        if (!item || !bullet) {
+            return { consumed: false };
+        }
+        if (bullet.sourceId && item.id && bullet.sourceId === item.id) {
+            return { consumed: false };
+        }
+
+        const impactX = Number.isFinite(bullet.x) ? bullet.x : item.x;
+        const impactY = Number.isFinite(bullet.y) ? bullet.y : item.y;
+        const damage = Number.isFinite(bullet.damage) ? bullet.damage : 5;
+
+        const response = {
+            consumed: true,
+            destroyed: false,
+            type: item.type,
+        };
+
+        if (this.shouldRemoveOnHit(item.type)) {
+            this.destroyItem(item, { impactX, impactY });
+            response.destroyed = true;
+            return response;
+        }
+
+        this.ensureItemDurability(item);
+
+        if (!Number.isFinite(item.life)) {
+            this.destroyItem(item, { impactX, impactY });
+            response.destroyed = true;
+            return response;
+        }
+
+        item.life -= damage;
+
+        if (item.life <= 0) {
+            this.destroyItem(item, { impactX, impactY });
+            response.destroyed = true;
+            return response;
+        }
+
+        if (Number.isFinite(item.burnThreshold) && item.life <= item.burnThreshold) {
+            this.markItemBurning(item);
+        }
+
+        this.spawnExplosion(impactX, impactY);
+        this.game.forceDraw = true;
+        return response;
     }
 
     newItem(owner, x, y, type, options = {}) {
@@ -309,8 +500,7 @@ class ItemFactory {
             adjustedY = Math.floor(y / 48) * 48;
         }
 
-        const hazardTypes = [ITEM_TYPE_MINE, ITEM_TYPE_BOMB, ITEM_TYPE_DFG];
-        const isHazard = hazardTypes.includes(type);
+        const isHazard = HAZARD_ITEM_TYPES.has(type);
         const notifyServer = options.notifyServer !== false && isHazard;
         const hazardId = options.id || (isHazard ? this.generateHazardId() : null);
 
@@ -337,6 +527,8 @@ class ItemFactory {
             previous: null,
             synced: !notifyServer
         };
+
+        this.ensureItemDurability(item, type);
 
         this.insertItem(item);
 
@@ -505,6 +697,10 @@ class ItemFactory {
             const diffY = Math.floor(building.y) - centerTileY;
             if (Math.abs(diffX) <= BOMB_EXPLOSION_TILE_RADIUS &&
                 Math.abs(diffY) <= BOMB_EXPLOSION_TILE_RADIUS) {
+                if (building.type === BUILDING_COMMAND_CENTER) {
+                    building = building.next;
+                    continue;
+                }
                 building = this.game.buildingFactory.deleteBuilding(building, notifyServer);
                 continue;
             }
@@ -645,6 +841,13 @@ class ItemFactory {
         if (hazard.detonateAt) {
             item.detonateTick = hazard.detonateAt;
         }
+        if (hazard.life !== undefined) {
+            const nextLife = this.toFiniteNumber(hazard.life, item.life);
+            if (Number.isFinite(nextLife)) {
+                item.life = nextLife;
+            }
+        }
+        this.ensureItemDurability(item);
     }
 
     resolveItemType(hazardType) {

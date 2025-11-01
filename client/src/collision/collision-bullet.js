@@ -112,13 +112,18 @@ export const collidedWithItem = (game, bullet) => {
             h: 48,
         };
 
+        if (bullet.sourceId && item.id && bullet.sourceId === item.id) {
+            item = item.next;
+            continue;
+        }
+
         if (collided(itemRect, bullet)) {
-            return true;
+            return item;
         }
 
         item = item.next;
     }
-    return false;
+    return null;
 };
 
 export const collidedWithBuilding = (game, bullet) => {

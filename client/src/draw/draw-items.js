@@ -31,11 +31,33 @@ var getItemsWithingRange = function (itemFactory, player) {
 };
 
 var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
-    var tmpText = new PIXI.Texture(
-        game.textures['imageTurretBase'].baseTexture,
-        new PIXI.Rectangle((item.type - 9) * 48, 0, 48, 48)
+    const baseTexture = game.textures['imageTurretBase']?.baseTexture;
+    if (!baseTexture) {
+        return;
+    }
+    const typeIndex = Math.max(0, Math.min(2, (item.type ?? ITEM_TYPE_TURRET) - ITEM_TYPE_TURRET));
+    const maxLife = Number.isFinite(item?.maxLife) ? item.maxLife : null;
+    const currentLife = Number.isFinite(item?.life) ? item.life : null;
+    const burnThreshold = Number.isFinite(item?.burnThreshold) ? item.burnThreshold : null;
+
+    let damageColumn = 0;
+    if (maxLife && currentLife !== null && currentLife < maxLife) {
+        const ratio = currentLife / maxLife;
+        if (ratio <= 0 || (burnThreshold !== null && currentLife <= burnThreshold)) {
+            damageColumn = 2;
+        } else if (ratio <= 0.66) {
+            damageColumn = 1;
+        }
+    } else if (item?.isBurning) {
+        damageColumn = 2;
+    }
+    damageColumn = Math.max(0, Math.min(2, damageColumn));
+
+    const baseFrame = new PIXI.Texture(
+        baseTexture,
+        new PIXI.Rectangle(damageColumn * 48, typeIndex * 48, 48, 48)
     );
-    itemTiles.addFrame(tmpText, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
+    itemTiles.addFrame(baseFrame, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
 
     let orientation = 0;
     if (Number.isFinite(item.angle)) {

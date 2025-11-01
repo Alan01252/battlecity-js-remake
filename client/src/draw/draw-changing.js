@@ -1,8 +1,8 @@
 import PIXI from '../pixi';
 import { getCityDisplayName } from '../utils/citySpawns';
 
-const EXPLOSION_FRAME_SIZE = 144;
-const EXPLOSION_TOTAL_FRAMES = 8;
+const EXPLOSION_FRAME_SIZE = 48;
+const EXPLOSION_TOTAL_FRAMES = 10;
 const EXPLOSION_FRAME_DURATION = 100;
 const MAYOR_BADGE_OFFSET_Y = 8;
 const MAYOR_FRIENDLY_COLOR = 0x1E5AAF;
@@ -167,8 +167,15 @@ const drawExplosions = (game, stage) => {
     if (!Array.isArray(game.explosions) || game.explosions.length === 0) {
         return;
     }
-    const explosionTexture = game.textures['imageLEExplosion'];
+    const explosionTexture = game.textures['imageSExplosion'] || game.textures['imageLEExplosion'];
     if (!explosionTexture || !explosionTexture.baseTexture) {
+        return;
+    }
+    const framesPerRow = Math.max(1, Math.floor(explosionTexture.baseTexture.width / EXPLOSION_FRAME_SIZE));
+    const rows = Math.max(1, Math.floor(explosionTexture.baseTexture.height / EXPLOSION_FRAME_SIZE));
+    const totalAvailableFrames = framesPerRow * rows;
+    const totalFrames = Math.min(EXPLOSION_TOTAL_FRAMES, totalAvailableFrames);
+    if (totalFrames <= 0) {
         return;
     }
     const now = game.tick || Date.now();
@@ -185,7 +192,7 @@ const drawExplosions = (game, stage) => {
             explosion.nextFrameTick = now + EXPLOSION_FRAME_DURATION;
         }
 
-        if ((explosion.frame || 0) >= EXPLOSION_TOTAL_FRAMES) {
+        if ((explosion.frame || 0) >= totalFrames) {
             game.explosions.splice(i, 1);
             continue;
         }
@@ -194,8 +201,8 @@ const drawExplosions = (game, stage) => {
         const texture = new PIXI.Texture(
             explosionTexture.baseTexture,
             new PIXI.Rectangle(
-                0,
-                frameIndex * EXPLOSION_FRAME_SIZE,
+                (frameIndex % framesPerRow) * EXPLOSION_FRAME_SIZE,
+                Math.floor(frameIndex / framesPerRow) * EXPLOSION_FRAME_SIZE,
                 EXPLOSION_FRAME_SIZE,
                 EXPLOSION_FRAME_SIZE
             )

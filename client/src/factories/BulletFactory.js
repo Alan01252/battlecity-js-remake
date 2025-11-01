@@ -64,13 +64,19 @@ class BulletFactory {
             }
 
             if (collidedWithRock(this.game, bullet)) {
-                console.log("Bullet collided with rock");
                 bullet.life = BULLET_DEAD;
             }
 
-            if (collidedWithItem(this.game, bullet)) {
-                console.log("Bullet collided with item");
-                bullet.life = BULLET_DEAD;
+            const collidedItem = collidedWithItem(this.game, bullet);
+            if (collidedItem) {
+                if (this.game.itemFactory && typeof this.game.itemFactory.handleBulletHit === 'function') {
+                    const result = this.game.itemFactory.handleBulletHit(collidedItem, bullet) || {};
+                    if (result.consumed !== false) {
+                        bullet.life = BULLET_DEAD;
+                    }
+                } else {
+                    bullet.life = BULLET_DEAD;
+                }
             }
 
             if (collidedWithBuilding(this.game, bullet)) {
@@ -78,7 +84,6 @@ class BulletFactory {
             }
 
             if (collidedWithAnotherPlayer(this.game, bullet)) {
-                console.log("Bullet collided with someone else");
                 bullet.life = BULLET_DEAD;
             }
 
@@ -112,20 +117,28 @@ class BulletFactory {
         return returnBullet;
     }
 
-    newBullet(shooter, x, y, type, angle, team = null) {
+    newBullet(shooter, x, y, type, angle, team = null, options = {}) {
         const bulletType = Number.isFinite(type) ? type : 0;
+        const metadata = options || {};
+
+        const resolvedDamage = Number.isFinite(metadata.damage)
+            ? metadata.damage
+            : getBulletDamage(bulletType);
 
         var bullet = {
             "shooter": shooter,
             "x": x,
             "y": y,
             "life": BULLET_ALIVE,
-            "damage": getBulletDamage(bulletType),
+            "damage": resolvedDamage,
             "animation": 0,
             "type": bulletType,
             "angle": angle,
             "team": team,
             "speed": getBulletSpeed(bulletType),
+            "sourceId": metadata.sourceId ?? null,
+            "sourceType": metadata.sourceType ?? null,
+            "targetId": metadata.targetId ?? null,
             "next": null,
             "previous": null
         };

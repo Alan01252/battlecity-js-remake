@@ -104,6 +104,20 @@ export const ITEM_TYPE_SLEEPER = 10;
 export const ITEM_TYPE_PLASMA = 11;
 export const ITEM_TYPE_LASER = 12;
 
+export const ITEM_INITIAL_LIFE = Object.freeze({
+    [ITEM_TYPE_WALL]: 40,
+    [ITEM_TYPE_TURRET]: 32,
+    [ITEM_TYPE_SLEEPER]: 16,
+    [ITEM_TYPE_PLASMA]: 40,
+});
+
+export const ITEM_BURN_THRESHOLDS = Object.freeze({
+    [ITEM_TYPE_WALL]: 20,
+    [ITEM_TYPE_TURRET]: 8,
+    [ITEM_TYPE_SLEEPER]: 16,
+    [ITEM_TYPE_PLASMA]: 20,
+});
+
 export const ITEM_TYPE_LIMITS = {
     [ITEM_TYPE_CLOAK]: 4,
     [ITEM_TYPE_ROCKET]: 4,

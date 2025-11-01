@@ -26,7 +26,8 @@ const FACTORY_ITEM_LIMITS = {
     103: 5,  // Bomb factory
     102: 20, // Medkit factory
     104: 10, // Mine factory
-    105: 1,  // Orb / Cougar factory
+    105: 1,  // Orb 
+    111: 4,// Plasma factory
     101: 4,  // Cougar research factory variant
     110: 5,  // Sleeper factory
     108: 5,  // Wall factory

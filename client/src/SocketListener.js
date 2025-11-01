@@ -119,7 +119,26 @@ class SocketListener extends EventEmitter2 {
 
         this.io.on("bullet_shot", (bullet) => {
             var bullet = JSON.parse(bullet);
-            this.game.bulletFactory.newBullet(bullet.shooter, bullet.x, bullet.y, bullet.type, bullet.angle, bullet.team ?? null)
+            const options = {
+                sourceId: bullet.sourceId ?? null,
+                sourceType: bullet.sourceType ?? null,
+                targetId: bullet.targetId ?? null,
+            };
+            if (bullet.damage !== undefined) {
+                const numericDamage = Number(bullet.damage);
+                if (Number.isFinite(numericDamage)) {
+                    options.damage = numericDamage;
+                }
+            }
+            this.game.bulletFactory.newBullet(
+                bullet.shooter,
+                bullet.x,
+                bullet.y,
+                bullet.type,
+                bullet.angle,
+                bullet.team ?? null,
+                options
+            );
         });
 
         this.io.on("new_icon", (icon) => {

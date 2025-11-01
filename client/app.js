@@ -640,6 +640,7 @@ const resourcesToLoad = [
     { name: 'imgTurretHead', url: assetUrl('skins/BattleCityDX/imgTurretHead.png') },
     { name: 'imgSmoke', url: assetUrl('imgSmoke.png') },
     { name: 'imgLEExplosion', url: assetUrl('imgLExplosion.png') },
+    { name: 'imgSExplosion', url: assetUrl('imgSExplosion.png') },
     {
         name: 'mapData',
         url: assetUrl('map.dat'),
@@ -712,7 +713,8 @@ function setup() {
         resources.imgMoneyUp,
         resources.imgMoneyDown,
         resources.imgSmoke,
-        resources.imgLEExplosion
+        resources.imgLEExplosion,
+        resources.imgSExplosion
     ];
 
     colorKeyTargets.forEach((resource) => applyColorKey(resource));
@@ -740,6 +742,7 @@ function setup() {
     game.textures['smoke'] = resources.imgSmoke.texture;
     game.textures['imageLEExplosion'] = resources.imgLEExplosion.texture;
     game.textures['imgLEExplosion'] = resources.imgLEExplosion.texture;
+    game.textures['imageSExplosion'] = resources.imgSExplosion.texture;
 
 
     setupKeyboardInputs(game);
