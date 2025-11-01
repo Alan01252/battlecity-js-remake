@@ -1,8 +1,22 @@
 import PIXI from '../pixi';
 import { getCityDisplayName } from '../utils/citySpawns';
 
-const EXPLOSION_FRAME_SIZE = 48;
-const EXPLOSION_TOTAL_FRAMES = 10;
+const EXPLOSION_VARIANTS = {
+    small: {
+        frameSize: 48,
+        totalFrames: 10,
+        duration: 100,
+        textureKey: 'imageSExplosion',
+        fallbackKey: 'imageLEExplosion'
+    },
+    large: {
+        frameSize: 144,
+        totalFrames: 8,
+        duration: 90,
+        textureKey: 'imageLEExplosion',
+        fallbackKey: 'imageSExplosion'
+    }
+};
 const EXPLOSION_FRAME_DURATION = 100;
 const MAYOR_BADGE_OFFSET_Y = 8;
 const MAYOR_FRIENDLY_COLOR = 0x1E5AAF;
@@ -167,17 +181,6 @@ const drawExplosions = (game, stage) => {
     if (!Array.isArray(game.explosions) || game.explosions.length === 0) {
         return;
     }
-    const explosionTexture = game.textures['imageSExplosion'] || game.textures['imageLEExplosion'];
-    if (!explosionTexture || !explosionTexture.baseTexture) {
-        return;
-    }
-    const framesPerRow = Math.max(1, Math.floor(explosionTexture.baseTexture.width / EXPLOSION_FRAME_SIZE));
-    const rows = Math.max(1, Math.floor(explosionTexture.baseTexture.height / EXPLOSION_FRAME_SIZE));
-    const totalAvailableFrames = framesPerRow * rows;
-    const totalFrames = Math.min(EXPLOSION_TOTAL_FRAMES, totalAvailableFrames);
-    if (totalFrames <= 0) {
-        return;
-    }
     const now = game.tick || Date.now();
     for (let i = game.explosions.length - 1; i >= 0; i--) {
         const explosion = game.explosions[i];
@@ -185,30 +188,45 @@ const drawExplosions = (game, stage) => {
             game.explosions.splice(i, 1);
             continue;
         }
+        const variantKey = explosion.variant || 'large';
+        const variant = EXPLOSION_VARIANTS[variantKey] || EXPLOSION_VARIANTS.large;
+        const texture = game.textures[variant.textureKey] || game.textures[variant.fallbackKey];
+        if (!texture || !texture.baseTexture) {
+            continue;
+        }
+        const frameSize = variant.frameSize;
+        const totalFrames = variant.totalFrames;
+        const frameDuration = variant.duration ?? EXPLOSION_FRAME_DURATION;
+        const framesPerRow = Math.max(1, Math.floor(texture.baseTexture.width / frameSize));
+        const rows = Math.max(1, Math.floor(texture.baseTexture.height / frameSize));
+        const availableFrames = Math.min(totalFrames, framesPerRow * rows);
+        if (availableFrames <= 0) {
+            continue;
+        }
         if (!explosion.nextFrameTick) {
-            explosion.nextFrameTick = now + EXPLOSION_FRAME_DURATION;
+            explosion.nextFrameTick = now + frameDuration;
         } else if (now >= explosion.nextFrameTick) {
             explosion.frame = (explosion.frame || 0) + 1;
-            explosion.nextFrameTick = now + EXPLOSION_FRAME_DURATION;
+            explosion.nextFrameTick = now + frameDuration;
         }
 
-        if ((explosion.frame || 0) >= totalFrames) {
+        if ((explosion.frame || 0) >= availableFrames) {
             game.explosions.splice(i, 1);
             continue;
         }
 
         const frameIndex = Math.max(0, explosion.frame || 0);
-        const texture = new PIXI.Texture(
-            explosionTexture.baseTexture,
+        const spriteTexture = new PIXI.Texture(
+            texture.baseTexture,
             new PIXI.Rectangle(
-                (frameIndex % framesPerRow) * EXPLOSION_FRAME_SIZE,
-                Math.floor(frameIndex / framesPerRow) * EXPLOSION_FRAME_SIZE,
-                EXPLOSION_FRAME_SIZE,
-                EXPLOSION_FRAME_SIZE
+                (frameIndex % framesPerRow) * frameSize,
+                Math.floor(frameIndex / framesPerRow) * frameSize,
+                frameSize,
+                frameSize
             )
         );
 
-        const sprite = new PIXI.Sprite(texture);
+        const sprite = new PIXI.Sprite(spriteTexture);
         const offsetX = game.player.defaultOffset.x - game.player.offset.x;
         const offsetY = game.player.defaultOffset.y - game.player.offset.y;
 

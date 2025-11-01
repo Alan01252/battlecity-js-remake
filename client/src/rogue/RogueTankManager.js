@@ -25,6 +25,9 @@ const BOMB_FUSE_JITTER = 1200;
 const BOMB_DROP_RADIUS = TILE_SIZE * 7;
 const MAX_LIFETIME = 240000;
 const WANDER_RADIUS = TILE_SIZE * 9;
+const ROGUE_MIN_SPAWN_RADIUS = TILE_SIZE * 18;
+const ROGUE_SPAWN_RADIUS_VARIANCE = TILE_SIZE * 10;
+const ROGUE_SPAWN_MAX_ATTEMPTS = 20;
 
 const toFinite = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -224,12 +227,16 @@ class RogueTankManager {
         const cityY = toFinite(city?.y, 0);
         const centerX = cityX + (TILE_SIZE * 1.5);
         const centerY = cityY + (TILE_SIZE * 1.5);
+        const minDistance = ROGUE_MIN_SPAWN_RADIUS;
+        const maxDistance = ROGUE_MIN_SPAWN_RADIUS + ROGUE_SPAWN_RADIUS_VARIANCE;
 
-        for (let attempt = 0; attempt < 12; attempt += 1) {
+        for (let attempt = 0; attempt < ROGUE_SPAWN_MAX_ATTEMPTS; attempt += 1) {
             const angle = Math.random() * Math.PI * 2;
-            const distance = (TILE_SIZE * 4) + (Math.random() * TILE_SIZE * 5);
-            const spawnX = centerX + Math.cos(angle) * distance;
-            const spawnY = centerY + Math.sin(angle) * distance;
+            const distance = minDistance + (Math.random() * (maxDistance - minDistance));
+            let spawnX = centerX + Math.cos(angle) * distance;
+            let spawnY = centerY + Math.sin(angle) * distance;
+            spawnX = Math.max(HALF_TILE, Math.min((512 * TILE_SIZE) - HALF_TILE, spawnX));
+            spawnY = Math.max(HALF_TILE, Math.min((512 * TILE_SIZE) - HALF_TILE, spawnY));
             if (this.isBlocked(spawnX, spawnY)) {
                 continue;
             }

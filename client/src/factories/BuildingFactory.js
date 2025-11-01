@@ -210,7 +210,8 @@ class BuildingFactory {
                 x: tileX * 48,
                 y: tileY * 48,
                 frame: 0,
-                nextFrameTick: (this.game.tick || Date.now()) + 75
+                nextFrameTick: (this.game.tick || Date.now()) + 75,
+                variant: 'large'
             });
         }
 

@@ -934,7 +934,8 @@ class ItemFactory {
             x,
             y,
             frame: 0,
-            nextFrameTick: null
+            nextFrameTick: null,
+            variant: 'small'
         });
     }
 
