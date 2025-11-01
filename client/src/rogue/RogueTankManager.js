@@ -103,15 +103,15 @@ const rotateVector = (vector, angle) => {
     return normalizeVector(dx, dy);
 };
 
-const describeDirectionFromCity = (cityX, cityY, targetX, targetY) => {
+const describeDirectionFromCity = (cityX, cityY, targetX, targetY, threshold = DIRECTION_THRESHOLD) => {
     const dx = targetX - cityX;
     const dy = targetY - cityY;
     let horizontal = '';
     let vertical = '';
-    if (Math.abs(dx) > DIRECTION_THRESHOLD) {
+    if (Math.abs(dx) > threshold) {
         horizontal = dx > 0 ? 'east' : 'west';
     }
-    if (Math.abs(dy) > DIRECTION_THRESHOLD) {
+    if (Math.abs(dy) > threshold) {
         vertical = dy > 0 ? 'south' : 'north';
     }
     if (horizontal && vertical) {
@@ -129,6 +129,7 @@ class RogueTankManager {
         this.nextSpawnCheck = 0;
         this.instancePrefix = `local_${Math.random().toString(16).slice(-6)}`;
         this.nextAllowedSpawnTime = 0;
+        this.cityRadiusCache = new Map();
     }
 
     sanitizeIdComponent(value) {
@@ -283,6 +284,7 @@ class RogueTankManager {
 
             const tankId = this.createTankId();
             const timestamp = Number.isFinite(now) ? now : (this.game.tick || Date.now());
+            const engageRadius = this.getCityEngageRadius(cityId, timestamp);
             const tank = {
                 id: tankId,
                 offset: {x: spawnX, y: spawnY},
@@ -300,7 +302,9 @@ class RogueTankManager {
                 city: -1,
                 health: 20,
                 cachedVector: null,
-                notifiedAttack: false
+                notifiedAttack: false,
+                engageRadius,
+                nextRadiusRefresh: timestamp + 5000
             };
 
             this.tanks.push(tank);
@@ -329,13 +333,18 @@ class RogueTankManager {
 
         const cityCenter = this.getCityCenter(tank.targetCityId);
         if (cityCenter) {
+            if (!Number.isFinite(tank.engageRadius) || now >= (tank.nextRadiusRefresh || 0)) {
+                tank.engageRadius = this.getCityEngageRadius(tank.targetCityId, now);
+                tank.nextRadiusRefresh = now + 5000;
+            }
+            const engageRadius = Number.isFinite(tank.engageRadius) ? tank.engageRadius : ROGUE_ENGAGE_RADIUS;
             const distSq = distanceSquared(
                 tank.offset.x + HALF_TILE,
                 tank.offset.y + HALF_TILE,
                 cityCenter.x,
                 cityCenter.y
             );
-            if (distSq > (ROGUE_ENGAGE_RADIUS * ROGUE_ENGAGE_RADIUS)) {
+            if (distSq > (engageRadius * engageRadius)) {
                 tank.target = {
                     kind: 'point',
                     x: cityCenter.x,
@@ -343,7 +352,7 @@ class RogueTankManager {
                 };
                 return;
             }
-            this.notifyCityUnderAttack(tank, tank.targetCityId, cityCenter);
+            this.notifyCityUnderAttack(tank, tank.targetCityId, cityCenter, engageRadius);
         }
 
         const turretTarget = this.pickNearestTurret(tank);
@@ -763,7 +772,7 @@ class RogueTankManager {
         this.nextAllowedSpawnTime = now + delay;
     }
 
-    notifyCityUnderAttack(tank, cityId, cityCenter) {
+    notifyCityUnderAttack(tank, cityId, cityCenter, engageRadius) {
         if (!tank || tank.notifiedAttack) {
             return;
         }
@@ -776,7 +785,8 @@ class RogueTankManager {
             cityCenter?.x ?? 0,
             cityCenter?.y ?? 0,
             tank.offset?.x ?? 0,
-            tank.offset?.y ?? 0
+            tank.offset?.y ?? 0,
+            Math.max(DIRECTION_THRESHOLD, (engageRadius || DIRECTION_THRESHOLD) * 0.25)
         );
         const message = direction
             ? `Rogue tank assaulting ${cityName} from the ${direction}.`
@@ -788,6 +798,39 @@ class RogueTankManager {
             timeout: 6500
         });
         tank.notifiedAttack = true;
+    }
+
+    getCityEngageRadius(cityId, now) {
+        const cityKey = Number.isFinite(cityId) ? cityId : parseInt(cityId, 10);
+        if (!Number.isFinite(cityKey)) {
+            return ROGUE_ENGAGE_RADIUS;
+        }
+        const timestamp = Number.isFinite(now) ? now : (this.game.tick || Date.now());
+        const cached = this.cityRadiusCache.get(cityKey);
+        if (cached && (timestamp - cached.timestamp) < 4000) {
+            return cached.radius;
+        }
+        const radius = this.computeCityEngageRadius(cityKey);
+        this.cityRadiusCache.set(cityKey, {
+            radius,
+            timestamp
+        });
+        return radius;
+    }
+
+    computeCityEngageRadius(cityId) {
+        if (!this.game?.buildingFactory || typeof this.game.buildingFactory.measureCityLayout !== 'function') {
+            return ROGUE_ENGAGE_RADIUS;
+        }
+        const layout = this.game.buildingFactory.measureCityLayout(cityId);
+        if (!layout) {
+            return ROGUE_ENGAGE_RADIUS;
+        }
+        const rawRadius = Number.isFinite(layout.maxRadiusSq) && layout.maxRadiusSq > 0 ? Math.sqrt(layout.maxRadiusSq) : 0;
+        if (!Number.isFinite(rawRadius) || rawRadius <= 0) {
+            return ROGUE_ENGAGE_RADIUS;
+        }
+        return Math.max(ROGUE_ENGAGE_RADIUS, rawRadius + (TILE_SIZE * 4));
     }
 }
 

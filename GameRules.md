@@ -26,11 +26,14 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Client handles bullet physics; server currently trusts reported positions and broadcasts them to peers.
 - Mines detonate when an opposing-city tank overlaps their tile, dealing `DAMAGE_MINE` (19) and clearing the mine from the field while leaving allies unaffected. (client/src/collision/collision-helpers.js:54, client/src/play.js:11)
 - Bombs dropped while armed (`B` toggles arming) explode after 5 seconds, wiping nearby items, demolishing buildings within two tiles, and inflicting lethal damage on tanks in the blast radius. (client/src/factories/ItemFactory.js:215, client/src/input/input-keyboard.js:128)
+- Rogue tank assaults now raise a `Rogue Assault` toast as soon as a raider crosses the dynamic perimeter that surrounds every city; the radius expands to match the furthest owned building plus a four-tile buffer so players always get warned before defenses fall. (client/src/rogue/RogueTankManager.js:334, client/src/rogue/RogueTankManager.js:783)
+- Once a wave of rogues is destroyed the manager delays the next spawn by 60–120 seconds, keeping pressure on cities without immediate respawns. (client/src/rogue/RogueTankManager.js:760)
 - The radar UI plots tanks within ~2,400px of the local player, colour-coding friendlies vs enemies; cloaked players stay hidden and dots disappear once targets leave the radar window. (client/src/draw/draw-panel-interface.js:164, client/src/constants.js:4)
 
 ## Buildings & Items
 - Building placement consumes the appropriate resources and links into the building factory's list (`next`/`previous` pointers must remain valid).
 - Mayors can only place a building when their city's cash balance covers `COST_BUILDING`; insufficient funds now reject the placement server-side and refund any optimistic client adjustments. (server/src/BuildingFactory.js:87, client/src/factories/BuildingFactory.js:50)
+- New construction must remain contiguous: non-command center buildings are rejected if their center lies more than 20 tiles (~960px) from the nearest friendly structure, and the client surfaces a toast explaining the rule. The same layout scan feeds rogue assault radius calculations. (client/src/factories/BuildingFactory.js:133, client/src/factories/BuildingFactory.js:414)
 - Factory buildings emit `new_icon` events when they start producing item drops.
 - Dropped items always render using the appropriate sprites (turret heads, sleepers, bombs, walls, mines, etc.), with enemy mines hidden while armed to match legacy behaviour. (client/src/draw/draw-items.js:1)
 - Houses maintain up to two attachment slots for nearby support buildings; the server keeps the attachment list authoritative and rebroadcasts population changes.

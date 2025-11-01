@@ -8,6 +8,30 @@ import {COST_BUILDING} from "../constants";
 import _ from 'underscore';
 import {BUILDING_COMMAND_CENTER} from "../constants";
 import {MAP_SQUARE_BUILDING} from "../constants";
+import {getCityDisplayName} from '../utils/citySpawns';
+
+const TILE_SIZE = 48;
+const MAX_BUILDING_CHAIN_DISTANCE = TILE_SIZE * 20;
+const MAX_BUILDING_CHAIN_DISTANCE_SQ = MAX_BUILDING_CHAIN_DISTANCE * MAX_BUILDING_CHAIN_DISTANCE;
+
+const toFinite = (value, fallback = 0) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+    return fallback;
+};
+
+const distanceSquared = (ax, ay, bx, by) => {
+    const dx = ax - bx;
+    const dy = ay - by;
+    return (dx * dx) + (dy * dy);
+};
 
 var unflatten = function (array, parent, tree) {
 
@@ -104,6 +128,30 @@ class BuildingFactory {
         if (checkBuildingCollision(this.game, building)) {
             console.log("Collision");
             return false;
+        }
+
+        if (isLocalPlacement && type !== BUILDING_COMMAND_CENTER) {
+            const buildingCenter = {
+                x: (toFinite(x, 0) + 1.5) * TILE_SIZE,
+                y: (toFinite(y, 0) + 1.5) * TILE_SIZE
+            };
+            const layout = this.measureCityLayout(cityId, buildingCenter);
+            if (layout.buildingCount > 0) {
+                const nearestSq = layout.nearestDistanceSq;
+                if (nearestSq !== null && nearestSq > MAX_BUILDING_CHAIN_DISTANCE_SQ) {
+                    if (typeof this.game.notify === 'function') {
+                        const cityName = getCityDisplayName(cityId);
+                        const maxTiles = Math.round(MAX_BUILDING_CHAIN_DISTANCE / TILE_SIZE);
+                        this.game.notify({
+                            title: 'Construction Denied',
+                            message: `New structures must be within ${maxTiles} tiles of your existing ${cityName} build grid. Try placing closer to your city.`,
+                            variant: 'warn',
+                            timeout: 6500
+                        });
+                    }
+                    return false;
+                }
+            }
         }
 
         if (notifyServer && this.game.socketListener && this.game.socketListener.sendNewBuilding) {
@@ -361,6 +409,52 @@ class BuildingFactory {
             node = node.next;
         }
         return null;
+    }
+
+    measureCityLayout(cityId, candidateCenter = null) {
+        const numericCityId = Number.isFinite(cityId) ? cityId : parseInt(cityId, 10);
+        const city = this.game.cities?.[numericCityId];
+        const baseX = toFinite(city?.x, 0);
+        const baseY = toFinite(city?.y, 0);
+        const cityCenter = {
+            x: baseX + (TILE_SIZE * 1.5),
+            y: baseY + (TILE_SIZE * 1.5)
+        };
+
+        let node = this.getHead();
+        let maxRadiusSq = 0;
+        const hasCandidate = Number.isFinite(candidateCenter?.x) && Number.isFinite(candidateCenter?.y);
+        let nearestDistanceSq = hasCandidate ? Infinity : null;
+        let buildingCount = 0;
+
+        while (node) {
+            const nodeCity = Number.isFinite(node.city) ? node.city : parseInt(node.city, 10);
+            if (Number.isFinite(nodeCity) && Number.isFinite(numericCityId) && nodeCity !== numericCityId) {
+                node = node.next;
+                continue;
+            }
+            const centerX = (toFinite(node.x, 0) + 1.5) * TILE_SIZE;
+            const centerY = (toFinite(node.y, 0) + 1.5) * TILE_SIZE;
+            const radiusSq = distanceSquared(centerX, centerY, cityCenter.x, cityCenter.y);
+            if (radiusSq > maxRadiusSq) {
+                maxRadiusSq = radiusSq;
+            }
+            if (nearestDistanceSq !== null) {
+                const candidateSq = distanceSquared(centerX, centerY, candidateCenter.x, candidateCenter.y);
+                if (candidateSq < nearestDistanceSq) {
+                    nearestDistanceSq = candidateSq;
+                }
+            }
+            buildingCount += 1;
+            node = node.next;
+        }
+
+        return {
+            cityCenter,
+            maxRadiusSq,
+            nearestDistanceSq,
+            buildingCount
+        };
     }
 
     countBuildingsForCity(cityId) {
