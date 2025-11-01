@@ -35,6 +35,8 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Houses maintain up to two attachment slots for nearby support buildings; the server keeps the attachment list authoritative and rebroadcasts population changes.
 - Dropping a Mine icon spawns an armed mine item that remembers the owner's city, renders via the item tile layer, and is removed from the item list once triggered. (client/src/factories/ItemFactory.js:12, client/src/draw/draw-items.js:27)
 - Bomb icons snap to the tile grid when placed; armed bombs start a 5-second detonation timer, while unarmed bombs remain inert until dropped while armed. (client/src/factories/ItemFactory.js:135, client/src/draw/draw-items.js:14)
+- Cities become *orbable* once they either (a) reach a historical maximum of at least 21 constructed buildings, or (b) have ever operated a Bomb or Orb factory. (server/src/CityManager.js:129)
+- An Orb dropped on an enemy command center now triggers a full city wipe when the target meets the orbable criteria: the command center is destroyed, every building is demolished, all hazards are cleared, and the affected players are sent back to the lobby. (server/src/orb/OrbManager.js:47, server/src/PlayerFactory.js:658)
 - Factory output counts persist locally; on reload, stored `itemsLeft` values recreate the appropriate icons at each factory so players can pick up previously-produced stock. (client/src/factories/BuildingFactory.js:70, client/src/storage/persistence.js:71)
 - Inventory stacks repeatable items (bombs, mines, turrets) and shows a count overlay; selecting a bomb arms the stack so drops inherit the armed state. (client/src/factories/IconFactory.js:20, client/src/draw/draw-panel-interface.js:37)
 - Item pickups respect the classic per-city caps (e.g., Cloaks 4, Bombs 20, Turrets 10, Plasma 5, Orb 1); excess inventory is trimmed during restore and additional pickups are blocked once a cap is reached. (client/src/constants.js:90, client/src/factories/IconFactory.js:18)
@@ -52,6 +54,12 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 ## Networking
 - Socket.IO server runs on port 8021 and rebroadcasts player, bullet, and building updates it receives from clients.
 - Client emits `player`, `bullet_shot`, and `new_building` events when local state changes; listeners reconcile remote entities under `game.otherPlayers`.
+- Orb drops are authoritative: the client sends an `orb:drop` request, the server validates the target and broadcasts the `city:orbed` result (or an `orb:result` failure) so every peer stays in sync. (client/src/factories/ItemFactory.js:134, server/src/orb/OrbManager.js:47)
+
+## Points & Scoring
+- Each city tracks a running `score` tally and the number of successful orbs (`orbs`), both of which are surfaced in the mayor finance panel, lobby listings, and the contextual right-click inspector. (client/src/draw/draw-panel-interface.js:53, client/src/lobby/LobbyManager.js:215)
+- Destroying an orbable enemy city awards points to the attacking city based on the victim's historical growth (max buildings) plus a 5-point bonus per prior orb they had launched; this value is also exposed as the city's `Bounty` in inspection panels. (server/src/CityManager.js:166, client/app.js:305)
+- When a city is destroyed its economy resets to the starting balance, its orb bounty drops to zero, and every occupant must rejoin via the lobby overlay. (server/src/CityManager.js:200, client/src/lobby/LobbyManager.js:410)
 
 ## Houses ↔ Factories
 - Every non-house building (including factories) must attach to a compatible house to accumulate staff population; without an attachment its population is reset to `0`. (server/src/Building.js:75, server/src/BuildingFactory.js:205)

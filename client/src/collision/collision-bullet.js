@@ -49,8 +49,40 @@ export const collidedWithAnotherPlayer = (game, bullet) => {
         }
 
         return collided(getPlayerRect(player), bullet)
-    });
+    }) || collidedWithRogues(game, bullet);
 };
+
+function collidedWithRogues(game, bullet) {
+    const manager = game.rogueTankManager;
+    if (!manager || !Array.isArray(manager.tanks)) {
+        return false;
+    }
+
+    const bulletTeam = bullet.team ?? null;
+
+    for (let i = 0; i < manager.tanks.length; i += 1) {
+        const tank = manager.tanks[i];
+        if (!tank || !tank.offset) {
+            continue;
+        }
+
+        if (bullet.shooter && bullet.shooter === tank.id) {
+            continue;
+        }
+
+        const tankTeam = tank.city ?? null;
+        if (bulletTeam !== null && tankTeam === bulletTeam) {
+            continue;
+        }
+
+        if (collided(getPlayerRect(tank), bullet)) {
+            manager.handleBulletCollision(bullet, tank);
+            return true;
+        }
+    }
+
+    return false;
+}
 
 export const collidedWithCurrentPlayer = (game, bullet) => {
 

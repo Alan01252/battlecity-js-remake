@@ -306,6 +306,21 @@ class HazardManager {
         }
         this.playerFactory.applyDamage(socketId, amount, meta);
     }
+
+    removeHazardsForTeam(teamId, reason = "city_destroyed") {
+        if (teamId === null || teamId === undefined) {
+            return 0;
+        }
+        let removed = 0;
+        for (const hazard of Array.from(this.hazards.values())) {
+            if ((hazard.teamId ?? null) !== teamId) {
+                continue;
+            }
+            this.removeHazard(hazard.id, reason);
+            removed += 1;
+        }
+        return removed;
+    }
 }
 
 module.exports = HazardManager;

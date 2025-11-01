@@ -6,6 +6,7 @@ import {ITEM_TYPE_MINE} from "../constants";
 import {ITEM_TYPE_BOMB} from "../constants";
 import {BOMB_EXPLOSION_TILE_RADIUS} from "../constants";
 import {BOMB_ITEM_TILE_RADIUS} from "../constants";
+import {ITEM_TYPE_ORB} from "../constants";
 
 class ItemFactory {
 
@@ -24,7 +25,8 @@ class ItemFactory {
             ITEM_TYPE_SLEEPER,
             ITEM_TYPE_WALL,
             ITEM_TYPE_MINE,
-            ITEM_TYPE_BOMB
+            ITEM_TYPE_BOMB,
+            ITEM_TYPE_ORB
         ];
 
         this.validShooters = [
@@ -32,6 +34,8 @@ class ItemFactory {
             ITEM_TYPE_PLASMA,
             ITEM_TYPE_SLEEPER,
         ];
+
+        this.pendingOrbItems = [];
 
         if (this.game.socketListener) {
             this.bindSocketEvents(this.game.socketListener);
@@ -46,6 +50,7 @@ class ItemFactory {
         socketListener.on('hazard:spawn', (hazard) => this.onHazardSpawn(hazard));
         socketListener.on('hazard:update', (hazard) => this.onHazardUpdate(hazard));
         socketListener.on('hazard:remove', (hazard) => this.onHazardRemove(hazard));
+        socketListener.on('orb:result', (result) => this.onOrbResult(result));
     }
 
     generateHazardId() {
@@ -237,6 +242,13 @@ class ItemFactory {
 
         this.insertItem(item);
 
+        if (type === ITEM_TYPE_ORB && notifyServer !== false) {
+            this.queueOrbDrop(item, {
+                ownerId,
+                teamId: ownerTeam
+            });
+        }
+
         if (notifyServer && this.game.socketListener) {
             this.pendingHazards.add(item.id);
             this.game.socketListener.spawnHazard({
@@ -263,6 +275,12 @@ class ItemFactory {
             return null;
         }
         const returnItem = item.next;
+        if (Array.isArray(this.pendingOrbItems)) {
+            const index = this.pendingOrbItems.indexOf(item);
+            if (index !== -1) {
+                this.pendingOrbItems.splice(index, 1);
+            }
+        }
         this.detachItem(item);
         this.pendingHazards.delete(item.id);
         return returnItem;
@@ -283,7 +301,8 @@ class ItemFactory {
         }
     }
 
-    detonateBomb(item) {
+    detonateBomb(item, options = {}) {
+        const notifyServer = options.notifyServer !== undefined ? !!options.notifyServer : true;
         const centerTileX = Math.floor((item.x + 24) / 48);
         const centerTileY = Math.floor((item.y + 24) / 48);
 
@@ -311,7 +330,7 @@ class ItemFactory {
             const diffY = Math.floor(building.y) - centerTileY;
             if (Math.abs(diffX) <= BOMB_EXPLOSION_TILE_RADIUS &&
                 Math.abs(diffY) <= BOMB_EXPLOSION_TILE_RADIUS) {
-                building = this.game.buildingFactory.deleteBuilding(building);
+                building = this.game.buildingFactory.deleteBuilding(building, notifyServer);
                 continue;
             }
             building = building.next;
@@ -324,6 +343,33 @@ class ItemFactory {
 
     damagePlayersInRadius() {
         // Damage is applied authoritatively on the server.
+    }
+
+    queueOrbDrop(item, metadata = {}) {
+        if (!item || !this.game || !this.game.socketListener) {
+            return;
+        }
+        const localPlayerId = this.game.player?.id ?? null;
+        const ownerId = metadata.ownerId ?? item.ownerId ?? localPlayerId;
+        if (!localPlayerId || ownerId !== localPlayerId) {
+            return;
+        }
+
+        if (!Array.isArray(this.pendingOrbItems)) {
+            this.pendingOrbItems = [];
+        }
+        this.pendingOrbItems.push(item);
+        item.pendingOrbCheck = true;
+
+        const payload = {
+            id: item.id,
+            x: item.x,
+            y: item.y,
+            ownerId,
+            city: metadata.teamId ?? item.teamId ?? this.game.player?.city ?? null,
+            type: ITEM_TYPE_ORB
+        };
+        this.game.socketListener.sendOrbDrop(payload);
     }
 
     triggerMine(item) {
@@ -382,6 +428,26 @@ class ItemFactory {
         if (hazard.reason === 'bomb_detonated') {
             this.spawnExplosion(hazard.x ?? item.x, hazard.y ?? item.y);
         }
+        this.deleteItem(item);
+        this.game.forceDraw = true;
+    }
+
+    onOrbResult(result) {
+        if (!Array.isArray(this.pendingOrbItems) || !this.pendingOrbItems.length) {
+            return;
+        }
+        const item = this.pendingOrbItems.shift();
+        if (!item) {
+            return;
+        }
+        item.pendingOrbCheck = false;
+
+        const payload = result || {};
+        if (payload.status !== 'detonated') {
+            return;
+        }
+
+        this.spawnExplosion(item.x, item.y);
         this.deleteItem(item);
         this.game.forceDraw = true;
     }

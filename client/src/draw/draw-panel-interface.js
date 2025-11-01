@@ -107,6 +107,30 @@ var drawFinance = (game, stage) => {
     cashText.x = game.maxMapX + 21;
     cashText.y = 226;
     stage.addChild(cashText);
+
+    const scoreValue = Number.isFinite(city.score) ? city.score : parseInt(city.score, 10) || 0;
+    const scoreText = new PIXI.Text(`Score: ${scoreValue}`, {
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fill: 0xFDFEFE,
+        stroke: 0x000000,
+        strokeThickness: 2,
+    });
+    scoreText.x = game.maxMapX + 21;
+    scoreText.y = 244;
+    stage.addChild(scoreText);
+
+    const orbCount = Number.isFinite(city.orbs) ? city.orbs : parseInt(city.orbs, 10) || 0;
+    const orbText = new PIXI.Text(`Orbs: ${orbCount}`, {
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fill: 0xFDFEFE,
+        stroke: 0x000000,
+        strokeThickness: 2,
+    });
+    orbText.x = game.maxMapX + 21;
+    orbText.y = 258;
+    stage.addChild(orbText);
 };
 
 var drawItems = (game, stage) => {

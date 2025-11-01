@@ -1,5 +1,6 @@
 import {TIMER_SHOOT_LASER} from "../constants";
 import {ITEM_TYPE_BOMB} from "../constants";
+import {ITEM_TYPE_LASER} from "../constants";
 /**
  * Created by alan on 27/03/17.
  */
@@ -144,6 +145,31 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
     };
 
     shift.press = function () {
+        const hasLaserEquipped = (() => {
+            if (!game || !game.player || game.player.id === undefined || game.player.id === null) {
+                return false;
+            }
+            if (!game.iconFactory || typeof game.iconFactory.findOwnedIconByType !== 'function') {
+                return false;
+            }
+            const laserIcon = game.iconFactory.findOwnedIconByType(game.player.id, ITEM_TYPE_LASER);
+            if (!laserIcon) {
+                return false;
+            }
+            if (laserIcon.quantity === undefined || laserIcon.quantity === null) {
+                return true;
+            }
+            const quantity = Number.isFinite(laserIcon.quantity)
+                ? laserIcon.quantity
+                : parseInt(laserIcon.quantity, 10);
+            return Number.isFinite(quantity) ? quantity > 0 : false;
+        })();
+
+        if (!hasLaserEquipped) {
+            console.log("Laser unavailable: cannot fire.");
+            return;
+        }
+
         console.log("shift key pressed");
         if (game.tick > lastShot) {
             lastShot = game.tick + TIMER_SHOOT_LASER;

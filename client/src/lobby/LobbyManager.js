@@ -1,3 +1,5 @@
+import { getCityDisplayName } from '../utils/citySpawns';
+
 class LobbyManager {
     constructor(game) {
         this.game = game;
@@ -15,6 +17,7 @@ class LobbyManager {
         this.onLobbyDenied = (payload) => this.handleDenial(payload);
         this.onSocketConnected = () => this.handleConnected();
         this.onSocketDisconnected = (reason) => this.handleDisconnected(reason);
+        this.onLobbyEvicted = (payload) => this.handleEviction(payload);
 
         this.injectStyles();
         this.createOverlay();
@@ -245,6 +248,7 @@ class LobbyManager {
             this.socketListener.off('lobby:denied', this.onLobbyDenied);
             this.socketListener.off('connected', this.onSocketConnected);
             this.socketListener.off('disconnected', this.onSocketDisconnected);
+            this.socketListener.off('lobby:evicted', this.onLobbyEvicted);
         }
         this.socketListener = socketListener;
         socketListener.on('lobby:snapshot', this.onLobbySnapshot);
@@ -253,6 +257,7 @@ class LobbyManager {
         socketListener.on('lobby:denied', this.onLobbyDenied);
         socketListener.on('connected', this.onSocketConnected);
         socketListener.on('disconnected', this.onSocketDisconnected);
+        socketListener.on('lobby:evicted', this.onLobbyEvicted);
     }
 
     show() {
@@ -347,7 +352,19 @@ class LobbyManager {
             const playerCount = Number.isFinite(city.playerCount) ? city.playerCount : 0;
             const meta = document.createElement('div');
             meta.className = 'lobby-city-meta';
-            meta.textContent = `Mayor: ${mayorLabel} • Players: ${playerCount}/${capacity}`;
+            const metaParts = [
+                `Mayor: ${mayorLabel}`,
+                `Players: ${playerCount}/${capacity}`
+            ];
+            const scoreValue = Number.isFinite(city.score) ? city.score : Number(city.score);
+            if (Number.isFinite(scoreValue)) {
+                metaParts.push(`Score: ${scoreValue}`);
+            }
+            const orbsValue = Number.isFinite(city.orbs) ? city.orbs : Number(city.orbs);
+            if (Number.isFinite(orbsValue)) {
+                metaParts.push(`Orbs: ${orbsValue}`);
+            }
+            meta.textContent = metaParts.join(' • ');
 
             info.appendChild(name);
             info.appendChild(meta);
@@ -436,6 +453,35 @@ class LobbyManager {
         if (this.game && this.game.persistence && typeof this.game.persistence.restoreInventory === 'function') {
             this.game.persistence.restoreInventory();
         }
+    }
+
+    handleEviction(details) {
+        this.waiting = false;
+        this.waitingCity = null;
+        this.waitingRole = null;
+        this.inGame = false;
+
+        const cityId = Number.isFinite(details?.city) ? Number(details.city) : null;
+        const attackerId = Number.isFinite(details?.attackerCity) ? Number(details.attackerCity) : null;
+        const points = Number.isFinite(details?.points) ? Number(details.points) : null;
+
+        const cityName = cityId !== null ? getCityDisplayName(cityId) : 'your city';
+        const attackerName = attackerId !== null ? getCityDisplayName(attackerId) : null;
+
+        const fragments = [];
+        if (attackerName) {
+            fragments.push(`${attackerName} destroyed ${cityName}.`);
+        } else {
+            fragments.push(`An enemy orb destroyed ${cityName}.`);
+        }
+        if (points !== null && points > 0) {
+            fragments.push(`They earned ${points} points.`);
+        }
+
+        this.show();
+        this.setStatus(fragments.join(' '), { type: 'error' });
+        this.renderCityList();
+        this.requestSnapshot();
     }
 
     handleDenial(details) {

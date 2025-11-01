@@ -103,6 +103,24 @@ var drawOtherPlayers = (game, stage) => {
     });
 };
 
+const drawRogueTanks = (game, stage) => {
+    const manager = game.rogueTankManager;
+    if (!manager || !Array.isArray(manager.tanks) || manager.tanks.length === 0) {
+        return;
+    }
+
+    manager.tanks.forEach((tank) => {
+        if (!tank || !tank.offset) {
+            return;
+        }
+
+        const sprite = createTankSprite(game, tank, game.player);
+        sprite.x = (tank.offset.x) + (game.player.defaultOffset.x - (game.player.offset.x / 48) * 48);
+        sprite.y = (tank.offset.y) + (game.player.defaultOffset.y - (game.player.offset.y / 48) * 48);
+        stage.addChild(sprite);
+    });
+};
+
 var drawBullets = (game, stage) => {
     var bullet = game.bulletFactory.getHead();
 
@@ -186,6 +204,7 @@ export const drawChanging = (game) => {
 
     drawPlayer(game, game.objectContainer);
     drawOtherPlayers(game, game.objectContainer);
+    drawRogueTanks(game, game.objectContainer);
     drawBullets(game, game.objectContainer);
     drawExplosions(game, game.objectContainer);
 };

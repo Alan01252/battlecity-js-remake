@@ -134,6 +134,9 @@ class BuildingFactory {
         }
 
         this.registerBuilding(socket.id, newBuilding);
+        if (this.cityManager) {
+            this.cityManager.registerBuilding(newBuilding);
+        }
         this.cityManager.recordBuildingCost(newBuilding.cityId);
 
         if (isHouse(newBuilding.type)) {
@@ -225,6 +228,10 @@ class BuildingFactory {
             if (socketSet.size === 0) {
                 this.buildingsBySocket.delete(building.ownerId);
             }
+        }
+
+        if (this.cityManager) {
+            this.cityManager.unregisterBuilding(building);
         }
 
         building.population = 0;
@@ -365,6 +372,24 @@ class BuildingFactory {
         }
         const payload = { ...this.serializeBuilding(building), removed };
         this.io.emit('population:update', payload);
+    }
+
+    destroyCity(cityId, options = {}) {
+        const numericId = Number(cityId);
+        if (!Number.isFinite(numericId)) {
+            return 0;
+        }
+        const broadcast = options.broadcast !== false;
+        const buildings = Array.from(this.buildings.values()).filter((building) => {
+            const candidateCity = building.cityId ?? building.city ?? 0;
+            return Number(candidateCity) === numericId;
+        });
+        let removed = 0;
+        for (const building of buildings) {
+            this.removeBuilding(building.id, broadcast);
+            removed += 1;
+        }
+        return removed;
     }
 }
 

@@ -249,6 +249,18 @@ class SocketListener extends EventEmitter2 {
             }
             this.emit('hazard:remove', hazard);
         });
+        this.io.on("orb:result", (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('orb:result', data);
+        });
+        this.io.on("city:orbed", (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('city:orbed', data);
+        });
+        this.io.on("lobby:evicted", (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('lobby:evicted', data);
+        });
     }
 
     sendNewBuilding(building) {
@@ -371,6 +383,14 @@ class SocketListener extends EventEmitter2 {
             return;
         }
         this.io.emit('hazard:remove', JSON.stringify({ id }));
+    }
+
+    sendOrbDrop(drop) {
+        if (!this.io || this.io.disconnected || drop === null || drop === undefined) {
+            return;
+        }
+        const payload = (typeof drop === 'string') ? drop : JSON.stringify(drop);
+        this.io.emit('orb:drop', payload);
     }
 
     createPlayerPayload() {

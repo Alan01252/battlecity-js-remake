@@ -243,6 +243,63 @@ class PlayerFactory {
         return null;
     }
 
+    getPlayer(socketId) {
+        if (!socketId) {
+            return null;
+        }
+        return this.game.players[socketId] || null;
+    }
+
+    evictCityPlayers(cityId, options = {}) {
+        const numericCity = Number(cityId);
+        if (!Number.isFinite(numericCity)) {
+            return 0;
+        }
+
+        const toEvict = [];
+        Object.entries(this.game.players).forEach(([socketId, player]) => {
+            if (!player) {
+                return;
+            }
+            const playerCity = Number(player.city);
+            if (!Number.isFinite(playerCity) || playerCity !== numericCity) {
+                return;
+            }
+            toEvict.push({ socketId, player });
+        });
+
+        if (!toEvict.length) {
+            return 0;
+        }
+
+        const reason = options.reason || 'orb';
+        const attackerCity = options.attackerCity ?? null;
+        const points = options.points ?? null;
+
+        toEvict.forEach(({ socketId, player }) => {
+            const socket = (this.io && this.io.sockets && this.io.sockets.sockets)
+                ? this.io.sockets.sockets.get(socketId)
+                : null;
+
+            if (socket) {
+                socket.emit('lobby:evicted', JSON.stringify({
+                    city: numericCity,
+                    reason,
+                    attackerCity,
+                    points
+                }));
+            }
+
+            this.releaseSlot(player);
+            delete this.game.players[socketId];
+            if (this.io) {
+                this.io.emit('player:removed', JSON.stringify({ id: player.id }));
+            }
+        });
+
+        return toEvict.length;
+    }
+
     applyDamage(socketId, amount, meta) {
         const player = this.game.players[socketId];
         if (!player) {
@@ -611,7 +668,15 @@ class PlayerFactory {
             openMayor: state.openMayor,
             openRecruits: state.openRecruits,
             hasRecruitVacancy: state.openRecruits > 0,
-            maxRecruits: this.maxRecruitsPerCity
+            maxRecruits: this.maxRecruitsPerCity,
+            score: (() => {
+                const city = this.game.cities ? this.game.cities[state.cityId] : null;
+                return city ? Number(city.score) || 0 : 0;
+            })(),
+            orbs: (() => {
+                const city = this.game.cities ? this.game.cities[state.cityId] : null;
+                return city ? Number(city.orbs) || 0 : 0;
+            })()
         };
     }
 

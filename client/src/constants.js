@@ -55,6 +55,8 @@ export const HAS_BUILT = 2;
 export const CAN_BUILD_HOSPITAL = 200;
 export const CAN_BUILD_HOUSE = 300;
 
+export const CAN_BUILD_LASER_RESEARCH = 412;
+export const CAN_BUILD_LASER_FACTORY = 112;
 export const CAN_BUILD_BAZOOKA_RESEARCH = 401;
 export const CAN_BUILD_BAZOOKA_FACTORY = 101;
 export const CAN_BUILD_TURRET_RESEARCH = 409;
@@ -107,6 +109,7 @@ export const ITEM_TYPE_LIMITS = {
     [ITEM_TYPE_TURRET]: 10,
     [ITEM_TYPE_SLEEPER]: 5,
     [ITEM_TYPE_PLASMA]: 5,
+    [ITEM_TYPE_LASER]: 4,
 };
 
 export const BUILD_TREE_CONFIG = [
@@ -127,6 +130,24 @@ export const BUILD_TREE_CONFIG = [
         image: BUILDING_HOUSE,
         parent: 0,
         initial: CAN_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_LASER_RESEARCH',
+        type: CAN_BUILD_LASER_RESEARCH,
+        label: 'Laser Research',
+        icon: 1,
+        image: BUILDING_RESEARCH,
+        parent: CAN_BUILD_HOUSE,
+        initial: CAN_BUILD,
+    },
+    {
+        key: 'CAN_BUILD_LASER_FACTORY',
+        type: CAN_BUILD_LASER_FACTORY,
+        label: 'Laser Factory',
+        icon: 1,
+        image: BUILDING_FACTORY,
+        parent: CAN_BUILD_LASER_RESEARCH,
+        initial: CANT_BUILD,
     },
     {
         key: 'CAN_BUILD_BAZOOKA_RESEARCH',

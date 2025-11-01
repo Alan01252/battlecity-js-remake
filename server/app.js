@@ -18,6 +18,7 @@ var PlayerFactory = require('./src/PlayerFactory');
 var BulletFactory = require('./src/BulletFactory');
 var BuildingFactory = require('./src/BuildingFactory');
 var HazardManager = require('./src/hazards/HazardManager');
+var OrbManager = require('./src/orb/OrbManager');
 
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -44,6 +45,14 @@ const buildingFactory = new BuildingFactory(game);
 buildingFactory.listen(io);
 const hazardManager = new HazardManager(game, playerFactory);
 hazardManager.setIo(io);
+const orbManager = new OrbManager({
+    game,
+    cityManager: buildingFactory.cityManager,
+    playerFactory,
+    buildingFactory,
+    hazardManager
+});
+orbManager.setIo(io);
 
 const toFiniteNumber = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -142,12 +151,25 @@ const collectCityInfo = (cityId) => {
         }
     }
 
-    const cityState = buildingFactory && buildingFactory.cityManager
-        ? buildingFactory.cityManager.getCity(id)
+    const cityManager = buildingFactory && buildingFactory.cityManager
+        ? buildingFactory.cityManager
+        : null;
+    const cityState = cityManager
+        ? cityManager.getCity(id)
         : (game.cities && game.cities[id]) || null;
 
-    const uptimeInMinutes = cityState && cityState.updatedAt
-        ? Math.max(0, Math.floor((Date.now() - cityState.updatedAt) / 60000))
+    const orbPoints = cityState && cityManager
+        ? cityManager.getOrbValue(cityState)
+        : 0;
+    const cityOrbs = cityState ? Number(cityState.orbs) || 0 : 0;
+    const cityScore = cityState ? Number(cityState.score) || 0 : 0;
+    const isOrbable = cityManager ? cityManager.isOrbable(id) : false;
+
+    const startedAt = cityState && cityState.startedAt
+        ? cityState.startedAt
+        : (cityState && cityState.updatedAt) || null;
+    const uptimeInMinutes = startedAt
+        ? Math.max(0, Math.floor((Date.now() - startedAt) / 60000))
         : 0;
 
     return {
@@ -157,9 +179,10 @@ const collectCityInfo = (cityId) => {
         mayorLabel: mayorLabel,
         playerCount: players.length,
         buildingCount,
-        isOrbable: false,
-        orbs: null,
-        orbPoints: null,
+        isOrbable,
+        orbs: cityOrbs,
+        orbPoints,
+        score: cityScore,
         uptimeInMinutes,
     };
 };
@@ -183,6 +206,9 @@ io.on('connection', (socket) => {
         if (info) {
             socket.emit('city:info', info);
         }
+    });
+    socket.on('orb:drop', (payload) => {
+        orbManager.handleDrop(socket, payload);
     });
     socket.on('disconnect', () => {
         hazardManager.onDisconnect(socket.id);

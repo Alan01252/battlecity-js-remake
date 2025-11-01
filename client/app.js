@@ -20,6 +20,7 @@ import BuildingFactory from "./src/factories/BuildingFactory";
 import BulletFactory from "./src/factories/BulletFactory"
 import IconFactory from "./src/factories/IconFactory";
 import ItemFactory from "./src/factories/ItemFactory";
+import RogueTankManager from "./src/rogue/RogueTankManager";
 
 import SocketListener from "./src/SocketListener"
 import {setupBuildingMenu} from "./src/draw/draw-building-interface";
@@ -301,6 +302,13 @@ const buildCityPanelMessage = (cityId, data = {}) => {
         `Size:    ${buildingCount} building${buildingCount === 1 ? '' : 's'}`
     ];
 
+    if (data.score !== undefined) {
+        const scoreValue = Number.isFinite(data.score)
+            ? data.score
+            : toFiniteNumber(data.score, 0);
+        lines.push(`Score:   ${scoreValue} pts`);
+    }
+
     if (data.isOrbable && data.orbPoints !== undefined) {
         const points = Number.isFinite(data.orbPoints)
             ? data.orbPoints
@@ -374,6 +382,7 @@ game.lobby = new LobbyManager(game);
 game.lobby.attachSocket(game.socketListener);
 game.iconFactory = new IconFactory(game);
 game.itemFactory = new ItemFactory(game);
+game.rogueTankManager = new RogueTankManager(game);
 
 const resourcesToLoad = [
     { name: 'imgTanks', url: assetUrl('imgTanks.png') },
@@ -569,6 +578,24 @@ function setup() {
         } else {
             city.grossIncome = city.income - (city.itemProduction + city.research + city.hospital + city.construction);
         }
+        if (data.orbPoints !== undefined) {
+            city.orbPoints = toFiniteNumber(data.orbPoints, city.orbPoints ?? 0);
+        }
+        if (data.score !== undefined) {
+            city.score = toFiniteNumber(data.score, city.score ?? 0);
+        }
+        if (data.orbs !== undefined) {
+            city.orbs = toFiniteNumber(data.orbs, city.orbs ?? 0);
+        }
+        if (data.isOrbable !== undefined) {
+            city.isOrbable = !!data.isOrbable;
+        }
+        if (data.currentBuildings !== undefined) {
+            city.currentBuildings = toFiniteNumber(data.currentBuildings, city.currentBuildings ?? 0);
+        }
+        if (data.maxBuildings !== undefined) {
+            city.maxBuildings = toFiniteNumber(data.maxBuildings, city.maxBuildings ?? 0);
+        }
         city.updatedAt = data.updatedAt ? toFiniteNumber(data.updatedAt, Date.now()) : Date.now();
         game.forceDraw = true;
     });
@@ -577,6 +604,75 @@ function setup() {
             return;
         }
         game.showCityInfo(info);
+    });
+    game.socketListener.on('orb:result', (result) => {
+        if (!result) {
+            return;
+        }
+        if (result.status === 'detonated') {
+            const targetLabel = (result.targetCity !== undefined && result.targetCity !== null)
+                ? getCityDisplayName(result.targetCity)
+                : 'Enemy city';
+            const pointsAwarded = toFiniteNumber(result.points, 0);
+            const lines = [
+                `Destroyed ${targetLabel}.`,
+                pointsAwarded > 0 ? `Awarded ${pointsAwarded} points.` : null
+            ].filter(Boolean);
+            game.setPanelMessage({
+                heading: 'Orb Successful',
+                lines
+            });
+            game.forceDraw = true;
+            return;
+        }
+        if (result.status === 'idle' || result.status === 'rejected') {
+            let description = 'The orb failed to trigger.';
+            if (result.reason === 'not_orbable') {
+                description = 'Target city is not orbable yet.';
+            } else if (result.reason === 'no_target') {
+                description = 'An orb must land on an enemy command center.';
+            }
+            game.setPanelMessage({
+                heading: 'Orb Inert',
+                lines: [description]
+            });
+            game.forceDraw = true;
+        }
+    });
+    game.socketListener.on('city:orbed', (data) => {
+        if (!data) {
+            return;
+        }
+        const attackerName = getCityDisplayName(data.attackerCity);
+        const targetName = getCityDisplayName(data.targetCity);
+        const points = toFiniteNumber(data.points, 0);
+        const lines = [
+            `${attackerName} destroyed ${targetName}.`,
+            points > 0 ? `They earned ${points} points.` : null
+        ].filter(Boolean);
+        game.setPanelMessage({
+            heading: 'City Destroyed',
+            lines
+        });
+        if (Number.isFinite(data.targetCity) && game.cities?.[data.targetCity]) {
+            const city = game.cities[data.targetCity];
+            city.orbPoints = 0;
+            city.isOrbable = false;
+            city.currentBuildings = toFiniteNumber(city.currentBuildings, 1);
+            city.maxBuildings = Math.max(1, toFiniteNumber(city.maxBuildings, 1));
+            city.updatedAt = Date.now();
+        }
+        game.forceDraw = true;
+    });
+    game.socketListener.on('lobby:evicted', (payload) => {
+        if (game.player) {
+            game.player.city = null;
+            game.player.isMayor = false;
+        }
+        if (game.lobby && typeof game.lobby.handleEviction === 'function') {
+            game.lobby.handleEviction(payload);
+        }
+        game.forceDraw = true;
     });
     game.socketListener.on('build:denied', (payload) => {
         let data = payload;
@@ -607,9 +703,6 @@ function setup() {
      app.stage.addChild(objectContainer);
      app.stage.addChild(panelContainer);
 
-
-     game.iconFactory.newIcon(null, 1304, 1540, 12);
-     game.itemFactory.newItem(null, 1500, 1800, 12);
 
      setupBuildingMenu(game);
 
@@ -648,6 +741,9 @@ function gameLoop() {
         game.socketListener.cycle();
     }
     game.itemFactory.cycle();
+    if (game.rogueTankManager) {
+        game.rogueTankManager.update();
+    }
 
     setupBuildingMenu(game);
     drawGround(game, groundTiles);
