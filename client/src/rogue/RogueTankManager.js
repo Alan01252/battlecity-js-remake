@@ -3,6 +3,7 @@ import {ITEM_TYPE_TURRET} from '../constants';
 import {ITEM_TYPE_PLASMA} from '../constants';
 import {ITEM_TYPE_BOMB} from '../constants';
 import {rectangleCollision} from '../collision/collision-helpers';
+import {getCityDisplayName} from '../utils/citySpawns';
 
 const TILE_SIZE = 48;
 const HALF_TILE = TILE_SIZE / 2;
@@ -29,7 +30,10 @@ const ROGUE_ENGAGE_RADIUS = TILE_SIZE * 11;
 const ROGUE_MIN_SPAWN_RADIUS = TILE_SIZE * 13;
 const ROGUE_SPAWN_RADIUS_VARIANCE = TILE_SIZE * 7;
 const ROGUE_SPAWN_MAX_ATTEMPTS = 20;
+const RESPAWN_BASE_DELAY = 60000;
+const RESPAWN_DELAY_JITTER = 60000;
 const AVOIDANCE_ANGLES = Object.freeze([Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]);
+const DIRECTION_THRESHOLD = TILE_SIZE * 2.5;
 
 const toFinite = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -99,6 +103,23 @@ const rotateVector = (vector, angle) => {
     return normalizeVector(dx, dy);
 };
 
+const describeDirectionFromCity = (cityX, cityY, targetX, targetY) => {
+    const dx = targetX - cityX;
+    const dy = targetY - cityY;
+    let horizontal = '';
+    let vertical = '';
+    if (Math.abs(dx) > DIRECTION_THRESHOLD) {
+        horizontal = dx > 0 ? 'east' : 'west';
+    }
+    if (Math.abs(dy) > DIRECTION_THRESHOLD) {
+        vertical = dy > 0 ? 'south' : 'north';
+    }
+    if (horizontal && vertical) {
+        return `${vertical}-${horizontal}`;
+    }
+    return vertical || horizontal || '';
+};
+
 class RogueTankManager {
 
     constructor(game) {
@@ -107,6 +128,7 @@ class RogueTankManager {
         this.nextId = 1;
         this.nextSpawnCheck = 0;
         this.instancePrefix = `local_${Math.random().toString(16).slice(-6)}`;
+        this.nextAllowedSpawnTime = 0;
     }
 
     sanitizeIdComponent(value) {
@@ -163,13 +185,14 @@ class RogueTankManager {
 
         if (now >= this.nextSpawnCheck) {
             this.nextSpawnCheck = now + SPAWN_EVALUATION_INTERVAL;
-            this.evaluateSpawns();
+            this.evaluateSpawns(now);
         }
 
         this.updateTanks(now);
     }
 
-    evaluateSpawns() {
+    evaluateSpawns(now) {
+        const timestamp = Number.isFinite(now) ? now : (this.game.tick || Date.now());
         const cities = this.game.cities || [];
         if (!cities.length) {
             return;
@@ -177,6 +200,10 @@ class RogueTankManager {
 
         let globalSlots = Math.max(0, MAX_GLOBAL_TANKS - this.tanks.length);
         if (globalSlots === 0) {
+            return;
+        }
+
+        if (this.tanks.length === 0 && this.nextAllowedSpawnTime > 0 && timestamp < this.nextAllowedSpawnTime) {
             return;
         }
 
@@ -194,7 +221,7 @@ class RogueTankManager {
             const targetPerCity = Math.min(desired, MAX_TANKS_PER_CITY);
             const deficit = Math.min(globalSlots, targetPerCity - existing.length);
             for (let i = 0; i < deficit; i += 1) {
-                if (this.spawnTankNearCity(city, index)) {
+                if (this.spawnTankNearCity(city, index, timestamp)) {
                     globalSlots -= 1;
                     if (globalSlots <= 0) {
                         return;
@@ -235,7 +262,7 @@ class RogueTankManager {
         return buildingCount >= (CITY_SIZE_THRESHOLD - 3);
     }
 
-    spawnTankNearCity(city, cityId) {
+    spawnTankNearCity(city, cityId, now) {
         const cityX = toFinite(city?.x, 0);
         const cityY = toFinite(city?.y, 0);
         const centerX = cityX + (TILE_SIZE * 1.5);
@@ -255,7 +282,7 @@ class RogueTankManager {
             }
 
             const tankId = this.createTankId();
-            const now = this.game.tick || Date.now();
+            const timestamp = Number.isFinite(now) ? now : (this.game.tick || Date.now());
             const tank = {
                 id: tankId,
                 offset: {x: spawnX, y: spawnY},
@@ -264,15 +291,16 @@ class RogueTankManager {
                 isMoving: 0,
                 targetCityId: cityId,
                 target: null,
-                nextDecisionAt: now + 250 + Math.random() * 250,
-                nextTargetRefresh: now + Math.random() * 500,
-                fireCooldown: now + 1400 + Math.random() * 900,
-                bombCooldown: now + 3800 + Math.random() * 2200,
+                nextDecisionAt: timestamp + 250 + Math.random() * 250,
+                nextTargetRefresh: timestamp + Math.random() * 500,
+                fireCooldown: timestamp + 1400 + Math.random() * 900,
+                bombCooldown: timestamp + 3800 + Math.random() * 2200,
                 activeBombs: [],
-                spawnedAt: now,
+                spawnedAt: timestamp,
                 city: -1,
                 health: 20,
-                cachedVector: null
+                cachedVector: null,
+                notifiedAttack: false
             };
 
             this.tanks.push(tank);
@@ -315,6 +343,7 @@ class RogueTankManager {
                 };
                 return;
             }
+            this.notifyCityUnderAttack(tank, tank.targetCityId, cityCenter);
         }
 
         const turretTarget = this.pickNearestTurret(tank);
@@ -722,7 +751,43 @@ class RogueTankManager {
                 this.game.itemFactory.deleteItem(entry.item);
             });
         }
+        if (this.tanks.length === 0) {
+            this.scheduleNextSpawn();
+        }
         this.game.forceDraw = true;
+    }
+
+    scheduleNextSpawn() {
+        const now = this.game.tick || Date.now();
+        const delay = RESPAWN_BASE_DELAY + Math.random() * RESPAWN_DELAY_JITTER;
+        this.nextAllowedSpawnTime = now + delay;
+    }
+
+    notifyCityUnderAttack(tank, cityId, cityCenter) {
+        if (!tank || tank.notifiedAttack) {
+            return;
+        }
+        const notify = this.game?.notify;
+        if (typeof notify !== 'function') {
+            return;
+        }
+        const cityName = getCityDisplayName(cityId);
+        const direction = describeDirectionFromCity(
+            cityCenter?.x ?? 0,
+            cityCenter?.y ?? 0,
+            tank.offset?.x ?? 0,
+            tank.offset?.y ?? 0
+        );
+        const message = direction
+            ? `Rogue tank assaulting ${cityName} from the ${direction}.`
+            : `Rogue tank assaulting ${cityName}.`;
+        notify({
+            title: 'Rogue Assault',
+            message,
+            variant: 'warn',
+            timeout: 6500
+        });
+        tank.notifiedAttack = true;
     }
 }
 
