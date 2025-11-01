@@ -281,6 +281,7 @@ class SocketListener extends EventEmitter2 {
             if (!data || !data.id) {
                 return;
             }
+            this.emit('player:dead', data);
             this.applyHealthUpdate({ id: data.id, health: 0, source: data.reason });
         });
 

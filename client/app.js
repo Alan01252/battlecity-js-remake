@@ -5,9 +5,7 @@ import * as mapBuilder from "./src/mapBuilder";
 import * as cityBuilder from "./src/cityBuilder";
 
 import {play} from './src/play';
-import {RESOLUTION_X} from "./src/constants";
-import {RESOLUTION_Y} from "./src/constants";
-import {MAX_HEALTH} from "./src/constants";
+import { RESOLUTION_X, RESOLUTION_Y, MAX_HEALTH, COST_BUILDING, LABELS } from "./src/constants";
 
 import {setupKeyboardInputs} from './src/input/input-keyboard';
 import {setupMouseInputs} from './src/input/input-mouse';
@@ -30,6 +28,7 @@ import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 import {getCitySpawn, getCityDisplayName} from "./src/utils/citySpawns";
 import LobbyManager from "./src/lobby/LobbyManager";
+import NotificationManager from "./src/ui/NotificationManager";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -235,6 +234,16 @@ document.body.appendChild(orbHintElement);
 game.orbHintElement = orbHintElement;
 game.lastOrbHintMessage = '';
 
+game.notificationManager = new NotificationManager();
+game.notify = (payload) => {
+    if (!game.notificationManager) {
+        return null;
+    }
+    return game.notificationManager.notify(payload);
+};
+game.cityFinanceFlags = new Map();
+game.mapOverlayActive = false;
+
 const describeDirection = (dx, dy, threshold = TILE_SIZE_PX) => {
     let horizontal = '';
     let vertical = '';
@@ -289,6 +298,52 @@ const resolveCityName = (city, index) => {
         return city.name;
     }
     return getCityDisplayName(index);
+};
+
+const BUILDING_LABEL_LOOKUP = Object.values(LABELS || {}).reduce((acc, entry) => {
+    if (!entry || entry.TYPE === undefined) {
+        return acc;
+    }
+    acc[entry.TYPE] = entry.LABEL;
+    return acc;
+}, {});
+
+const collectStaffSummary = (game, cityId) => {
+    const summary = {
+        totalPopulation: 0,
+        totalBuildings: 0,
+        staffedBuildings: 0,
+        houses: 0,
+        labels: new Map(),
+    };
+    if (!game || !game.buildingFactory || typeof game.buildingFactory.getHead !== 'function') {
+        return summary;
+    }
+    let node = game.buildingFactory.getHead();
+    while (node) {
+        const nodeCity = normaliseCityId(node.city, null);
+        if (nodeCity === cityId) {
+            summary.totalBuildings += 1;
+            const population = toFiniteNumber(node.population, 0);
+            const clampedPopulation = Number.isFinite(population) ? Math.max(0, population) : 0;
+            summary.totalPopulation += clampedPopulation;
+            if (clampedPopulation > 0) {
+                summary.staffedBuildings += 1;
+            }
+            const label = BUILDING_LABEL_LOOKUP[node.type] || 'Structure';
+            if (!summary.labels.has(label)) {
+                summary.labels.set(label, { count: 0, population: 0 });
+            }
+            const metrics = summary.labels.get(label);
+            metrics.count += 1;
+            metrics.population += clampedPopulation;
+            if (label && label.toLowerCase().includes('house')) {
+                summary.houses += 1;
+            }
+        }
+        node = node.next;
+    }
+    return summary;
 };
 
 game.updateOrbHint = (options = {}) => {
@@ -583,6 +638,7 @@ game.setPanelMessage = (message) => {
 };
 
 game.clearPanelMessage = () => {
+    game.mapOverlayActive = false;
     applyPanelMessage(DEFAULT_PANEL_MESSAGE);
 };
 
@@ -608,6 +664,209 @@ game.showCityInfo = (cityOrData, overrides = {}) => {
     const message = buildCityPanelMessage(normalisedId, data || {});
     applyPanelMessage(message);
 };
+
+game.showStaffSummary = () => {
+    const cityId = normaliseCityId(game.player && game.player.city, null);
+    if (cityId === null) {
+        if (game.notify) {
+            game.notify({
+                title: 'Staff Overview',
+                message: 'Join a city to view staffing information.',
+                variant: 'warn'
+            });
+        }
+        return;
+    }
+    const summary = collectStaffSummary(game, cityId);
+    const cityName = getCityDisplayName(cityId);
+    const lines = [
+        `Population: ${summary.totalPopulation}`,
+        `Buildings: ${summary.totalBuildings}`,
+        `Staffed:   ${summary.staffedBuildings}`,
+    ];
+    if (summary.houses > 0) {
+        lines.push(`Housing:  ${summary.houses}`);
+    }
+    const populatedSegments = Array.from(summary.labels.entries())
+        .filter(([, metrics]) => metrics.population > 0)
+        .sort((a, b) => b[1].population - a[1].population)
+        .slice(0, 3);
+    if (populatedSegments.length) {
+        populatedSegments.forEach(([label, metrics]) => {
+            lines.push(`${label}: ${metrics.population}`);
+        });
+    } else {
+        lines.push('Factories need staff before production begins.');
+    }
+    game.setPanelMessage({
+        heading: `${cityName} Staff`,
+        lines
+    });
+    if (game.notify) {
+        game.notify({
+            title: 'Staff Overview',
+            message: `${cityName}: ${summary.totalPopulation} population across ${summary.totalBuildings} structures.`,
+            variant: 'info',
+            timeout: 4600
+        });
+    }
+    game.forceDraw = true;
+};
+
+game.toggleMapOverlay = () => {
+    game.mapOverlayActive = !game.mapOverlayActive;
+    if (game.mapOverlayActive) {
+        game.setPanelMessage({
+            heading: 'Tactical Map',
+            lines: [
+                'Full-screen map is still under construction.',
+                'Use the radar and right-click inspections for intel.',
+                'Notifications highlight city threats in real time.'
+            ]
+        });
+        if (game.notify) {
+            game.notify({
+                title: 'Tactical Map',
+                message: 'Radar and notifications provide situational awareness until the full map returns.',
+                variant: 'info',
+                timeout: 5200
+            });
+        }
+    } else {
+        game.clearPanelMessage();
+    }
+    game.forceDraw = true;
+};
+
+game.showPlayerCityInfo = () => {
+    const cityId = normaliseCityId(game.player && game.player.city, null);
+    if (cityId === null) {
+        if (game.notify) {
+            game.notify({
+                title: 'City Intel',
+                message: 'Join a city to view local intel.',
+                variant: 'warn'
+            });
+        }
+        return;
+    }
+    game.showCityInfo(cityId);
+    if (game.notify) {
+        game.notify({
+            title: 'City Intel',
+            message: `Showing intel for ${getCityDisplayName(cityId)} in the panel.`,
+            variant: 'info',
+            timeout: 3600
+        });
+    }
+};
+
+game.showPointsSummary = () => {
+    const cityId = normaliseCityId(game.player && game.player.city, null);
+    if (cityId === null) {
+        if (game.notify) {
+            game.notify({
+                title: 'Points Overview',
+                message: 'Join a city to review point totals.',
+                variant: 'warn'
+            });
+        }
+        return;
+    }
+    const city = game.cities?.[cityId] || {};
+    const score = toFiniteNumber(city.score, 0);
+    const orbs = toFiniteNumber(city.orbs, 0);
+    const bounty = toFiniteNumber(city.orbPoints, 0);
+    const lines = [
+        `City score: ${score}`,
+        `Orbs fired: ${orbs}`,
+        `Orb bounty: ${bounty}`,
+        'Monthly leaderboards will surface in a future patch.'
+    ];
+    game.setPanelMessage({
+        heading: `${getCityDisplayName(cityId)} Points`,
+        lines
+    });
+    if (game.notify) {
+        game.notify({
+            title: 'Points Overview',
+            message: `${getCityDisplayName(cityId)} currently holds ${score} points.`,
+            variant: 'info',
+            timeout: 4000
+        });
+    }
+    game.forceDraw = true;
+};
+
+game.openOptionsPanel = () => {
+    game.setPanelMessage({
+        heading: 'Options (Preview)',
+        lines: [
+            'In-game configuration UI is still on the roadmap.',
+            'Use the lobby overlay to change cities or roles.',
+            'See AGENTS.md for developer setup and tweaks.'
+        ]
+    });
+    if (game.notify) {
+        game.notify({
+            title: 'Options',
+            message: 'Configuration controls are coming soon. The panel lists available workarounds.',
+            variant: 'warn'
+        });
+    }
+    game.forceDraw = true;
+};
+
+game.showHelpMessage = () => {
+    game.setPanelMessage({
+        heading: 'Help',
+        lines: [
+            'Movement: WASD / Arrow keys',
+            'Fire: SHIFT  •  Drop item: Space  •  Arm bomb: B',
+            'Medkit: H  •  Cloak: C  •  DFG freeze: use from inventory',
+            'Right-click structures for city intel and build options.'
+        ]
+    });
+    if (game.notify) {
+        game.notify({
+            title: 'Help',
+            message: 'Core controls and tips are listed in the panel. GameRules.md tracks full mechanics.',
+            variant: 'info',
+            timeout: 6000
+        });
+    }
+    game.forceDraw = true;
+};
+
+game.toggleBuildMenuFromPanel = () => {
+    game.showBuildMenu = !game.showBuildMenu;
+    if (game.notify) {
+        game.notify({
+            title: 'Build Menu',
+            message: game.showBuildMenu
+                ? 'Select a blueprint to place or choose Demolish.'
+                : 'Build menu hidden.',
+            variant: 'info',
+            timeout: 3600
+        });
+    }
+    game.forceDraw = true;
+};
+
+game.requestExitToLobby = () => {
+    if (game.lobby && typeof game.lobby.show === 'function') {
+        game.lobby.show();
+        game.lobby.setStatus('Lobby opened. Choose a city slot or wait for the next match.', { type: 'info' });
+    }
+    if (game.notify) {
+        game.notify({
+            title: 'Exit to Lobby',
+            message: 'The lobby overlay is open. Session hand-off will improve in a future build.',
+            variant: 'warn'
+        });
+    }
+};
+
 game.clearPanelMessage();
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
@@ -808,11 +1067,12 @@ function setup() {
                 grossIncome: 0,
             };
         }
-    const city = game.cities[cityId];
-    city.cash = toFiniteNumber(data.cash, city.cash ?? 0);
-    city.income = toFiniteNumber(data.income, 0);
-    city.itemProduction = toFiniteNumber(data.itemProduction, 0);
-    city.research = toFiniteNumber(data.research, 0);
+        const city = game.cities[cityId];
+        const previousFlags = game.cityFinanceFlags.get(cityId) || {};
+        city.cash = toFiniteNumber(data.cash, city.cash ?? 0);
+        city.income = toFiniteNumber(data.income, 0);
+        city.itemProduction = toFiniteNumber(data.itemProduction, 0);
+        city.research = toFiniteNumber(data.research, 0);
         city.hospital = toFiniteNumber(data.hospital, 0);
         city.construction = toFiniteNumber(data.construction, 0);
         if (data.grossIncome !== undefined) {
@@ -839,6 +1099,39 @@ function setup() {
             city.maxBuildings = toFiniteNumber(data.maxBuildings, city.maxBuildings ?? 0);
         }
         city.updatedAt = data.updatedAt ? toFiniteNumber(data.updatedAt, Date.now()) : Date.now();
+        const playerCityId = normaliseCityId(game.player && game.player.city, null);
+        const financeFlags = {
+            orbable: !!city.isOrbable,
+            negativeIncome: city.grossIncome < 0,
+            cashZero: city.cash <= 0,
+            cashLow: city.cash > 0 && city.cash < COST_BUILDING
+        };
+        game.cityFinanceFlags.set(cityId, financeFlags);
+        if (playerCityId === cityId && game.notify) {
+            const cityName = getCityDisplayName(cityId);
+            if (financeFlags.cashZero && !previousFlags.cashZero) {
+                game.notify({
+                    title: 'City Treasury Empty',
+                    message: `${cityName} has run out of cash. Income ticks are needed before building again.`,
+                    variant: 'error'
+                });
+            } else if (financeFlags.negativeIncome && !previousFlags.negativeIncome) {
+                game.notify({
+                    title: 'Income Shortfall',
+                    message: `${cityName} is spending more than it earns. Consider staffing houses or pausing construction.`,
+                    variant: 'warn',
+                    timeout: 5200
+                });
+            }
+            if (financeFlags.orbable && !previousFlags.orbable) {
+                game.notify({
+                    title: 'City Orbable',
+                    message: `${cityName} can now be destroyed by an enemy orb. Strengthen defenses.`,
+                    variant: 'warn',
+                    timeout: 5200
+                });
+            }
+        }
         if (typeof game.updateOrbHint === 'function') {
             game.updateOrbHint({ force: true });
         }
@@ -867,6 +1160,18 @@ function setup() {
                 heading: 'Orb Successful',
                 lines
             });
+            if (game.notify) {
+                const fragments = [`${targetLabel} destroyed.`];
+                if (pointsAwarded > 0) {
+                    fragments.push(`+${pointsAwarded} points.`);
+                }
+                game.notify({
+                    title: 'Orb Detonated',
+                    message: fragments.join(' '),
+                    variant: 'success',
+                    timeout: 5400
+                });
+            }
             game.forceDraw = true;
             return;
         }
@@ -881,6 +1186,14 @@ function setup() {
                 heading: 'Orb Inert',
                 lines: [description]
             });
+            if (game.notify) {
+                game.notify({
+                    title: 'Orb Failed',
+                    message: description,
+                    variant: 'warn',
+                    timeout: 4200
+                });
+            }
             game.forceDraw = true;
         }
     });
@@ -899,6 +1212,18 @@ function setup() {
             heading: 'City Destroyed',
             lines
         });
+        if (game.notify) {
+            const fragments = [`${attackerName} eliminated ${targetName}.`];
+            if (points > 0) {
+                fragments.push(`+${points} points.`);
+            }
+            game.notify({
+                title: 'City Destroyed',
+                message: fragments.join(' '),
+                variant: data.targetCity === normaliseCityId(game.player && game.player.city, null) ? 'error' : 'warn',
+                timeout: 5600
+            });
+        }
         if (Number.isFinite(data.targetCity) && game.cities?.[data.targetCity]) {
             const city = game.cities[data.targetCity];
             city.orbPoints = 0;
@@ -914,10 +1239,75 @@ function setup() {
             game.player.city = null;
             game.player.isMayor = false;
         }
+        let details = payload;
+        if (typeof payload === 'string') {
+            try {
+                details = JSON.parse(payload);
+            } catch (error) {
+                details = {};
+            }
+        }
+        if (game.notify && details) {
+            const reason = typeof details.reason === 'string' ? details.reason : 'orb';
+            const cityId = normaliseCityId(details.city, null);
+            const attackerId = normaliseCityId(details.attackerCity, null);
+            const cityName = cityId !== null ? getCityDisplayName(cityId) : 'your city';
+            const attackerName = attackerId !== null ? getCityDisplayName(attackerId) : null;
+            const variants = {
+                death: 'error',
+                orb: 'error'
+            };
+            const fragments = [];
+            if (reason === 'death') {
+                fragments.push(attackerName ? `${attackerName} eliminated you.` : 'You were destroyed in combat.');
+            } else if (attackerName) {
+                fragments.push(`${attackerName} destroyed ${cityName}.`);
+            } else {
+                fragments.push(`${cityName} was destroyed.`);
+            }
+            if (Number.isFinite(details.points) && details.points > 0) {
+                fragments.push(`They earned ${details.points} points.`);
+            }
+            game.notify({
+                title: 'Evicted',
+                message: fragments.join(' '),
+                variant: variants[reason] || 'warn',
+                timeout: 5600
+            });
+        }
         if (game.lobby && typeof game.lobby.handleEviction === 'function') {
             game.lobby.handleEviction(payload);
         }
         game.forceDraw = true;
+    });
+    game.socketListener.on('player:dead', (payload) => {
+        if (!payload || !payload.id || !game.notify) {
+            return;
+        }
+        const myId = game.socketListener?.io?.id || null;
+        if (myId && payload.id === myId) {
+            return;
+        }
+        const victim = game.otherPlayers?.[payload.id] || null;
+        const victimCityId = normaliseCityId(victim && victim.city, null);
+        const victimLabel = victimCityId !== null ? getCityDisplayName(victimCityId) : 'A tank';
+        let attackerLabel = null;
+        if (payload.reason && typeof payload.reason === 'object') {
+            const attackerCityId = normaliseCityId(payload.reason.teamId ?? payload.reason.cityId ?? null, null);
+            if (attackerCityId !== null) {
+                attackerLabel = getCityDisplayName(attackerCityId);
+            }
+        }
+        const fragments = [`${victimLabel} tank destroyed.`];
+        if (attackerLabel) {
+            fragments.push(`Attacker: ${attackerLabel}.`);
+        }
+        game.notify({
+            title: 'Tank Destroyed',
+            message: fragments.join(' '),
+            variant: 'warn',
+            timeout: 4200
+        });
     });
     game.socketListener.on('build:denied', (payload) => {
         let data = payload;

@@ -44,6 +44,96 @@ const resolveSlotPosition = (type, defaultX, defaultY) => {
     return INVENTORY_SLOTS[type] ?? {x: defaultX, y: defaultY};
 };
 
+const PANEL_BUTTON_DEFINITIONS = [
+    {
+        key: 'staff',
+        offsetX: 145,
+        y: 268,
+        width: 45,
+        height: 20,
+        handler: (game) => game?.showStaffSummary && game.showStaffSummary()
+    },
+    {
+        key: 'map',
+        offsetX: 145,
+        y: 290,
+        width: 45,
+        height: 20,
+        handler: (game) => game?.toggleMapOverlay && game.toggleMapOverlay()
+    },
+    {
+        key: 'info',
+        offsetX: 145,
+        y: 312,
+        width: 45,
+        height: 20,
+        handler: (game) => game?.showPlayerCityInfo && game.showPlayerCityInfo()
+    },
+    {
+        key: 'points',
+        offsetX: 145,
+        y: 334,
+        width: 45,
+        height: 20,
+        handler: (game) => game?.showPointsSummary && game.showPointsSummary()
+    },
+    {
+        key: 'options',
+        offsetX: 145,
+        y: 356,
+        width: 45,
+        height: 20,
+        handler: (game) => game?.openOptionsPanel && game.openOptionsPanel()
+    },
+    {
+        key: 'help',
+        offsetX: 145,
+        y: 378,
+        width: 45,
+        height: 20,
+        handler: (game) => game?.showHelpMessage && game.showHelpMessage()
+    },
+    {
+        key: 'build',
+        offsetX: 126,
+        y: 400,
+        width: 64,
+        height: 22,
+        handler: (game) => game?.toggleBuildMenuFromPanel && game.toggleBuildMenuFromPanel()
+    },
+    {
+        key: 'exit',
+        offsetX: 150,
+        y: 576,
+        width: 42,
+        height: 18,
+        handler: (game) => game?.requestExitToLobby && game.requestExitToLobby()
+    }
+];
+
+const attachPanelButtons = (game, stage) => {
+    if (!game || !stage) {
+        return;
+    }
+    const baseX = game.maxMapX || 0;
+    PANEL_BUTTON_DEFINITIONS.forEach((definition) => {
+        const graphics = new PIXI.Graphics();
+        graphics.beginFill(0xffffff, 0.001);
+        graphics.drawRect(baseX + definition.offsetX, definition.y, definition.width, definition.height);
+        graphics.endFill();
+        graphics.interactive = true;
+        graphics.buttonMode = true;
+        graphics.cursor = 'pointer';
+        graphics.on('pointertap', (event) => {
+            event.stopPropagation();
+            if (typeof definition.handler === 'function') {
+                definition.handler(game);
+            }
+        });
+        stage.addChild(graphics);
+    });
+};
+
 const formatCash = (value) => {
     const amount = Number.isFinite(value) ? value : parseInt(value, 10) || 0;
     try {
@@ -507,6 +597,7 @@ export const drawPanelInterface = (game, panelContainer) => {
         drawHealth(game, panelContainer);
         drawItems(game, panelContainer);
         drawPanelMessages(game, panelContainer);
+        attachPanelButtons(game, panelContainer);
     }
 
     const radarState = ensureRadarState(game, panelContainer);
