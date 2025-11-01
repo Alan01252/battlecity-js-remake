@@ -12,6 +12,7 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - The authoritative server guarantees each city has exactly one mayor and at most three recruits; newcomers round-robin between city `0` and city `1` until both rosters reach that capacity. (server/src/PlayerFactory.js:11, server/src/PlayerFactory.js:195)
 - When every slot is filled the join request is rejected with `cities_full`, allowing a future lobby flow to queue players without spawning them. (server/src/PlayerFactory.js:39)
 - City spawn points and canonical city names are keyed in `shared/citySpawns.json`; both client and server snap players to those offsets so each team enters at the correct base. (client/src/utils/citySpawns.js:1, server/src/PlayerFactory.js:208)
+- The `map.dat` asset is rotated 180° during load so command centers align with their classic plazas; this prevents rocks from appearing inside the base footprint. (client/src/mapBuilder.js:45)
 - Mayors render a “Mayor of _City_” banner above their tank using the shared city display name to make leadership clear in-game. (client/src/draw/draw-changing.js:6)
 
 ## Economy

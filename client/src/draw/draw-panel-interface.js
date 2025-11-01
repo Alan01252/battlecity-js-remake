@@ -220,6 +220,57 @@ var drawMayorIndicator = (game, stage) => {
     stage.addChild(label);
 };
 
+const drawPanelMessages = (game, stage) => {
+    if (!game || !stage) {
+        return;
+    }
+    const panelState = game.panelState || {};
+    const heading = panelState.heading || '';
+    const lines = Array.isArray(panelState.lines) ? panelState.lines : [];
+
+    if (!heading && !lines.length) {
+        return;
+    }
+
+    const baseX = game.maxMapX + 12;
+    let currentY = 465;
+
+    if (heading) {
+        const headingText = new PIXI.Text(heading, {
+            fontFamily: 'Arial',
+            fontSize: 14,
+            fontWeight: 'bold',
+            fill: 0xF4D03F,
+            stroke: 0x000000,
+            strokeThickness: 2,
+        });
+        headingText.x = baseX;
+        headingText.y = currentY;
+        stage.addChild(headingText);
+        currentY += 15;
+    }
+
+    const bodyStyle = {
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fill: 0xFDFEFE,
+        stroke: 0x000000,
+        strokeThickness: 2,
+    };
+
+    lines.forEach((line) => {
+        if (line === null || line === undefined) {
+            currentY += 15;
+            return;
+        }
+        const text = new PIXI.Text(`${line}`, bodyStyle);
+        text.x = baseX;
+        text.y = currentY;
+        stage.addChild(text);
+        currentY += 15;
+    });
+};
+
 var drawHealth = (game, stage) => {
 
     var percent = game.player.health / MAX_HEALTH;
@@ -248,5 +299,6 @@ export const drawPanelInterface = (game, panelContainer) => {
         drawHealth(game, panelContainer);
         drawItems(game, panelContainer);
         drawMayorIndicator(game, panelContainer);
+        drawPanelMessages(game, panelContainer);
     }
 };

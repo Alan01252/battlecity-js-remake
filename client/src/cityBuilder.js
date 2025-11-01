@@ -1,10 +1,11 @@
-import {MAP_SQUARE_BUILDING} from "./constants";
 import {DEFAULT_CITY_CAN_BUILD} from "./constants";
 import {MONEY_STARTING_VALUE} from "./constants";
+import citySpawns from '@shared/citySpawns.json';
+import {getCityDisplayName, getCitySpawn} from "./utils/citySpawns";
 
 const createDefaultCanBuild = () => ({ ...DEFAULT_CITY_CAN_BUILD });
 
-var city = {
+const createCityTemplate = () => ({
     canBuild: createDefaultCanBuild(),
     cash: MONEY_STARTING_VALUE,
     income: 0,
@@ -13,7 +14,7 @@ var city = {
     hospital: 0,
     construction: 0,
     grossIncome: 0,
-};
+});
 
 function createFakeCity(game) {
     /*
@@ -42,17 +43,27 @@ function createFakeCity(game) {
 }
 
 function createCities(game) {
-    for (var j = 0; j < game.map.length; j++) {
-        for (var i = 0; i < game.map.length; i++) {
-            if ((game.map[i][j] == MAP_SQUARE_BUILDING)) {
-                var newCity = JSON.parse(JSON.stringify(city));
-                newCity.id = i;
-                newCity.x = i * 48;
-                newCity.y = j * 48;
-                game.cities.push(newCity);
-            }
+    game.cities = [];
+    Object.keys(citySpawns || {}).forEach((key) => {
+        const numericId = Number(key);
+        if (!Number.isFinite(numericId)) {
+            return;
         }
-    }
+        const entry = citySpawns[key];
+        const spawn = getCitySpawn(numericId);
+        const newCity = createCityTemplate();
+        newCity.id = numericId;
+        const tileX = Number(entry?.tileX);
+        const tileY = Number(entry?.tileY);
+        const resolvedTileX = Number.isFinite(tileX) ? tileX : (spawn?.tileX ?? 0);
+        const resolvedTileY = Number.isFinite(tileY) ? tileY : (spawn?.tileY ?? 0);
+        newCity.tileX = resolvedTileX;
+        newCity.tileY = resolvedTileY;
+        newCity.x = resolvedTileX * 48;
+        newCity.y = resolvedTileY * 48;
+        newCity.name = getCityDisplayName(numericId);
+        game.cities[numericId] = newCity;
+    });
 }
 
 export const build = (game) => {

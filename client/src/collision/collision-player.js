@@ -23,7 +23,6 @@ var checkBuildings = (game, playerRect) => {
             buildingRect.h = buildingRect.h - 48;
         }
 
-
         if (rectangleCollision(playerRect, buildingRect)) {
             return COLLISION_BLOCKING;
         }

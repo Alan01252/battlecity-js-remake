@@ -28,13 +28,17 @@ import {drawItems} from "./src/draw/draw-items";
 import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 import {initPersistence} from "./src/storage/persistence";
-import {getCitySpawn} from "./src/utils/citySpawns";
+import {getCitySpawn, getCityDisplayName} from "./src/utils/citySpawns";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
 const LOAD_TYPE = LoaderResource ? LoaderResource.LOAD_TYPE : {};
 const XHR_RESPONSE_TYPE = LoaderResource ? LoaderResource.XHR_RESPONSE_TYPE : {};
 const COLOR_KEY_MAGENTA = { r: 255, g: 0, b: 255 };
+const DEFAULT_PANEL_MESSAGE = {
+    heading: 'Intel',
+    lines: ['Right-click a city building to inspect.']
+};
 
 const applyColorKey = (resource, color = COLOR_KEY_MAGENTA) => {
     if (!resource || !resource.data || !resource.texture) {
@@ -90,6 +94,24 @@ const toFiniteNumber = (value, fallback = 0) => {
         }
     }
     return fallback;
+};
+
+const normaliseCityId = (value, fallback = null) => {
+    const numeric = toFiniteNumber(value, fallback);
+    if (!Number.isFinite(numeric)) {
+        return fallback;
+    }
+    return Math.max(0, Math.floor(numeric));
+};
+
+const shortenId = (value) => {
+    if (!value || typeof value !== 'string') {
+        return null;
+    }
+    if (value.length <= 8) {
+        return value;
+    }
+    return `${value.slice(0, 4)}...${value.slice(-2)}`;
 };
 
 
@@ -169,10 +191,180 @@ const game = {
         sequence: 0
     },
     explosions: [],
+    panelState: {
+        heading: DEFAULT_PANEL_MESSAGE.heading,
+        lines: [...DEFAULT_PANEL_MESSAGE.lines],
+    },
     app: app,
     stage: app.stage,
     objectContainer: objectContainer
 };
+
+const applyPanelMessage = (message) => {
+    const heading = message && typeof message.heading === 'string' ? message.heading : '';
+    const linesSource = (message && Array.isArray(message.lines)) ? message.lines : [];
+    const lines = [];
+    linesSource.forEach((entry) => {
+        if (entry === null || entry === undefined) {
+            return;
+        }
+        const text = `${entry}`;
+        lines.push(text);
+    });
+    game.panelState = {
+        heading,
+        lines
+    };
+    game.forceDraw = true;
+};
+
+const computeLocalCitySnapshot = (cityId) => {
+    const id = normaliseCityId(cityId, null);
+    if (id === null) {
+        return null;
+    }
+
+    let playerCount = 0;
+    let mayorId = null;
+
+    const myCity = normaliseCityId(game.player && game.player.city, null);
+    if (myCity === id) {
+        playerCount += 1;
+        if (game.player && game.player.isMayor) {
+            mayorId = game.player.id || mayorId;
+        }
+    }
+
+    Object.keys(game.otherPlayers || {}).forEach((key) => {
+        const player = game.otherPlayers[key];
+        if (!player) {
+            return;
+        }
+        if (normaliseCityId(player.city, null) !== id) {
+            return;
+        }
+        playerCount += 1;
+        if (!mayorId && player.isMayor) {
+            mayorId = player.id || null;
+        }
+    });
+
+    const buildingFactory = game.buildingFactory;
+    const buildingCount = buildingFactory && typeof buildingFactory.countBuildingsForCity === 'function'
+        ? buildingFactory.countBuildingsForCity(id)
+        : 0;
+
+    return {
+        cityId: id,
+        playerCount,
+        buildingCount,
+        mayorId,
+        mayorLabel: mayorId ? shortenId(mayorId) : null
+    };
+};
+
+const buildCityPanelMessage = (cityId, data = {}) => {
+    const id = normaliseCityId(cityId, null);
+    if (id === null) {
+        return {
+            heading: DEFAULT_PANEL_MESSAGE.heading,
+            lines: [...DEFAULT_PANEL_MESSAGE.lines]
+        };
+    }
+
+    const local = computeLocalCitySnapshot(id) || {
+        cityId: id,
+        playerCount: 0,
+        buildingCount: 0,
+        mayorId: null,
+        mayorLabel: null
+    };
+
+    const cityState = game.cities?.[id];
+    const heading = data.cityName || cityState?.name || getCityDisplayName(id);
+    const mayorLabel = data.mayorLabel || local.mayorLabel;
+    const resolvedMayorId = data.mayorId !== undefined ? data.mayorId : local.mayorId;
+    const mayorDisplay = mayorLabel || shortenId(resolvedMayorId) || '(unknown)';
+
+    const playerCount = Number.isFinite(data.playerCount)
+        ? data.playerCount
+        : local.playerCount;
+    const buildingCount = Number.isFinite(data.buildingCount)
+        ? data.buildingCount
+        : local.buildingCount;
+
+    const lines = [
+        `Mayor:   ${mayorDisplay}`,
+        `Players: ${playerCount}`,
+        `Size:    ${buildingCount} building${buildingCount === 1 ? '' : 's'}`
+    ];
+
+    if (data.isOrbable && data.orbPoints !== undefined) {
+        const points = Number.isFinite(data.orbPoints)
+            ? data.orbPoints
+            : toFiniteNumber(data.orbPoints, 0);
+        lines.push(`Bounty:  ${points} points`);
+    }
+
+    if (data.isOrbable && data.orbs !== undefined) {
+        const orbCount = Number.isFinite(data.orbs)
+            ? data.orbs
+            : toFiniteNumber(data.orbs, 0);
+        lines.push(`Orbs:    ${orbCount}`);
+    }
+
+    if (data.uptimeInMinutes !== undefined && data.uptimeInMinutes !== null) {
+        const uptimeValue = Number.isFinite(data.uptimeInMinutes)
+            ? data.uptimeInMinutes
+            : toFiniteNumber(data.uptimeInMinutes, 0);
+        if (Number.isFinite(uptimeValue) && uptimeValue > 0) {
+            const hours = Math.floor(uptimeValue / 60);
+            const minutes = uptimeValue % 60;
+            lines.push(`Uptime:  ${hours}h ${minutes}m`);
+        }
+    }
+
+    return {
+        heading,
+        lines
+    };
+};
+
+game.setPanelMessage = (message) => {
+    if (!message) {
+        applyPanelMessage(DEFAULT_PANEL_MESSAGE);
+        return;
+    }
+    applyPanelMessage(message);
+};
+
+game.clearPanelMessage = () => {
+    applyPanelMessage(DEFAULT_PANEL_MESSAGE);
+};
+
+game.showCityInfo = (cityOrData, overrides = {}) => {
+    let data = overrides || {};
+    let cityId = cityOrData;
+
+    if (cityOrData && typeof cityOrData === 'object' && !Array.isArray(cityOrData)) {
+        data = cityOrData;
+        if (cityOrData.cityId !== undefined) {
+            cityId = cityOrData.cityId;
+        } else if (cityOrData.city !== undefined) {
+            cityId = cityOrData.city;
+        }
+    }
+
+    const normalisedId = normaliseCityId(cityId, null);
+    if (normalisedId === null) {
+        applyPanelMessage(DEFAULT_PANEL_MESSAGE);
+        return;
+    }
+
+    const message = buildCityPanelMessage(normalisedId, data || {});
+    applyPanelMessage(message);
+};
+game.clearPanelMessage();
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
@@ -365,11 +557,11 @@ function setup() {
                 grossIncome: 0,
             };
         }
-        const city = game.cities[cityId];
-        city.cash = toFiniteNumber(data.cash, city.cash ?? 0);
-        city.income = toFiniteNumber(data.income, 0);
-        city.itemProduction = toFiniteNumber(data.itemProduction, 0);
-        city.research = toFiniteNumber(data.research, 0);
+    const city = game.cities[cityId];
+    city.cash = toFiniteNumber(data.cash, city.cash ?? 0);
+    city.income = toFiniteNumber(data.income, 0);
+    city.itemProduction = toFiniteNumber(data.itemProduction, 0);
+    city.research = toFiniteNumber(data.research, 0);
         city.hospital = toFiniteNumber(data.hospital, 0);
         city.construction = toFiniteNumber(data.construction, 0);
         if (data.grossIncome !== undefined) {
@@ -379,6 +571,12 @@ function setup() {
         }
         city.updatedAt = data.updatedAt ? toFiniteNumber(data.updatedAt, Date.now()) : Date.now();
         game.forceDraw = true;
+    });
+    game.socketListener.on('city:info', (info) => {
+        if (!info) {
+            return;
+        }
+        game.showCityInfo(info);
     });
     game.socketListener.on('build:denied', (payload) => {
         let data = payload;

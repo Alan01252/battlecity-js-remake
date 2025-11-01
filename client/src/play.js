@@ -77,6 +77,9 @@ var turnPlayer = (game) => {
 
 var movePlayer = (game) => {
 
+    const previousX = game.player.offset.x;
+    const previousY = game.player.offset.y;
+
     var fDir = -game.player.direction;
     var velocity = (Math.sin((fDir / 16) * 3.14) * game.player.isMoving) * (game.timePassed * MOVEMENT_SPEED_PLAYER);
     if (velocity > 20) {
@@ -141,6 +144,9 @@ var movePlayer = (game) => {
             break;
     }
 
+    if (previousX !== game.player.offset.x || previousY !== game.player.offset.y) {
+        console.log(`Player position: (${game.player.offset.x.toFixed(2)}, ${game.player.offset.y.toFixed(2)})`);
+    }
 };
 
 const attemptUnstick = (game, originalPosition) => {

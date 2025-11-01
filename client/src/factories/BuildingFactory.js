@@ -351,6 +351,42 @@ class BuildingFactory {
         return this.buildingsByCoord[`${x}_${y}`];
     }
 
+    findBuildingAtTile(tileX, tileY) {
+        let node = this.getHead();
+        const targetX = Number.isFinite(tileX) ? tileX : parseInt(tileX, 10);
+        const targetY = Number.isFinite(tileY) ? tileY : parseInt(tileY, 10);
+        if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) {
+            return null;
+        }
+        while (node) {
+            const baseX = Number.isFinite(node.x) ? node.x : parseInt(node.x, 10) || 0;
+            const baseY = Number.isFinite(node.y) ? node.y : parseInt(node.y, 10) || 0;
+            if (targetX >= baseX && targetX <= baseX + 2 &&
+                targetY >= baseY && targetY <= baseY + 2) {
+                return node;
+            }
+            node = node.next;
+        }
+        return null;
+    }
+
+    countBuildingsForCity(cityId) {
+        const numericCity = Number.isFinite(cityId) ? cityId : parseInt(cityId, 10);
+        if (!Number.isFinite(numericCity)) {
+            return 0;
+        }
+        let count = 0;
+        let node = this.getHead();
+        while (node) {
+            const nodeCity = Number.isFinite(node.city) ? node.city : parseInt(node.city, 10) || 0;
+            if (nodeCity === numericCity) {
+                count += 1;
+            }
+            node = node.next;
+        }
+        return count;
+    }
+
     applyPopulationUpdate(update) {
         if (!update || !update.id) {
             return;

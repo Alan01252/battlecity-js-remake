@@ -12,6 +12,10 @@ const HALF_TILE = TILE_SIZE / 2;
 const COMMAND_CENTER_WIDTH_TILES = 3;
 const COMMAND_CENTER_HEIGHT_TILES = 2;
 const COMMAND_CENTER_FRONT_OFFSET = TILE_SIZE / 2;
+const PLAYER_SPRITE_SIZE = 48;
+const PLAYER_SPRITE_HALF = PLAYER_SPRITE_SIZE / 2;
+const PLAYER_SPAWN_ADJUST_X = 6.5;
+const PLAYER_SPAWN_ADJUST_Y = 5.5;
 
 class PlayerFactory {
 
@@ -234,9 +238,13 @@ class PlayerFactory {
             }
             const tileX = 479 - ((numeric % 8) * 64);
             const tileY = 479 - (Math.floor(numeric / 8) * 64);
+            const baseX = tileX * TILE_SIZE;
+            const baseY = tileY * TILE_SIZE;
+            const centerX = baseX + (COMMAND_CENTER_WIDTH_TILES * TILE_SIZE) / 2;
+            const centerY = baseY + (COMMAND_CENTER_HEIGHT_TILES * TILE_SIZE) + COMMAND_CENTER_FRONT_OFFSET;
             return {
-                x: tileX * TILE_SIZE,
-                y: tileY * TILE_SIZE,
+                x: centerX - PLAYER_SPRITE_HALF - PLAYER_SPAWN_ADJUST_X,
+                y: centerY - PLAYER_SPRITE_HALF - PLAYER_SPAWN_ADJUST_Y,
                 name: name || null
             };
         };
@@ -268,9 +276,11 @@ class PlayerFactory {
             if (hasTileX && hasTileY) {
                 const baseX = tileX * TILE_SIZE;
                 const baseY = tileY * TILE_SIZE;
+                const centerX = baseX + (COMMAND_CENTER_WIDTH_TILES * TILE_SIZE) / 2;
+                const centerY = baseY + (COMMAND_CENTER_HEIGHT_TILES * TILE_SIZE) + COMMAND_CENTER_FRONT_OFFSET;
                 return {
-                    x: baseX + (COMMAND_CENTER_WIDTH_TILES * TILE_SIZE) / 2,
-                    y: baseY + (COMMAND_CENTER_HEIGHT_TILES * TILE_SIZE) + COMMAND_CENTER_FRONT_OFFSET,
+                    x: centerX - PLAYER_SPRITE_HALF - PLAYER_SPAWN_ADJUST_X,
+                    y: centerY - PLAYER_SPRITE_HALF - PLAYER_SPAWN_ADJUST_Y,
                     name: entry.name || null
                 };
             }

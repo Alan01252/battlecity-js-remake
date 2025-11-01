@@ -145,6 +145,19 @@ class SocketListener extends EventEmitter2 {
             }
         });
 
+        this.io.on("city:info", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data || typeof data !== 'object') {
+                return;
+            }
+            if (data.cityId === undefined && data.city !== undefined) {
+                data.cityId = this.toFiniteNumber(data.city, data.city);
+            } else if (data.cityId !== undefined) {
+                data.cityId = this.toFiniteNumber(data.cityId, data.cityId);
+            }
+            this.emit('city:info', data);
+        });
+
         this.io.on("build:denied", (payload) => {
             try {
                 const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
@@ -219,6 +232,18 @@ class SocketListener extends EventEmitter2 {
             return;
         }
         this.io.emit('demolish_building', JSON.stringify({ id: buildingId }));
+    }
+
+    requestCityInfo(cityId) {
+        if (!this.io || this.io.disconnected) {
+            return;
+        }
+        const numericId = this.toFiniteNumber(cityId, null);
+        if (!Number.isFinite(numericId)) {
+            return;
+        }
+        const normalised = Math.max(0, Math.floor(numericId));
+        this.io.emit('city:inspect', JSON.stringify({ city: normalised }));
     }
 
     sendBulletShot(bullet) {

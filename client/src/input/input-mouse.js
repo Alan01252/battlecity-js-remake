@@ -68,6 +68,49 @@ export const setupMouseInputs = (game) => {
             game.stage.cursor = 'cursor';
             game.interactionLayer.cursor = 'cursor';
         }
+
+        const global = event && event.data ? event.data.global : null;
+        if (!global) {
+            if (typeof game.clearPanelMessage === 'function') {
+                game.clearPanelMessage();
+            }
+            return;
+        }
+
+        if (global.x < 0 || global.y < 0 || global.x > game.maxMapX || global.y > game.maxMapY) {
+            if (typeof game.clearPanelMessage === 'function') {
+                game.clearPanelMessage();
+            }
+            return;
+        }
+
+        const offTileX = Math.floor(game.player.offset.x % 48);
+        const offTileY = Math.floor(game.player.offset.y % 48);
+        const tileX = Math.floor((game.player.offset.x - game.player.defaultOffset.x + offTileX + global.x) / 48);
+        const tileY = Math.floor((game.player.offset.y - game.player.defaultOffset.y + offTileY + global.y) / 48);
+
+        const buildingFactory = game.buildingFactory;
+        const building = buildingFactory && buildingFactory.findBuildingAtTile ? buildingFactory.findBuildingAtTile(tileX, tileY) : null;
+        if (!building) {
+            if (typeof game.clearPanelMessage === 'function') {
+                game.clearPanelMessage();
+            }
+            return;
+        }
+
+        const cityValue = Number.isFinite(building.city) ? building.city : parseInt(building.city, 10);
+        const cityId = Number.isFinite(cityValue) ? cityValue : 0;
+
+        if (game.socketListener && typeof game.socketListener.requestCityInfo === 'function') {
+            game.socketListener.requestCityInfo(cityId);
+        }
+
+        if (typeof game.showCityInfo === 'function') {
+            game.showCityInfo(cityId, {
+                source: 'local',
+                building: building
+            });
+        }
     });
 
     if (typeof window !== 'undefined') {
