@@ -5,6 +5,9 @@ export default defineConfig({
   server: {
     port: 8020,
     host: '0.0.0.0',
+    fs: {
+      allow: ['..'],
+    },
   },
   preview: {
     port: 8020,
@@ -18,6 +21,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '@shared': path.resolve(__dirname, '../shared'),
     },
   },
 });

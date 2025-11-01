@@ -1,38 +1,38 @@
 import PIXI from '../pixi';
+import { getCityDisplayName } from '../utils/citySpawns';
 
-const MAYOR_BADGE_RADIUS = 9;
 const EXPLOSION_FRAME_SIZE = 144;
 const EXPLOSION_TOTAL_FRAMES = 8;
 const EXPLOSION_FRAME_DURATION = 100;
+const MAYOR_BADGE_OFFSET_Y = 8;
+const MAYOR_FRIENDLY_COLOR = 0x1E5AAF;
+const MAYOR_ENEMY_COLOR = 0xE74C3C;
 
-const createMayorBadge = () => {
+const createMayorBadge = (cityId, isAlly) => {
     const container = new PIXI.Container();
-    const circle = new PIXI.Graphics();
-    circle.beginFill(0xF1C40F)
-        .lineStyle(2, 0x9C6400)
-        .drawCircle(0, 0, MAYOR_BADGE_RADIUS)
-        .endFill();
-    container.addChild(circle);
-
-    const label = new PIXI.Text('M', {
+    const cityName = getCityDisplayName(cityId);
+    const label = new PIXI.Text(`Mayor of ${cityName}`, {
         fontFamily: 'Arial',
         fontSize: 12,
         fontWeight: 'bold',
-        fill: 0x1B2631,
+        fill: isAlly ? MAYOR_FRIENDLY_COLOR : MAYOR_ENEMY_COLOR,
+        align: 'center',
+        stroke: 0x000000,
+        strokeThickness: 2
     });
-    label.anchor.set(0.5);
+    label.anchor.set(0.5, 0);
     container.addChild(label);
-
     return container;
 };
 
-const maybeAddMayorBadge = (player, sprite) => {
+const maybeAddMayorBadge = (player, sprite, referenceCity) => {
     if (!player || !player.isMayor) {
         return;
     }
-    const badge = createMayorBadge();
+    const isAlly = referenceCity === undefined ? true : player.city === referenceCity;
+    const badge = createMayorBadge(player.city, isAlly);
     badge.x = sprite.width / 2;
-    badge.y = -MAYOR_BADGE_RADIUS - 4;
+    badge.y = -sprite.height / 2 - MAYOR_BADGE_OFFSET_Y;
     sprite.addChild(badge);
 };
 
@@ -77,7 +77,7 @@ var drawPlayer = (game, stage) => {
     playerTank.x = game.player.defaultOffset.x;
     playerTank.y = game.player.defaultOffset.y;
 
-    maybeAddMayorBadge(game.player, playerTank);
+    maybeAddMayorBadge(game.player, playerTank, game.player.city);
 
     stage.addChild(playerTank);
 };
@@ -96,7 +96,7 @@ var drawOtherPlayers = (game, stage) => {
         playerTank.y = ((player.offset.y) + (game.player.defaultOffset.y - (game.player.offset.y / 48) * 48));
 
 
-        maybeAddMayorBadge(player, playerTank);
+        maybeAddMayorBadge(player, playerTank, game.player.city);
 
 
         stage.addChild(playerTank);

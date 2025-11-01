@@ -28,6 +28,7 @@ import {drawItems} from "./src/draw/draw-items";
 import {drawIcons} from "./src/draw/draw-icons";
 import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 import {initPersistence} from "./src/storage/persistence";
+import {getCitySpawn} from "./src/utils/citySpawns";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -145,7 +146,7 @@ const game = {
     player: {
         id: -1,
         city: 0,
-        isMayor: true,
+        isMayor: false,
         health: MAX_HEALTH,
         isTurning: 0,
         timeTurn: 0,
@@ -239,8 +240,17 @@ function setup() {
     cityBuilder.build(game);
     initPersistence(game);
 
-    game.player.offset.x = game.cities[game.player.city].x + 48;
-    game.player.offset.y = game.cities[game.player.city].y + 100;
+    const initialSpawn = getCitySpawn(game.player.city);
+    if (initialSpawn) {
+        game.player.offset.x = initialSpawn.x;
+        game.player.offset.y = initialSpawn.y;
+    } else if (game.cities[game.player.city]) {
+        game.player.offset.x = game.cities[game.player.city].x + 48;
+        game.player.offset.y = game.cities[game.player.city].y + 100;
+    } else {
+        game.player.offset.x = 0;
+        game.player.offset.y = 0;
+    }
     game.player.lastSafeOffset = {
         x: game.player.offset.x,
         y: game.player.offset.y,
@@ -298,6 +308,7 @@ function setup() {
     setupMouseInputs(game);
 
     game.socketListener.listen();
+    game.itemFactory.bindSocketEvents(game.socketListener);
     game.socketListener.on("connected", () => {
         game.player.id = game.socketListener.enterGame();
         console.log("Connected starting game");

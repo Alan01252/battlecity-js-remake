@@ -4,11 +4,8 @@ import {ITEM_TYPE_WALL} from "../constants";
 import {ITEM_TYPE_SLEEPER} from "../constants";
 import {ITEM_TYPE_MINE} from "../constants";
 import {ITEM_TYPE_BOMB} from "../constants";
-import {TIMER_BOMB} from "../constants";
 import {BOMB_EXPLOSION_TILE_RADIUS} from "../constants";
 import {BOMB_ITEM_TILE_RADIUS} from "../constants";
-import {MAX_HEALTH} from "../constants";
-import {DAMAGE_BOMB} from "../constants";
 
 class ItemFactory {
 
@@ -16,6 +13,10 @@ class ItemFactory {
         this.game = game;
         this.itemListHead = null;
         this.calculateTick = 0;
+        this.itemsById = new Map();
+        this.pendingHazards = new Set();
+        this.socketBound = false;
+        this.nextLocalId = 0;
 
         this.validIcons = [
             ITEM_TYPE_TURRET,
@@ -31,6 +32,53 @@ class ItemFactory {
             ITEM_TYPE_PLASMA,
             ITEM_TYPE_SLEEPER,
         ];
+
+        if (this.game.socketListener) {
+            this.bindSocketEvents(this.game.socketListener);
+        }
+    }
+
+    bindSocketEvents(socketListener) {
+        if (!socketListener || this.socketBound) {
+            return;
+        }
+        this.socketBound = true;
+        socketListener.on('hazard:spawn', (hazard) => this.onHazardSpawn(hazard));
+        socketListener.on('hazard:update', (hazard) => this.onHazardUpdate(hazard));
+        socketListener.on('hazard:remove', (hazard) => this.onHazardRemove(hazard));
+    }
+
+    generateHazardId() {
+        this.nextLocalId += 1;
+        const base = this.game.socketListener?.io?.id ?? 'local';
+        return `hazard_${base}_${Date.now()}_${this.nextLocalId}`;
+    }
+
+    insertItem(item) {
+        if (this.itemListHead) {
+            this.itemListHead.previous = item;
+            item.next = this.itemListHead;
+        }
+        this.itemListHead = item;
+        this.itemsById.set(item.id, item);
+        this.game.forceDraw = true;
+    }
+
+    detachItem(item) {
+        if (!item) {
+            return;
+        }
+        if (item.next) {
+            item.next.previous = item.previous;
+        }
+        if (item.previous) {
+            item.previous.next = item.next;
+        } else if (this.itemListHead === item) {
+            this.itemListHead = item.next;
+        }
+        item.next = null;
+        item.previous = null;
+        this.itemsById.delete(item.id);
     }
 
     cycle() {
@@ -131,7 +179,7 @@ class ItemFactory {
         }
     }
 
-    newItem(owner, x, y, type) {
+    newItem(owner, x, y, type, options = {}) {
 
         if (!this.validIcons.includes(type)) {
             return null;
@@ -153,91 +201,85 @@ class ItemFactory {
 
         let adjustedX = x;
         let adjustedY = y;
-        if (type === ITEM_TYPE_BOMB) {
+        if (type === ITEM_TYPE_BOMB || type === ITEM_TYPE_MINE) {
             adjustedX = Math.floor(x / 48) * 48;
             adjustedY = Math.floor(y / 48) * 48;
         }
+
+        const hazardTypes = [ITEM_TYPE_MINE, ITEM_TYPE_BOMB];
+        const isHazard = hazardTypes.includes(type);
+        const notifyServer = options.notifyServer !== false && isHazard;
+        const hazardId = options.id || (isHazard ? this.generateHazardId() : null);
 
         const bombArmed = owner && typeof owner === 'object' && owner.armed !== undefined
             ? !!owner.armed
             : (this.game.player?.bombsArmed ?? false);
 
-        var item = {
-            "owner": ownerId,
-            "ownerId": ownerId,
-            "teamId": ownerTeam,
-            "city": ownerTeam,
-            "x": adjustedX,
-            "y": adjustedY,
-            "target": null,
-            "targetTeam": null,
-            "type": type,
-            "lastFired": 0,
-            "active": type === ITEM_TYPE_BOMB ? bombArmed : true,
-            "detonateTick": null,
-            "next": null,
-            "previous": null
-
+        const item = {
+            id: hazardId || `item_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+            owner: ownerId,
+            ownerId,
+            teamId: ownerTeam,
+            city: ownerTeam,
+            x: adjustedX,
+            y: adjustedY,
+            target: null,
+            targetTeam: null,
+            type: type,
+            lastFired: 0,
+            active: type === ITEM_TYPE_BOMB ? bombArmed : true,
+            armed: type === ITEM_TYPE_BOMB ? bombArmed : true,
+            detonateTick: options.detonateTick || null,
+            next: null,
+            previous: null,
+            synced: !notifyServer
         };
 
+        this.insertItem(item);
 
-        if (this.itemListHead) {
-            this.itemListHead.previous = item;
-            item.next = this.itemListHead
+        if (notifyServer && this.game.socketListener) {
+            this.pendingHazards.add(item.id);
+            this.game.socketListener.spawnHazard({
+                id: item.id,
+                type,
+                x: item.x,
+                y: item.y,
+                armed: item.active,
+                ownerId: ownerId,
+                teamId: ownerTeam
+            });
         }
 
-        console.log("Created item");
-        console.log(item);
-        this.game.forceDraw = true;
-
-        this.itemListHead = item;
         if (type === ITEM_TYPE_BOMB) {
-            this.armBomb(item, bombArmed);
+            this.armBomb(item, item.active, { notifyServer: false });
         }
+
         return item;
     }
 
 
     deleteItem(item) {
-        var returnItem = item.next;
-
-        if (item.next) {
-            item.next.previous = item.previous;
+        if (!item) {
+            return null;
         }
-
-        if (item.previous) {
-            item.previous.next = item.next
-        } else {
-            this.itemListHead = item.next;
-        }
-
+        const returnItem = item.next;
+        this.detachItem(item);
+        this.pendingHazards.delete(item.id);
         return returnItem;
     }
 
     processBombs() {
-        var item = this.getHead();
-        while (item) {
-            if (item.type === ITEM_TYPE_BOMB && item.active) {
-                if (!item.detonateTick) {
-                    this.armBomb(item, true);
-                } else if (this.game.tick >= item.detonateTick) {
-                    item = this.detonateBomb(item);
-                    continue;
-                }
-            }
-            item = item.next;
-        }
+        // Bomb timers and detonations are handled by the server.
     }
 
-    armBomb(item, armed) {
+    armBomb(item, armed, options = {}) {
         if (!item || item.type !== ITEM_TYPE_BOMB) {
             return;
         }
         item.active = armed;
-        if (armed) {
-            item.detonateTick = (this.game.tick || Date.now()) + TIMER_BOMB;
-        } else {
-            item.detonateTick = null;
+        item.armed = armed;
+        if (options.notifyServer !== false && this.game.socketListener && item.id) {
+            this.game.socketListener.updateHazard({ id: item.id, armed: !!armed });
         }
     }
 
@@ -280,32 +322,8 @@ class ItemFactory {
         return nextItem;
     }
 
-    damagePlayersInRadius(tileX, tileY) {
-        const checkPlayer = (player, applyHealth) => {
-            if (!player) {
-                return;
-            }
-            const px = player.offset?.x ?? player.x ?? 0;
-            const py = player.offset?.y ?? player.y ?? 0;
-            const playerTileX = Math.floor((px + 24) / 48);
-            const playerTileY = Math.floor((py + 24) / 48);
-            if (Math.abs(playerTileX - tileX) <= BOMB_ITEM_TILE_RADIUS &&
-                Math.abs(playerTileY - tileY) <= BOMB_ITEM_TILE_RADIUS) {
-                applyHealth(player);
-            }
-        };
-
-        checkPlayer(this.game.player, (player) => {
-            player.health = Math.max(0, player.health - DAMAGE_BOMB);
-        });
-
-        Object.keys(this.game.otherPlayers).forEach((id) => {
-            checkPlayer(this.game.otherPlayers[id], (player) => {
-                const currentHealth = player.health ?? MAX_HEALTH;
-                player.health = Math.max(0, currentHealth - DAMAGE_BOMB);
-                player.isDead = player.health <= 0;
-            });
-        });
+    damagePlayersInRadius() {
+        // Damage is applied authoritatively on the server.
     }
 
     triggerMine(item) {
@@ -313,8 +331,108 @@ class ItemFactory {
             return;
         }
         item.active = false;
+        item.hidden = true;
+        this.game.forceDraw = true;
+    }
+
+    onHazardSpawn(hazard) {
+        if (!hazard || !hazard.id) {
+            return;
+        }
+
+        let item = this.itemsById.get(hazard.id);
+        if (!item) {
+            const type = this.resolveItemType(hazard.type);
+            item = this.newItem(null, hazard.x, hazard.y, type, {
+                id: hazard.id,
+                notifyServer: false,
+                detonateTick: hazard.detonateAt ? hazard.detonateAt : null
+            });
+            if (!item) {
+                return;
+            }
+        }
+
+        this.applyHazardState(item, hazard);
+        item.synced = true;
+        this.pendingHazards.delete(hazard.id);
+    }
+
+    onHazardUpdate(hazard) {
+        if (!hazard || !hazard.id) {
+            return;
+        }
+        const item = this.itemsById.get(hazard.id);
+        if (!item) {
+            this.onHazardSpawn(hazard);
+            return;
+        }
+        this.applyHazardState(item, hazard);
+    }
+
+    onHazardRemove(hazard) {
+        if (!hazard || !hazard.id) {
+            return;
+        }
+        const item = this.itemsById.get(hazard.id);
+        if (!item) {
+            return;
+        }
+
+        if (hazard.reason === 'bomb_detonated') {
+            this.spawnExplosion(hazard.x ?? item.x, hazard.y ?? item.y);
+        }
         this.deleteItem(item);
         this.game.forceDraw = true;
+    }
+
+    applyHazardState(item, hazard) {
+        item.x = this.toFiniteNumber(hazard.x, item.x);
+        item.y = this.toFiniteNumber(hazard.y, item.y);
+        if (hazard.active !== undefined) {
+            item.active = !!hazard.active;
+        }
+        if (hazard.armed !== undefined) {
+            item.armed = !!hazard.armed;
+        }
+        if (hazard.detonateAt) {
+            item.detonateTick = hazard.detonateAt;
+        }
+    }
+
+    resolveItemType(hazardType) {
+        if (hazardType === 'mine' || hazardType === ITEM_TYPE_MINE || hazardType === 4) {
+            return ITEM_TYPE_MINE;
+        }
+        if (hazardType === 'bomb' || hazardType === ITEM_TYPE_BOMB || hazardType === 3) {
+            return ITEM_TYPE_BOMB;
+        }
+        return ITEM_TYPE_MINE;
+    }
+
+    spawnExplosion(x, y) {
+        if (!this.game || !Array.isArray(this.game.explosions)) {
+            return;
+        }
+        this.game.explosions.push({
+            x,
+            y,
+            frame: 0,
+            nextFrameTick: null
+        });
+    }
+
+    toFiniteNumber(value, fallback) {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+        if (typeof value === 'string') {
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+        return fallback;
     }
 
 

@@ -56,11 +56,6 @@ class BulletFactory {
 
             if (collidedWithCurrentPlayer(this.game, bullet)) {
                 bullet.life = BULLET_DEAD;
-                const sameShooter = bullet.shooter === this.game.player.id;
-                const sameTeam = bullet.team != null && bullet.team === (this.game.player.city ?? null);
-                if (!sameShooter && !sameTeam && this.game.player.health > 0) {
-                    this.game.player.health -= bullet.damage;
-                }
             }
 
             if (bullet.life == BULLET_DEAD) {

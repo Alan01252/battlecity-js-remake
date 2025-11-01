@@ -7,7 +7,7 @@ import {COLLISION_MAP_EDGE_TOP} from "./constants";
 import {COLLISION_MAP_EDGE_BOTTOM} from "./constants";
 import {COLLISION_BLOCKING} from "./constants";
 import {COLLISION_MINE} from "./constants";
-import {DAMAGE_MINE} from "./constants";
+import {getCitySpawn} from "./utils/citySpawns";
 
 const TILE_SIZE = 48;
 const NEAREST_SAFE_MAX_RADIUS_TILES = 12;
@@ -52,10 +52,6 @@ const handleMineCollision = (game, item) => {
     }
 
     game.itemFactory.triggerMine(item);
-
-    if (game.player.health > 0) {
-        game.player.health = Math.max(0, game.player.health - DAMAGE_MINE);
-    }
 
     game.forceDraw = true;
     game.player.collidedItem = null;
@@ -240,14 +236,20 @@ const movePlayerToCitySpawn = (game) => {
     if (!game || !game.player) {
         return;
     }
+    const spawn = getCitySpawn(game.player.city);
+    if (spawn) {
+        game.player.offset.x = spawn.x;
+        game.player.offset.y = spawn.y;
+        return;
+    }
     const city = game.cities?.[game.player.city];
     if (city) {
         game.player.offset.x = city.x + 48;
         game.player.offset.y = city.y + 100;
-    } else {
-        game.player.offset.x = 0;
-        game.player.offset.y = 0;
+        return;
     }
+    game.player.offset.x = 0;
+    game.player.offset.y = 0;
 };
 
 const ensurePlayerUnstuck = (game) => {

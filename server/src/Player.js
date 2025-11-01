@@ -1,13 +1,15 @@
 /*jslint node: true */
 "use strict";
 
+const { MAX_HEALTH } = require("./gameplay/constants");
+
 class Player {
 
     constructor(id, player, now) {
         this.id = id;
         this.city = 0;
         this.isMayor = false;
-        this.health = 0;
+        this.health = MAX_HEALTH;
         this.direction = 0;
         this.isTurning = 0;
         this.isMoving = 0;
@@ -49,10 +51,6 @@ class Player {
 
         if (player.isMayor !== undefined) {
             this.isMayor = !!player.isMayor;
-        }
-
-        if (player.health !== undefined) {
-            this.health = this._toFiniteNumber(player.health, this.health);
         }
 
         if (player.sequence !== undefined) {

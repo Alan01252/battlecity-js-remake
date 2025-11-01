@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { EventEmitter2 } from 'eventemitter2';
+import { getCitySpawn } from './utils/citySpawns';
 
 class SocketListener extends EventEmitter2 {
 
@@ -165,6 +166,46 @@ class SocketListener extends EventEmitter2 {
                 console.warn('Failed to handle demolish payload', error);
             }
         });
+
+        this.io.on("player:health", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data || !data.id) {
+                return;
+            }
+            this.applyHealthUpdate(data);
+        });
+
+        this.io.on("player:dead", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data || !data.id) {
+                return;
+            }
+            this.applyHealthUpdate({ id: data.id, health: 0, source: data.reason });
+        });
+
+        this.io.on("hazard:spawn", (payload) => {
+            const hazard = this.normaliseHazardPayload(payload);
+            if (!hazard) {
+                return;
+            }
+            this.emit('hazard:spawn', hazard);
+        });
+
+        this.io.on("hazard:update", (payload) => {
+            const hazard = this.normaliseHazardPayload(payload);
+            if (!hazard) {
+                return;
+            }
+            this.emit('hazard:update', hazard);
+        });
+
+        this.io.on("hazard:remove", (payload) => {
+            const hazard = this.normaliseHazardPayload(payload);
+            if (!hazard) {
+                return;
+            }
+            this.emit('hazard:remove', hazard);
+        });
     }
 
     sendNewBuilding(building) {
@@ -205,6 +246,27 @@ class SocketListener extends EventEmitter2 {
             const payload = this.createPlayerPayload();
             this.io.emit("player", JSON.stringify(payload));
         }
+    }
+
+    spawnHazard(hazard) {
+        if (!this.io || this.io.disconnected) {
+            return;
+        }
+        this.io.emit('hazard:spawn', JSON.stringify(hazard));
+    }
+
+    updateHazard(hazard) {
+        if (!this.io || this.io.disconnected) {
+            return;
+        }
+        this.io.emit('hazard:arm', JSON.stringify(hazard));
+    }
+
+    removeHazard(id) {
+        if (!this.io || this.io.disconnected || !id) {
+            return;
+        }
+        this.io.emit('hazard:remove', JSON.stringify({ id }));
     }
 
     createPlayerPayload() {
@@ -267,6 +329,9 @@ class SocketListener extends EventEmitter2 {
         }
 
         me.id = player.id ?? me.id;
+        const previousCity = Number.isFinite(me.city) ? me.city : null;
+        const nextCity = this.toFiniteNumber(player.city, me.city);
+        const cityChanged = previousCity !== nextCity;
         if (player.offset && typeof player.offset === 'object') {
             const serverX = this.toFiniteNumber(player.offset.x, me.offset.x);
             const serverY = this.toFiniteNumber(player.offset.y, me.offset.y);
@@ -287,7 +352,24 @@ class SocketListener extends EventEmitter2 {
                 me.lastSafeOffset.y = me.offset.y;
             }
         }
-        me.city = this.toFiniteNumber(player.city, me.city);
+        me.city = nextCity;
+        if (cityChanged) {
+            const spawn = getCitySpawn(nextCity);
+            if (spawn) {
+                me.offset.x = spawn.x;
+                me.offset.y = spawn.y;
+            } else {
+                const city = this.game.cities?.[nextCity];
+                if (city) {
+                    me.offset.x = city.x + 48;
+                    me.offset.y = city.y + 100;
+                }
+            }
+            if (me.lastSafeOffset) {
+                me.lastSafeOffset.x = me.offset.x;
+                me.lastSafeOffset.y = me.offset.y;
+            }
+        }
         me.isMayor = !!player.isMayor;
         me.health = this.toFiniteNumber(player.health, me.health);
         const serverDirection = Math.round(this.toFiniteNumber(player.direction, me.direction));
@@ -352,6 +434,41 @@ class SocketListener extends EventEmitter2 {
         player.sequence = Math.max(0, Math.round(this.toFiniteNumber(player.sequence, 0)));
 
         return player;
+    }
+
+    normaliseHazardPayload(payload) {
+        const data = this.safeParse(payload);
+        if (!data || typeof data !== 'object' || !data.id) {
+            return null;
+        }
+        return {
+            id: data.id,
+            type: data.type,
+            x: this.toFiniteNumber(data.x, 0),
+            y: this.toFiniteNumber(data.y, 0),
+            ownerId: data.ownerId ?? null,
+            teamId: data.teamId ?? null,
+            active: !!data.active,
+            armed: !!data.armed,
+            detonateAt: data.detonateAt ?? null,
+            reason: data.reason ?? null
+        };
+    }
+
+    applyHealthUpdate(update) {
+        const healthValue = this.toFiniteNumber(update.health, null);
+        if (!update.id || healthValue === null) {
+            return;
+        }
+        const myId = this.io?.id;
+        if (myId && update.id === myId) {
+            this.game.player.health = Math.max(0, healthValue);
+            return;
+        }
+        if (!this.game.otherPlayers[update.id]) {
+            this.game.otherPlayers[update.id] = { id: update.id };
+        }
+        this.game.otherPlayers[update.id].health = Math.max(0, healthValue);
     }
 
     safeParse(payload) {
