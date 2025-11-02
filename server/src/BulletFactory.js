@@ -8,9 +8,13 @@ const {
     BULLET_DAMAGE,
     DAMAGE_ROCKET,
     DAMAGE_FLARE,
-    BULLET_FLARE_SPEED
+    BULLET_FLARE_SPEED,
+    TILE_SIZE,
+    COMMAND_CENTER_WIDTH_TILES,
+    COMMAND_CENTER_HEIGHT_TILES
 } = require("./gameplay/constants");
 const { createBulletRect, getPlayerRect, rectangleCollision } = require("./gameplay/geometry");
+const { isCommandCenter } = require('./constants');
 
 let bulletCounter = 0;
 
@@ -40,6 +44,11 @@ const resolveBulletSpeed = (type) => {
     return BULLET_SPEED_UNITS_PER_MS;
 };
 
+const BLOCKING_TILE_VALUES = new Set([1, 2, 3]);
+const MAP_SIZE_TILES = 512;
+const MAP_PIXEL_SIZE = MAP_SIZE_TILES * TILE_SIZE;
+const BULLET_BUILDING_PADDING = TILE_SIZE * 0.2;
+
 class BulletFactory {
 
     constructor(game, playerFactory) {
@@ -49,6 +58,9 @@ class BulletFactory {
         this.bullets = new Map();
         this.recentSourceShots = new Map();
         this.sourceCleanupAt = 0;
+        if (!Array.isArray(this.game?.map) || !Array.isArray(this.game.map[0])) {
+            debug('[bullet] Warning: game.map is missing or malformed; terrain collisions disabled');
+        }
     }
 
     listen(io) {
@@ -323,8 +335,38 @@ class BulletFactory {
         const velocityX = Math.sin((bullet.angle / 16) * Math.PI) * -1 * bullet.speed * deltaMs;
         const velocityY = Math.cos((bullet.angle / 16) * Math.PI) * -1 * bullet.speed * deltaMs;
 
-        bullet.x += velocityX;
-        bullet.y += velocityY;
+        const stepCount = Math.max(1, Math.ceil(Math.max(Math.abs(velocityX), Math.abs(velocityY)) / 8));
+        const stepX = velocityX / stepCount;
+        const stepY = velocityY / stepCount;
+
+        for (let index = 0; index < stepCount; index += 1) {
+            const nextX = bullet.x + stepX;
+            const nextY = bullet.y + stepY;
+            const prevX = bullet.x;
+            const prevY = bullet.y;
+            bullet.x = nextX;
+            bullet.y = nextY;
+
+            if (this.checkTerrainCollision(bullet)) {
+                bullet.x = prevX;
+                bullet.y = prevY;
+                bullet._destroy = true;
+                debug(`Bullet ${bullet.id} hit terrain at (${prevX.toFixed(1)}, ${prevY.toFixed(1)})`);
+                break;
+            }
+
+            if (this.checkStructureCollision(bullet)) {
+                bullet.x = prevX;
+                bullet.y = prevY;
+                bullet._destroy = true;
+                debug(`Bullet ${bullet.id} hit structure at (${prevX.toFixed(1)}, ${prevY.toFixed(1)})`);
+                break;
+            }
+        }
+
+        if (bullet._destroy) {
+            return;
+        }
 
         if (this.outOfBounds(bullet)) {
             bullet._destroy = true;
@@ -376,6 +418,115 @@ class BulletFactory {
             return false;
         }
         return true;
+    }
+
+    getMapValue(tileX, tileY) {
+        const map = this.game?.map;
+        if (!Array.isArray(map) || !Array.isArray(map[0])) {
+            return 0;
+        }
+        if (tileX < 0 || tileY < 0 || tileX >= MAP_SIZE_TILES || tileY >= MAP_SIZE_TILES) {
+            return 0;
+        }
+        const column = map[tileX];
+        if (!Array.isArray(column)) {
+            return 0;
+        }
+        const value = column[tileY];
+        if (value === undefined || value === null) {
+            return 0;
+        }
+        return value;
+    }
+
+    hitsBlockingTile(rect) {
+        if (!rect) {
+            return false;
+        }
+        const startTileX = Math.max(0, Math.floor(rect.x / TILE_SIZE));
+        const endTileX = Math.min(MAP_SIZE_TILES - 1, Math.floor((rect.x + rect.w - 1) / TILE_SIZE));
+        const startTileY = Math.max(0, Math.floor(rect.y / TILE_SIZE));
+        const endTileY = Math.min(MAP_SIZE_TILES - 1, Math.floor((rect.y + rect.h - 1) / TILE_SIZE));
+
+        for (let tileX = startTileX; tileX <= endTileX; tileX += 1) {
+            for (let tileY = startTileY; tileY <= endTileY; tileY += 1) {
+                const value = this.getMapValue(tileX, tileY);
+                if (BLOCKING_TILE_VALUES.has(value)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    getBuildingFootprint(building) {
+        if (!building) {
+            return { width: 1, height: 1 };
+        }
+        const type = Number.isFinite(building.type) ? building.type : null;
+        if (type !== null && isCommandCenter(type)) {
+            return {
+                width: COMMAND_CENTER_WIDTH_TILES,
+                height: COMMAND_CENTER_HEIGHT_TILES
+            };
+        }
+        return { width: 1, height: 1 };
+    }
+
+    hitsBuilding(rect) {
+        if (!rect) {
+            return false;
+        }
+        const factory = this.game?.buildingFactory;
+        if (!factory || !factory.buildings || typeof factory.buildings.values !== 'function') {
+            return false;
+        }
+        for (const building of factory.buildings.values()) {
+            if (!building) {
+                continue;
+            }
+            const tileX = Number.isFinite(building.x) ? Math.floor(building.x) : null;
+            const tileY = Number.isFinite(building.y) ? Math.floor(building.y) : null;
+            if (tileX === null || tileY === null) {
+                continue;
+            }
+            const footprint = this.getBuildingFootprint(building);
+            const width = Math.max(1, Number.isFinite(footprint.width) ? footprint.width : 1);
+            const height = Math.max(1, Number.isFinite(footprint.height) ? footprint.height : 1);
+            const buildingRect = {
+                x: (tileX * TILE_SIZE) + BULLET_BUILDING_PADDING,
+                y: (tileY * TILE_SIZE) + BULLET_BUILDING_PADDING,
+                w: Math.max(TILE_SIZE * width - (BULLET_BUILDING_PADDING * 2), 8),
+                h: Math.max(TILE_SIZE * height - (BULLET_BUILDING_PADDING * 2), 8)
+            };
+            if (rectangleCollision(rect, buildingRect)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    clampBulletRect(bullet) {
+        const rect = createBulletRect(bullet);
+        rect.x = Math.max(0, Math.min(rect.x, MAP_PIXEL_SIZE - rect.w));
+        rect.y = Math.max(0, Math.min(rect.y, MAP_PIXEL_SIZE - rect.h));
+        return rect;
+    }
+
+    checkTerrainCollision(bullet) {
+        const rect = this.clampBulletRect(bullet);
+        if (this.hitsBlockingTile(rect)) {
+            return true;
+        }
+        return false;
+    }
+
+    checkStructureCollision(bullet) {
+        const rect = this.clampBulletRect(bullet);
+        if (this.hitsBuilding(rect)) {
+            return true;
+        }
+        return false;
     }
 
     registerSourceShot(sourceId, now) {

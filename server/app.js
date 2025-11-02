@@ -21,6 +21,7 @@ var HazardManager = require('./src/hazards/HazardManager');
 var OrbManager = require('./src/orb/OrbManager');
 var FakeCityManager = require('./src/FakeCityManager');
 var DefenseManager = require('./src/DefenseManager');
+var { loadMapData } = require('./src/utils/mapLoader');
 
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -35,8 +36,21 @@ var game = {
     tick: 0,
 
     players: {},
-    cities: []
+    cities: [],
+    map: []
 };
+
+try {
+    var mapData = loadMapData();
+    if (mapData && Array.isArray(mapData.map)) {
+        game.map = mapData.map;
+        console.log(`[map] Loaded map.dat (${game.map.length} columns / ${Array.isArray(game.map[0]) ? game.map[0].length : 0} rows)`);
+    } else {
+        console.warn('[map] Map data missing or invalid, collision checks may fail');
+    }
+} catch (error) {
+    console.warn('[map] Unable to load map data:', error.message);
+}
 
 
 const playerFactory = new PlayerFactory(game);

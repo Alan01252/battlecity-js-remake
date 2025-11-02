@@ -74,6 +74,7 @@ class BuildingFactory {
         this.buildingsById = {};
         this.buildingsByCoord = {};
         this.pendingBuildCosts = new Map();
+        this.pendingDemolish = new Set();
     }
 
     cycle() {
@@ -224,24 +225,16 @@ class BuildingFactory {
 
         console.log("Trying to demolish building at " + x + " " + y);
 
-        var buildingNode = this.getHead();
-
-        while (buildingNode) {
-
-            if (buildingNode.type !== 0) {
-
-                console.log(buildingNode.x + " " + buildingNode.y);
-
-                if (x >= buildingNode.x &&
-                    x <= buildingNode.x + 2 &&
-                    y >= buildingNode.y &&
-                    y <= buildingNode.y + 2
-                ) {
-                    this.game.forceDraw = true;
-                    this.deleteBuilding(buildingNode)
-                }
-            }
-            buildingNode = buildingNode.next;
+        const buildingNode = this.findBuildingAtTile(x, y);
+        if (!buildingNode) {
+            return;
+        }
+        if (this.pendingDemolish.has(buildingNode.id)) {
+            return;
+        }
+        if (this.game.socketListener?.sendDemolishBuilding) {
+            this.pendingDemolish.add(buildingNode.id);
+            this.game.socketListener.sendDemolishBuilding(buildingNode.id);
         }
     }
 
@@ -250,6 +243,10 @@ class BuildingFactory {
 
         this.game.map[building.x][building.y] = 0;
         this.game.tiles[building.x][building.y] = 0;
+
+        if (this.pendingDemolish.has(building.id)) {
+            this.pendingDemolish.delete(building.id);
+        }
 
         if (Array.isArray(this.game.explosions)) {
             const tileX = Number.isFinite(building.x) ? Number(building.x) : 0;
@@ -314,6 +311,16 @@ class BuildingFactory {
         }
 
         return returnBuilding;
+    }
+
+    handleDemolishDenied(data) {
+        const id = data?.id;
+        if (id && this.pendingDemolish.has(id)) {
+            this.pendingDemolish.delete(id);
+        }
+        if (data?.reason) {
+            console.warn(`Demolish denied (${data.reason}) for building ${id || '(unknown)'}`);
+        }
     }
 
     removeBuildingById(id) {

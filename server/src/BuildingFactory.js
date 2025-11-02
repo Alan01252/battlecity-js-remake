@@ -247,19 +247,42 @@ class BuildingFactory {
         }
 
         if (!data || !data.id) {
+            this.emitDemolishDenied(socket, null, 'invalid_payload');
             return;
         }
 
         const building = this.buildings.get(data.id);
         if (!building) {
+            debug(`Demolish ignored for missing building id=${data.id}`);
+            this.emitDemolishDenied(socket, data.id, 'not_found');
+            return;
+        }
+
+        if (typeof building.ownerId === 'string' && building.ownerId.startsWith('fake_city_')) {
+            debug(`Demolish denied for fake city structure ${data.id} owner=${building.ownerId} requestedBy=${socket.id}`);
+            this.emitDemolishDenied(socket, building.id, 'protected');
             return;
         }
 
         if (building.ownerId !== socket.id) {
+            debug(`Demolish denied for ${data.id} owner=${building.ownerId} requestedBy=${socket.id}`);
+            this.emitDemolishDenied(socket, building.id, 'not_owner');
             return;
         }
 
+        debug(`Demolish approved for ${data.id} by ${socket.id}`);
         this.removeBuilding(building.id);
+    }
+
+    emitDemolishDenied(socket, id, reason) {
+        if (!socket) {
+            return;
+        }
+        const payload = {
+            id: id || null,
+            reason: reason || 'denied'
+        };
+        socket.emit('demolish:denied', payload);
     }
 
     spawnStaticBuilding(data) {

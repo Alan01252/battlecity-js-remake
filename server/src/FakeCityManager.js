@@ -5,9 +5,12 @@ const fakeCityConfig = require('../../shared/fakeCities.json');
 const {
     TILE_SIZE,
     MAX_HEALTH,
+    PLAYER_HITBOX_GAP,
     COMMAND_CENTER_WIDTH_TILES,
     COMMAND_CENTER_HEIGHT_TILES
 } = require('./gameplay/constants');
+const { rectangleCollision } = require('./gameplay/geometry');
+const { isCommandCenter } = require('./constants');
 
 const DEFENSE_ITEM_TYPES = Object.freeze({
     turret: 9,
@@ -38,7 +41,12 @@ const RECRUIT_SIMULATION_STEP_MS = 16;
 const RECRUIT_MAX_SIM_STEPS = 12;
 const RECRUIT_MIN_MOVEMENT_DELTA = 0.25;
 const MAP_SIZE_TILES = 512;
-const MAP_MAX_COORD = (MAP_SIZE_TILES * TILE_SIZE) - TILE_SIZE;
+const MAP_PIXEL_SIZE = MAP_SIZE_TILES * TILE_SIZE;
+const MAP_MAX_COORD = (MAP_PIXEL_SIZE) - TILE_SIZE;
+const SPRITE_GAP = PLAYER_HITBOX_GAP;
+const PLAYER_RECT_SIZE = TILE_SIZE - (SPRITE_GAP * 2);
+const AVOIDANCE_ANGLES = Object.freeze([Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]);
+const RECRUIT_STUCK_TIMEOUT_MS = 5000;
 
 const RECRUIT_POSITION_PATTERNS = Object.freeze([
     { dx: -TILE_SIZE, dy: TILE_SIZE / 2, direction: 16 },
@@ -173,6 +181,31 @@ const toFiniteNumber = (value, fallback = 0) => {
     return fallback;
 };
 
+const normalizeVector = (dx, dy) => {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+        return null;
+    }
+    const length = Math.sqrt((dx * dx) + (dy * dy));
+    if (length < 1e-4) {
+        return null;
+    }
+    return {
+        dx: dx / length,
+        dy: dy / length
+    };
+};
+
+const rotateVector = (vector, angle) => {
+    if (!vector) {
+        return null;
+    }
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const dx = (vector.dx * cos) - (vector.dy * sin);
+    const dy = (vector.dx * sin) + (vector.dy * cos);
+    return normalizeVector(dx, dy);
+};
+
 const resolveBlueprintSize = (type) => {
     if (type === 0) {
         return {
@@ -215,6 +248,54 @@ const calculateLayoutBounds = (layout, baseTileX, baseTileY) => {
     return { minTileX, maxTileX, minTileY, maxTileY };
 };
 
+const BLOCKING_TILE_VALUES = new Set([1, 2, 3]);
+
+const isBlockingTileValue = (value) => {
+    if (value === null || value === undefined) {
+        return false;
+    }
+    if (BLOCKING_TILE_VALUES.has(value)) {
+        return true;
+    }
+    return false;
+};
+
+const clampPixel = (value) => {
+    if (!Number.isFinite(value)) {
+        return 0;
+    }
+    if (value < 0) {
+        return 0;
+    }
+    if (value > MAP_PIXEL_SIZE - 1) {
+        return MAP_PIXEL_SIZE - 1;
+    }
+    return value;
+};
+
+const createPlayerRectAt = (x, y) => ({
+    x: Math.floor(x + SPRITE_GAP),
+    y: Math.floor(y + SPRITE_GAP),
+    w: PLAYER_RECT_SIZE,
+    h: PLAYER_RECT_SIZE
+});
+
+const getBuildingFootprint = (building) => {
+    if (!building) {
+        return { width: 1, height: 1 };
+    }
+    const type = Number.isFinite(building.type) ? building.type : null;
+    if (type !== null && isCommandCenter(type)) {
+        return {
+            width: COMMAND_CENTER_WIDTH_TILES,
+            height: COMMAND_CENTER_HEIGHT_TILES
+        };
+    }
+    return { width: 1, height: 1 };
+};
+
+const BUILDING_HITBOX_PADDING = TILE_SIZE * 0.2;
+
 class FakeCityManager {
     constructor({ game, buildingFactory, playerFactory, hazardManager, defenseManager, bulletFactory }) {
         this.game = game;
@@ -231,6 +312,7 @@ class FakeCityManager {
         this.recruits = new Map();
         this.recruitsByCity = new Map();
         this.recruitSequence = 0;
+        this.debug = require('debug')('BattleCity:FakeCityManager');
     }
 
     setIo(io) {
@@ -430,6 +512,204 @@ class FakeCityManager {
         };
     }
 
+    getMapValue(tileX, tileY) {
+        const map = this.game?.map;
+        if (!Array.isArray(map) || !Array.isArray(map[0])) {
+            return 0;
+        }
+        if (tileX < 0 || tileY < 0 || tileX >= MAP_SIZE_TILES || tileY >= MAP_SIZE_TILES) {
+            return 0;
+        }
+        const column = map[tileX];
+        if (!Array.isArray(column)) {
+            return 0;
+        }
+        const value = column[tileY];
+        if (value === undefined || value === null) {
+            return 0;
+        }
+        return value;
+    }
+
+    hitsEdges(rect) {
+        if (!rect) {
+            return true;
+        }
+        if (rect.x < 0 || rect.y < 0) {
+            return true;
+        }
+        if ((rect.x + rect.w) > MAP_PIXEL_SIZE) {
+            return true;
+        }
+        if ((rect.y + rect.h) > MAP_PIXEL_SIZE) {
+            return true;
+        }
+        return false;
+    }
+
+    hitsBlockingTile(rect) {
+        if (!rect) {
+            return false;
+        }
+        const startTileX = Math.max(0, Math.floor(rect.x / TILE_SIZE));
+        const endTileX = Math.min(MAP_SIZE_TILES - 1, Math.floor((rect.x + rect.w - 1) / TILE_SIZE));
+        const startTileY = Math.max(0, Math.floor(rect.y / TILE_SIZE));
+        const endTileY = Math.min(MAP_SIZE_TILES - 1, Math.floor((rect.y + rect.h - 1) / TILE_SIZE));
+
+        for (let tileX = startTileX; tileX <= endTileX; tileX += 1) {
+            for (let tileY = startTileY; tileY <= endTileY; tileY += 1) {
+                const value = this.getMapValue(tileX, tileY);
+                if (isBlockingTileValue(value)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    hitsBuildings(rect) {
+        if (!rect) {
+            return false;
+        }
+        const factory = this.buildingFactory;
+        if (!factory || !factory.buildings || typeof factory.buildings.values !== 'function') {
+            return false;
+        }
+        for (const building of factory.buildings.values()) {
+            if (!building) {
+                continue;
+            }
+            const tileX = Number.isFinite(building.x) ? Math.floor(building.x) : null;
+            const tileY = Number.isFinite(building.y) ? Math.floor(building.y) : null;
+            if (tileX === null || tileY === null) {
+                continue;
+            }
+            const footprint = getBuildingFootprint(building);
+            const width = Math.max(1, Number.isFinite(footprint.width) ? footprint.width : 1);
+            const height = Math.max(1, Number.isFinite(footprint.height) ? footprint.height : 1);
+            const padding = BUILDING_HITBOX_PADDING;
+            const buildingRect = {
+                x: (tileX * TILE_SIZE) + padding,
+                y: (tileY * TILE_SIZE) + padding,
+                w: Math.max(TILE_SIZE * width - (padding * 2), TILE_SIZE * 0.5),
+                h: Math.max(TILE_SIZE * height - (padding * 2), TILE_SIZE * 0.5)
+            };
+            if (rectangleCollision(rect, buildingRect)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    isBlocked(x, y) {
+        const rect = createPlayerRectAt(clampPixel(x), clampPixel(y));
+        if (this.hitsEdges(rect)) {
+            return true;
+        }
+        if (this.hitsBlockingTile(rect)) {
+            return true;
+        }
+        if (this.hitsBuildings(rect)) {
+            return true;
+        }
+        return false;
+    }
+
+    ensureSpawnIsClear(spawn) {
+        if (!spawn) {
+            return spawn;
+        }
+        if (!this.isBlocked(spawn.x, spawn.y)) {
+            return spawn;
+        }
+        this.debug(`[recruit fallback] spawn blocked at (${spawn.x.toFixed(1)}, ${spawn.y.toFixed(1)}) searching alternatives`);
+        const offsets = [
+            { dx: TILE_SIZE, dy: 0 },
+            { dx: -TILE_SIZE, dy: 0 },
+            { dx: 0, dy: TILE_SIZE },
+            { dx: 0, dy: -TILE_SIZE },
+            { dx: TILE_SIZE * 0.75, dy: TILE_SIZE * 0.75 },
+            { dx: -TILE_SIZE * 0.75, dy: TILE_SIZE * 0.75 },
+            { dx: TILE_SIZE * 0.75, dy: -TILE_SIZE * 0.75 },
+            { dx: -TILE_SIZE * 0.75, dy: -TILE_SIZE * 0.75 }
+        ];
+        for (const offset of offsets) {
+            const candidateX = clamp(spawn.x + offset.dx, 0, MAP_MAX_COORD);
+            const candidateY = clamp(spawn.y + offset.dy, 0, MAP_MAX_COORD);
+            if (!this.isBlocked(candidateX, candidateY)) {
+                this.debug(`[recruit fallback] spawn moved to (${candidateX.toFixed(1)}, ${candidateY.toFixed(1)})`);
+                return Object.assign({}, spawn, { x: candidateX, y: candidateY });
+            }
+        }
+        return spawn;
+    }
+
+    tryMoveWithVector(px, py, vector, step) {
+        if (!vector) {
+            return null;
+        }
+        const nextX = clamp(px + (vector.dx * step), 0, MAP_MAX_COORD);
+        const nextY = clamp(py + (vector.dy * step), 0, MAP_MAX_COORD);
+        if (this.isBlocked(nextX, nextY)) {
+            return null;
+        }
+        const direction = vectorToDirection(vector.dx, vector.dy, 16);
+        return {
+            x: nextX,
+            y: nextY,
+            vector,
+            direction
+        };
+    }
+
+    findAlternateVector(baseVector, px, py, step) {
+        if (!baseVector) {
+            return null;
+        }
+        for (let index = 0; index < AVOIDANCE_ANGLES.length; index += 1) {
+            const rotated = rotateVector(baseVector, AVOIDANCE_ANGLES[index]);
+            if (!rotated) {
+                continue;
+            }
+            const attempt = this.tryMoveWithVector(px, py, rotated, step);
+            if (attempt) {
+                return attempt;
+            }
+        }
+        return null;
+    }
+
+    resetRecruitPosition(record, player, now = Date.now()) {
+        if (!record || !player) {
+            return false;
+        }
+        let spawn = record.spawn || this.computeRecruitSpawn(record.cityId, null, null, record.slotIndex || 0);
+        if (!spawn) {
+            return false;
+        }
+        spawn = this.ensureSpawnIsClear(spawn);
+        record.spawn = spawn;
+        player.offset.x = spawn.x;
+        player.offset.y = spawn.y;
+        if (spawn.direction !== undefined) {
+            player.direction = spawn.direction;
+        }
+        player.sequence = (player.sequence || 0) + 1;
+        player.isMoving = 0;
+        record.mode = 'patrol';
+        record.targetId = null;
+        record.patrolIndex = 0;
+        record.patrolDirection = 1;
+        record.nextScanAt = now + RECRUIT_TARGET_REFRESH_MS;
+        record.nextShotAt = now + RECRUIT_SHOOT_INTERVAL_MS;
+        record.lastMoveTimestamp = now;
+        record.stuckCounter = 0;
+        record.lastMoveX = spawn.x;
+        record.lastMoveY = spawn.y;
+        this.ensureRecruitPatrolState(record);
+        return true;
+    }
+
     resolveRecruitPatrol(record, px, py, fallbackDirection = 16) {
         if (!record) {
             return null;
@@ -481,6 +761,48 @@ class FakeCityManager {
             };
         }
 
+        return null;
+    }
+
+    resolveFallbackTarget(record, px, py, fallbackDirection = 16) {
+        if (!record) {
+            return null;
+        }
+        const spawn = this.ensureSpawnIsClear(record.spawn || this.computeRecruitSpawn(record.cityId, null, null, record.slotIndex || 0));
+        if (!spawn) {
+            return null;
+        }
+        const offsets = [
+            { dx: TILE_SIZE * 2, dy: 0 },
+            { dx: -TILE_SIZE * 2, dy: 0 },
+            { dx: 0, dy: TILE_SIZE * 2 },
+            { dx: 0, dy: -TILE_SIZE * 2 },
+            { dx: TILE_SIZE * 1.5, dy: TILE_SIZE * 1.5 },
+            { dx: -TILE_SIZE * 1.5, dy: TILE_SIZE * 1.5 },
+            { dx: TILE_SIZE * 1.5, dy: -TILE_SIZE * 1.5 },
+            { dx: -TILE_SIZE * 1.5, dy: -TILE_SIZE * 1.5 }
+        ];
+        const minDistanceSq = (TILE_SIZE * 0.75) * (TILE_SIZE * 0.75);
+
+        for (const offset of offsets) {
+            const targetX = clamp(spawn.x + offset.dx, 0, MAP_MAX_COORD);
+            const targetY = clamp(spawn.y + offset.dy, 0, MAP_MAX_COORD);
+            if (this.isBlocked(targetX, targetY)) {
+                continue;
+            }
+            const dx = targetX - px;
+            const dy = targetY - py;
+            const distanceSq = (dx * dx) + (dy * dy);
+            if (distanceSq < minDistanceSq) {
+                continue;
+            }
+            const direction = vectorToDirection(dx, dy, fallbackDirection);
+            return {
+                point: { x: targetX, y: targetY },
+                direction,
+                stopDistance: TILE_SIZE * 0.6
+            };
+        }
         return null;
     }
 
@@ -574,7 +896,13 @@ class FakeCityManager {
         record.lastBroadcastAt = now;
         record.lastThinkAt = now;
         this.ensureRecruitPatrolState(record);
+        record.lastMoveTimestamp = now;
+        record.lastMoveX = spawn.x;
+        record.lastMoveY = spawn.y;
+        record.stuckCounter = 0;
         player.isMoving = 0;
+        const debugLabel = `[recruit ${record.id}]`;
+        this.debug(`${debugLabel} spawn ready at (${spawn.x.toFixed(1)}, ${spawn.y.toFixed(1)}) dir=${player.direction}`);
 
         return player;
     }
@@ -589,6 +917,7 @@ class FakeCityManager {
         record.targetId = null;
         record.nextShotAt = 0;
         record.nextScanAt = now + RECRUIT_TARGET_REFRESH_MS;
+        record.stuckCounter = 0;
     }
 
     updateRecruitBehaviour(record, player, now) {
@@ -600,8 +929,6 @@ class FakeCityManager {
 
         let px = player.offset?.x ?? 0;
         let py = player.offset?.y ?? 0;
-        const previousX = px;
-        const previousY = py;
         const previousDirection = wrapDirection(player.direction ?? 0);
         const previousMoving = player.isMoving ? 1 : 0;
 
@@ -615,6 +942,9 @@ class FakeCityManager {
         if (!record.targetId || !record.nextScanAt || now >= record.nextScanAt) {
             record.targetId = this.acquireRecruitTarget(record, px, py);
             record.nextScanAt = now + RECRUIT_TARGET_REFRESH_MS;
+            if (record.targetId) {
+                this.debug(`[recruit ${record.id}] acquired target ${record.targetId}`);
+            }
         }
 
         let target = null;
@@ -657,6 +987,7 @@ class FakeCityManager {
                     x: engagePoint.point.x,
                     y: engagePoint.point.y
                 };
+                this.debug(`[recruit ${record.id}] engage target ${record.targetId} patrolIndex=${record.patrolIndex}`);
             } else {
                 movementTarget = null;
             }
@@ -668,11 +999,21 @@ class FakeCityManager {
                 };
             }
 
-            if (!record.nextShotAt || now >= record.nextShotAt) {
-                const aimDelta = directionDelta(desiredDirection, rawDirection);
-                if (aimDelta <= 2) {
-                    const fired = this.fireRecruitLaser(record, player, target, rawDirection, now);
-                    const delay = fired
+            if (!movementTarget) {
+                const fallback = this.resolveFallbackTarget(record, px, py, previousDirection);
+                if (fallback) {
+                    movementTarget = fallback.point;
+                    desiredDirection = fallback.direction ?? desiredDirection;
+                    stopDistance = fallback.stopDistance ?? stopDistance;
+                    this.debug(`[recruit ${record.id}] using engage fallback waypoint (${movementTarget.x.toFixed(1)}, ${movementTarget.y.toFixed(1)})`);
+                }
+            }
+
+        if (!record.nextShotAt || now >= record.nextShotAt) {
+            const aimDelta = directionDelta(desiredDirection, rawDirection);
+            if (aimDelta <= 2) {
+                const fired = this.fireRecruitLaser(record, player, target, rawDirection, now);
+                const delay = fired
                         ? (RECRUIT_SHOOT_INTERVAL_MS + Math.floor(Math.random() * RECRUIT_SHOOT_JITTER_MS))
                         : 300;
                     record.nextShotAt = now + delay;
@@ -700,9 +1041,25 @@ class FakeCityManager {
                 const baseDirection = record.spawn?.direction ?? 16;
                 desiredDirection = stepDirectionTowards(previousDirection, baseDirection, 2);
             }
+
+        if (!movementTarget) {
+            const fallback = this.resolveFallbackTarget(record, px, py, fallbackDirection);
+            if (fallback) {
+                movementTarget = fallback.point;
+                desiredDirection = fallback.direction ?? desiredDirection;
+                stopDistance = fallback.stopDistance ?? stopDistance;
+                this.debug(`[recruit ${record.id}] patrol fallback to (${movementTarget.x.toFixed(1)}, ${movementTarget.y.toFixed(1)})`);
+            }
+        }
+
+        if (!movementTarget) {
+            this.debug(`[recruit ${record.id}] no movement target; remain idle mode=${record.mode}`);
+        }
         }
 
         let moved = false;
+        let lastDirection = desiredDirection;
+        let resetPerformed = false;
         player.isMoving = 0;
         if (movementTarget) {
             let remainingTime = deltaMs;
@@ -735,13 +1092,32 @@ class FakeCityManager {
                     break;
                 }
 
-                const inv = 1 / distance;
-                const nextX = clamp(px + (dx * inv * step), 0, MAP_MAX_COORD);
-                const nextY = clamp(py + (dy * inv * step), 0, MAP_MAX_COORD);
-                px = nextX;
-                py = nextY;
-                player.isMoving = 1;
-                moved = moved || (Math.abs(nextX - previousX) > RECRUIT_MIN_MOVEMENT_DELTA || Math.abs(nextY - previousY) > RECRUIT_MIN_MOVEMENT_DELTA);
+                const baseVector = normalizeVector(dx, dy);
+                if (!baseVector) {
+                    break;
+                }
+
+                let attempt = this.tryMoveWithVector(px, py, baseVector, step);
+                if (!attempt) {
+                    attempt = this.findAlternateVector(baseVector, px, py, step);
+                }
+                if (!attempt) {
+                    const patrolPath = this.getRecruitPatrolPath(record);
+                    if (Array.isArray(patrolPath) && patrolPath.length) {
+                        const directionStep = (record.patrolDirection === -1) ? -1 : 1;
+                        record.patrolIndex = ((record.patrolIndex + directionStep) % patrolPath.length + patrolPath.length) % patrolPath.length;
+                    }
+                    break;
+                }
+
+                const prevX = px;
+                const prevY = py;
+                px = attempt.x;
+                py = attempt.y;
+                lastDirection = attempt.direction;
+                const stepDeltaX = Math.abs(px - prevX);
+                const stepDeltaY = Math.abs(py - prevY);
+                moved = moved || (stepDeltaX > RECRUIT_MIN_MOVEMENT_DELTA || stepDeltaY > RECRUIT_MIN_MOVEMENT_DELTA);
 
                 remainingTime -= stepTime;
                 iterations += 1;
@@ -760,6 +1136,39 @@ class FakeCityManager {
         player.offset.x = px;
         player.offset.y = py;
 
+        player.isMoving = moved ? 1 : 0;
+        if (moved) {
+            record.lastMoveTimestamp = now;
+            record.lastMoveX = px;
+            record.lastMoveY = py;
+            record.stuckCounter = 0;
+            if (Number.isFinite(lastDirection)) {
+                const turnStep = target ? 4 : 2;
+                desiredDirection = stepDirectionTowards(previousDirection, lastDirection, turnStep);
+            }
+        } else {
+            record.stuckCounter = (record.stuckCounter || 0) + 1;
+            const lastMoveAt = record.lastMoveTimestamp || 0;
+            if ((now - lastMoveAt) >= RECRUIT_STUCK_TIMEOUT_MS) {
+                const reset = this.resetRecruitPosition(record, player, now);
+                if (reset) {
+                    px = player.offset.x ?? px;
+                    py = player.offset.y ?? py;
+                    desiredDirection = wrapDirection(player.direction ?? desiredDirection, desiredDirection);
+                    lastDirection = desiredDirection;
+                    player.isMoving = 0;
+                    broadcast = true;
+                    resetPerformed = true;
+                }
+            }
+        }
+
+        if (resetPerformed) {
+            player.isMoving = 0;
+        } else {
+            player.isMoving = moved ? 1 : 0;
+        }
+
         if (directionDelta(previousDirection, desiredDirection) > 0) {
             player.direction = desiredDirection;
             sequenceDelta += 1;
@@ -777,6 +1186,11 @@ class FakeCityManager {
 
         if (sequenceDelta > 0) {
             player.sequence = (player.sequence || 0) + sequenceDelta;
+        }
+
+        if (this.debug && (moved || resetPerformed)) {
+            const modeLabel = record.mode || 'unknown';
+            this.debug(`[recruit ${record.id}] mode=${modeLabel} moved=${moved} reset=${resetPerformed} pos=(${player.offset.x.toFixed(1)}, ${player.offset.y.toFixed(1)}) target=${movementTarget ? `${movementTarget.x.toFixed(1)},${movementTarget.y.toFixed(1)}` : 'none'} dir=${player.direction}`);
         }
 
         if (broadcast && this.io) {
@@ -896,11 +1310,12 @@ class FakeCityManager {
         const offsetY = pattern.dy + (ring * TILE_SIZE);
         const mapMax = (512 * TILE_SIZE) - TILE_SIZE;
 
-        return {
+        const spawn = {
             x: clamp(originX + offsetX, 0, mapMax),
             y: clamp(originY + offsetY, 0, mapMax),
             direction: pattern.direction ?? 16
         };
+        return this.ensureSpawnIsClear(spawn);
     }
 
     ensureCityRecruits(cityId, entry, baseTileX, baseTileY) {

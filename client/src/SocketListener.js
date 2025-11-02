@@ -278,6 +278,13 @@ class SocketListener extends EventEmitter2 {
             }
         });
 
+        this.io.on('demolish:denied', (payload) => {
+            const data = this.safeParse(payload);
+            if (this.game.buildingFactory?.handleDemolishDenied) {
+                this.game.buildingFactory.handleDemolishDenied(data);
+            }
+        });
+
         this.io.on("player:health", (payload) => {
             const data = this.safeParse(payload);
             if (!data || !data.id) {
