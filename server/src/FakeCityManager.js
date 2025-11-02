@@ -47,6 +47,24 @@ const SPRITE_GAP = PLAYER_HITBOX_GAP;
 const PLAYER_RECT_SIZE = TILE_SIZE - (SPRITE_GAP * 2);
 const AVOIDANCE_ANGLES = Object.freeze([Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]);
 const RECRUIT_STUCK_TIMEOUT_MS = 5000;
+const NAV_MAX_NODES = 6000;
+const ARRIVE_RADIUS_PX = TILE_SIZE * 0.7;
+const REPATH_STALL_MS = 650;
+const LOS_RECHECK_MS = 300;
+const PATH_REBUILD_COOLDOWN_MS = 350;
+const OPTIMAL_RANGE_PX = TILE_SIZE * 12;
+const KITE_RANGE_PX = TILE_SIZE * 16;
+const BULLET_SPEED_PX_PER_S = TILE_SIZE * 28;
+const AVOID_PROBE_PX = 20;
+const SEPARATION_MIN_PX = 22;
+const SEPARATION_STRENGTH = 0.6;
+const PATH_WAYPOINT_REACH_PX = TILE_SIZE * 0.3;
+const LAST_SEEN_TIMEOUT_MS = 2000;
+const VISITED_TILE_LRU_SIZE = 10;
+const FLANK_SAMPLE_ANGLES = Object.freeze([Math.PI / 2, -Math.PI / 2, Math.PI / 3, -Math.PI / 3]);
+const RETREAT_HEALTH_FRACTION = 0.3;
+const KITE_HEALTH_FRACTION = 0.55;
+const FRIENDLY_FIRE_BUFFER_PX = TILE_SIZE * 0.5;
 
 const RECRUIT_POSITION_PATTERNS = Object.freeze([
     { dx: -TILE_SIZE, dy: TILE_SIZE / 2, direction: 16 },
@@ -206,6 +224,252 @@ const rotateVector = (vector, angle) => {
     return normalizeVector(dx, dy);
 };
 
+const pixelToTile = (px, py) => ({
+    x: clampTileIndex(px / TILE_SIZE),
+    y: clampTileIndex(py / TILE_SIZE)
+});
+
+const tileToPixelCenter = (tileX, tileY) => ({
+    x: (tileX * TILE_SIZE) + (TILE_SIZE / 2),
+    y: (tileY * TILE_SIZE) + (TILE_SIZE / 2)
+});
+
+const tileToOffsetOrigin = (tileX, tileY) => ({
+    x: clamp(tileX * TILE_SIZE, 0, MAP_MAX_COORD),
+    y: clamp(tileY * TILE_SIZE, 0, MAP_MAX_COORD)
+});
+
+const seekArrive = (current, target, maxSpeedPxPerMs, arriveRadiusPx) => {
+    if (!current || !target) {
+        return null;
+    }
+    const dx = (target.x ?? 0) - (current.x ?? 0);
+    const dy = (target.y ?? 0) - (current.y ?? 0);
+    const distSq = (dx * dx) + (dy * dy);
+    if (!Number.isFinite(distSq) || distSq < 1e-5) {
+        return null;
+    }
+    let speed = maxSpeedPxPerMs;
+    if (arriveRadiusPx > 0) {
+        const dist = Math.sqrt(distSq);
+        if (dist < arriveRadiusPx) {
+            const scaled = maxSpeedPxPerMs * (dist / arriveRadiusPx);
+            speed = Math.max(Math.min(maxSpeedPxPerMs, scaled), maxSpeedPxPerMs * 0.1);
+        }
+    }
+    const dist = Math.sqrt(distSq);
+    if (dist < 1e-5) {
+        return null;
+    }
+    const scale = speed / dist;
+    return {
+        dx: dx * scale,
+        dy: dy * scale
+    };
+};
+
+const avoidanceAdjust = (position, velocity, maxSpeedPxPerMs, navGrid, isTileBlocked) => {
+    if (!position || !velocity || !navGrid || typeof isTileBlocked !== 'function') {
+        return velocity;
+    }
+    const speed = Math.sqrt((velocity.dx * velocity.dx) + (velocity.dy * velocity.dy));
+    if (!Number.isFinite(speed) || speed < 1e-4) {
+        return velocity;
+    }
+    const unit = {
+        dx: velocity.dx / speed,
+        dy: velocity.dy / speed
+    };
+    const probeDistance = Math.max(AVOID_PROBE_PX, maxSpeedPxPerMs * RECRUIT_SIMULATION_STEP_MS * 1.5);
+    const forward = pixelToTile(position.x + (unit.dx * probeDistance), position.y + (unit.dy * probeDistance));
+    if (!isTileBlocked(forward.x, forward.y)) {
+        return velocity;
+    }
+    const checkBlocked = (vector) => {
+        if (!vector) {
+            return true;
+        }
+        const probeX = position.x + (vector.dx * probeDistance);
+        const probeY = position.y + (vector.dy * probeDistance);
+        const tile = pixelToTile(probeX, probeY);
+        return isTileBlocked(tile.x, tile.y);
+    };
+    const left = rotateVector(unit, Math.PI / 4);
+    const right = rotateVector(unit, -Math.PI / 4);
+    const back = rotateVector(unit, Math.PI);
+    const leftBlocked = checkBlocked(left);
+    const rightBlocked = checkBlocked(right);
+    let candidate = null;
+    if (!leftBlocked && rightBlocked) {
+        candidate = left;
+    } else if (!rightBlocked && leftBlocked) {
+        candidate = right;
+    } else if (!leftBlocked && !rightBlocked) {
+        candidate = Math.random() < 0.5 ? left : right;
+    } else if (back) {
+        candidate = back;
+    }
+    if (!candidate) {
+        return velocity;
+    }
+    return {
+        dx: candidate.dx * speed,
+        dy: candidate.dy * speed
+    };
+};
+
+const separationAdjust = (position, allies, maxSpeedPxPerMs) => {
+    if (!position || !Array.isArray(allies) || !allies.length) {
+        return { dx: 0, dy: 0 };
+    }
+    const sourceX = position.x + (TILE_SIZE / 2);
+    const sourceY = position.y + (TILE_SIZE / 2);
+    let totalDx = 0;
+    let totalDy = 0;
+    let totalWeight = 0;
+    const minDistSq = SEPARATION_MIN_PX * SEPARATION_MIN_PX;
+    for (const ally of allies) {
+        if (!ally) {
+            continue;
+        }
+        const dx = sourceX - ally.x;
+        const dy = sourceY - ally.y;
+        const distSq = (dx * dx) + (dy * dy);
+        if (!Number.isFinite(distSq) || distSq <= 1e-5 || distSq > minDistSq) {
+            continue;
+        }
+        const dist = Math.sqrt(distSq);
+        const strength = (SEPARATION_MIN_PX - dist) / SEPARATION_MIN_PX;
+        if (strength <= 0) {
+            continue;
+        }
+        totalDx += (dx / dist) * strength;
+        totalDy += (dy / dist) * strength;
+        totalWeight += strength;
+    }
+    if (totalWeight <= 0) {
+        return { dx: 0, dy: 0 };
+    }
+    const scale = (SEPARATION_STRENGTH * maxSpeedPxPerMs) / totalWeight;
+    return {
+        dx: totalDx * scale,
+        dy: totalDy * scale
+    };
+};
+
+const leadDirection = (shooter, target, bulletSpeedPxPerS, fallbackDirection = 16) => {
+    if (!shooter || !target) {
+        return fallbackDirection;
+    }
+    const shooterX = (shooter.offset?.x ?? shooter.x ?? 0) + (TILE_SIZE / 2);
+    const shooterY = (shooter.offset?.y ?? shooter.y ?? 0) + (TILE_SIZE / 2);
+    const targetX = (target.offset?.x ?? target.x ?? 0) + (TILE_SIZE / 2);
+    const targetY = (target.offset?.y ?? target.y ?? 0) + (TILE_SIZE / 2);
+    const dx = targetX - shooterX;
+    const dy = targetY - shooterY;
+    let vx = 0;
+    let vy = 0;
+    if (target.isMoving && Number.isFinite(target.direction)) {
+        const vec = directionToUnitVector(target.direction);
+        const targetSpeedPxPerMs = target.speed ?? (RECRUIT_PATROL_SPEED * 0.95);
+        const targetSpeedPxPerS = targetSpeedPxPerMs * 1000;
+        vx = vec.x * targetSpeedPxPerS;
+        vy = vec.y * targetSpeedPxPerS;
+    }
+    const a = (vx * vx) + (vy * vy) - (bulletSpeedPxPerS * bulletSpeedPxPerS);
+    const b = 2 * ((dx * vx) + (dy * vy));
+    const c = (dx * dx) + (dy * dy);
+    let t = 0;
+    if (Math.abs(a) < 1e-6) {
+        if (Math.abs(b) < 1e-6) {
+            return vectorToDirection(dx, dy, fallbackDirection);
+        }
+        t = -c / b;
+        if (t <= 0 || !Number.isFinite(t)) {
+            return vectorToDirection(dx, dy, fallbackDirection);
+        }
+    } else {
+        const discriminant = (b * b) - (4 * a * c);
+        if (discriminant < 0) {
+            return vectorToDirection(dx, dy, fallbackDirection);
+        }
+        const sqrt = Math.sqrt(discriminant);
+        const t1 = (-b - sqrt) / (2 * a);
+        const t2 = (-b + sqrt) / (2 * a);
+        t = Math.min(t1, t2);
+        if (t <= 0) {
+            t = Math.max(t1, t2);
+        }
+        if (t <= 0 || !Number.isFinite(t)) {
+            return vectorToDirection(dx, dy, fallbackDirection);
+        }
+    }
+    const predictedX = targetX + (vx * t);
+    const predictedY = targetY + (vy * t);
+    return vectorToDirection(predictedX - shooterX, predictedY - shooterY, fallbackDirection);
+};
+
+const linePointDistanceSq = (ax, ay, bx, by, px, py) => {
+    const abx = bx - ax;
+    const aby = by - ay;
+    const lengthSq = (abx * abx) + (aby * aby);
+    if (lengthSq < 1e-6) {
+        return distanceSquared(ax, ay, px, py);
+    }
+    let t = ((px - ax) * abx + (py - ay) * aby) / lengthSq;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + (abx * t);
+    const cy = ay + (aby * t);
+    return distanceSquared(cx, cy, px, py);
+};
+
+const hasFriendlyObstruction = (shooterCenter, targetCenter, alliesCenters) => {
+    if (!shooterCenter || !targetCenter || !Array.isArray(alliesCenters) || !alliesCenters.length) {
+        return false;
+    }
+    const ax = shooterCenter.x;
+    const ay = shooterCenter.y;
+    const bx = targetCenter.x;
+    const by = targetCenter.y;
+    const lineLengthSq = distanceSquared(ax, ay, bx, by);
+    if (lineLengthSq < 1e-6) {
+        return false;
+    }
+    for (const ally of alliesCenters) {
+        if (!ally) {
+            continue;
+        }
+        const distSq = linePointDistanceSq(ax, ay, bx, by, ally.x, ally.y);
+        if (distSq <= (FRIENDLY_FIRE_BUFFER_PX * FRIENDLY_FIRE_BUFFER_PX)) {
+            const abx = bx - ax;
+            const aby = by - ay;
+            const projection = ((ally.x - ax) * abx + (ally.y - ay) * aby) / lineLengthSq;
+            if (projection > 0 && projection < 1) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
+const pushVisitedTile = (record, tileX, tileY) => {
+    if (!record || !Number.isFinite(tileX) || !Number.isFinite(tileY)) {
+        return;
+    }
+    const key = `${tileX}_${tileY}`;
+    if (!Array.isArray(record.visitedTiles)) {
+        record.visitedTiles = [];
+    }
+    const existingIndex = record.visitedTiles.indexOf(key);
+    if (existingIndex !== -1) {
+        record.visitedTiles.splice(existingIndex, 1);
+    }
+    record.visitedTiles.push(key);
+    if (record.visitedTiles.length > VISITED_TILE_LRU_SIZE) {
+        record.visitedTiles.shift();
+    }
+};
+
 const resolveBlueprintSize = (type) => {
     if (type === 0) {
         return {
@@ -312,6 +576,7 @@ class FakeCityManager {
         this.recruits = new Map();
         this.recruitsByCity = new Map();
         this.recruitSequence = 0;
+        this.navGrid = null;
         this.debug = require('debug')('BattleCity:FakeCityManager');
     }
 
@@ -679,6 +944,364 @@ class FakeCityManager {
         return null;
     }
 
+    buildNavGrid(force = false) {
+        if (!force && this.navGrid) {
+            return this.navGrid;
+        }
+        const width = MAP_SIZE_TILES;
+        const height = MAP_SIZE_TILES;
+        const total = width * height;
+        const tiles = new Uint8Array(total);
+        const markBlocked = (tileX, tileY) => {
+            if (tileX < 0 || tileY < 0 || tileX >= width || tileY >= height) {
+                return;
+            }
+            tiles[(tileY * width) + tileX] = 1;
+        };
+
+        for (let tileX = 0; tileX < width; tileX += 1) {
+            for (let tileY = 0; tileY < height; tileY += 1) {
+                const value = this.getMapValue(tileX, tileY);
+                if (isBlockingTileValue(value)) {
+                    markBlocked(tileX, tileY);
+                }
+            }
+        }
+
+        const factory = this.buildingFactory;
+        if (factory && factory.buildings && typeof factory.buildings.values === 'function') {
+            for (const building of factory.buildings.values()) {
+                if (!building) {
+                    continue;
+                }
+                const baseX = Number.isFinite(building.x) ? Math.floor(building.x) : null;
+                const baseY = Number.isFinite(building.y) ? Math.floor(building.y) : null;
+                if (baseX === null || baseY === null) {
+                    continue;
+                }
+                const { width: footprintW, height: footprintH } = getBuildingFootprint(building);
+                const w = Math.max(1, Number.isFinite(footprintW) ? footprintW : 1);
+                const h = Math.max(1, Number.isFinite(footprintH) ? footprintH : 1);
+                for (let dx = 0; dx < w; dx += 1) {
+                    for (let dy = 0; dy < h; dy += 1) {
+                        markBlocked(baseX + dx, baseY + dy);
+                    }
+                }
+            }
+        }
+
+        this.navGrid = {
+            width,
+            height,
+            tiles
+        };
+        return this.navGrid;
+    }
+
+    isNavTileBlocked(tileX, tileY) {
+        if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) {
+            return true;
+        }
+        const nav = this.navGrid || this.buildNavGrid();
+        if (!nav) {
+            return true;
+        }
+        if (tileX < 0 || tileY < 0 || tileX >= nav.width || tileY >= nav.height) {
+            return true;
+        }
+        return nav.tiles[(tileY * nav.width) + tileX] === 1;
+    }
+
+    losTileRaycast(ax, ay, bx, by) {
+        const nav = this.navGrid || this.buildNavGrid();
+        if (!nav) {
+            return false;
+        }
+        const start = pixelToTile(ax, ay);
+        const end = pixelToTile(bx, by);
+        let x = start.x;
+        let y = start.y;
+        const dx = Math.abs(end.x - x);
+        const dy = Math.abs(end.y - y);
+        const sx = x < end.x ? 1 : -1;
+        const sy = y < end.y ? 1 : -1;
+        let err = dx - dy;
+
+        while (true) {
+            if (!(x === start.x && y === start.y)) {
+                if (this.isNavTileBlocked(x, y)) {
+                    return false;
+                }
+            }
+            if (x === end.x && y === end.y) {
+                break;
+            }
+            const e2 = err * 2;
+            if (e2 > -dy) {
+                err -= dy;
+                x += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y += sy;
+            }
+        }
+
+        return true;
+    }
+
+    astar(start, goal, nav = this.navGrid, options = {}) {
+        if (!nav) {
+            return null;
+        }
+        const visitedPenalty = options.visitedPenalty instanceof Set ? options.visitedPenalty : null;
+        const startKey = `${start.x}_${start.y}`;
+        const goalKey = `${goal.x}_${goal.y}`;
+        const open = [];
+        const openMap = new Map();
+        const cameFrom = new Map();
+        const gScore = new Map();
+        const heuristic = (x, y) => Math.abs(x - goal.x) + Math.abs(y - goal.y);
+        const maxNodes = options.maxNodes ?? NAV_MAX_NODES;
+
+        const pushNode = (node) => {
+            open.push(node);
+            openMap.set(`${node.x}_${node.y}`, node);
+        };
+
+        const popLowest = () => {
+            let bestIndex = -1;
+            let bestNode = null;
+            for (let index = 0; index < open.length; index += 1) {
+                const candidate = open[index];
+                if (!bestNode || candidate.f < bestNode.f) {
+                    bestNode = candidate;
+                    bestIndex = index;
+                }
+            }
+            if (bestIndex === -1) {
+                return null;
+            }
+            open.splice(bestIndex, 1);
+            openMap.delete(`${bestNode.x}_${bestNode.y}`);
+            return bestNode;
+        };
+
+        pushNode({ x: start.x, y: start.y, g: 0, f: heuristic(start.x, start.y) });
+        gScore.set(startKey, 0);
+        let expansions = 0;
+
+        while (open.length && expansions < maxNodes) {
+            const current = popLowest();
+            if (!current) {
+                break;
+            }
+            const currentKey = `${current.x}_${current.y}`;
+            if (current.x === goal.x && current.y === goal.y) {
+                const path = [];
+                let walkerKey = currentKey;
+                while (walkerKey && walkerKey !== startKey) {
+                    const [px, py] = walkerKey.split('_').map(Number);
+                    path.push({ x: px, y: py });
+                    walkerKey = cameFrom.get(walkerKey);
+                }
+                path.reverse();
+                if (path.length && path[0].x === start.x && path[0].y === start.y) {
+                    path.shift();
+                }
+                return path;
+            }
+
+            expansions += 1;
+            const neighbors = [
+                { x: current.x + 1, y: current.y },
+                { x: current.x - 1, y: current.y },
+                { x: current.x, y: current.y + 1 },
+                { x: current.x, y: current.y - 1 }
+            ];
+
+            for (const neighbor of neighbors) {
+                if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= nav.width || neighbor.y >= nav.height) {
+                    continue;
+                }
+                if (this.isNavTileBlocked(neighbor.x, neighbor.y)) {
+                    continue;
+                }
+                const neighborKey = `${neighbor.x}_${neighbor.y}`;
+                const penalty = visitedPenalty && visitedPenalty.has(neighborKey) ? 6 : 0;
+                const tentativeG = current.g + 1 + penalty;
+                const existingG = gScore.get(neighborKey);
+                if (existingG !== undefined && tentativeG >= existingG) {
+                    continue;
+                }
+                cameFrom.set(neighborKey, currentKey);
+                gScore.set(neighborKey, tentativeG);
+                const fScore = tentativeG + heuristic(neighbor.x, neighbor.y);
+                const existingNode = openMap.get(neighborKey);
+                if (existingNode) {
+                    existingNode.g = tentativeG;
+                    existingNode.f = fScore;
+                } else {
+                    pushNode({ x: neighbor.x, y: neighbor.y, g: tentativeG, f: fScore });
+                }
+            }
+        }
+
+        return null;
+    }
+
+    pickMode(context) {
+        const hasTarget = !!context.target;
+        const hasRecentSeen = context.lastSeenAge !== undefined && context.lastSeenAge <= LAST_SEEN_TIMEOUT_MS;
+        const rangePx = Number.isFinite(context.rangePx) ? context.rangePx : Infinity;
+        const hpFrac = Number.isFinite(context.hpFrac) ? context.hpFrac : 1;
+        const targetHpFrac = Number.isFinite(context.targetHpFrac) ? context.targetHpFrac : 1;
+        const outnumbered = !!context.outnumbered;
+
+        if (!hasTarget && !hasRecentSeen) {
+            return 'patrol';
+        }
+        if ((hpFrac <= RETREAT_HEALTH_FRACTION) || (outnumbered && hpFrac < 0.6)) {
+            return 'retreat';
+        }
+        if (!context.hasLOS) {
+            if (hasRecentSeen) {
+                return 'flank';
+            }
+            return 'patrol';
+        }
+        if (hpFrac < KITE_HEALTH_FRACTION && (targetHpFrac > hpFrac || rangePx < OPTIMAL_RANGE_PX * 0.8)) {
+            return 'kite';
+        }
+        if (rangePx > OPTIMAL_RANGE_PX * 1.3) {
+            return 'engage';
+        }
+        if (rangePx < OPTIMAL_RANGE_PX * 0.7) {
+            return 'kite';
+        }
+        return 'engage';
+    }
+
+    computeGoalTile(options) {
+        const { mode, record, player, target, hasLOS, rangePx, lastSeen } = options;
+        const px = player.offset?.x ?? 0;
+        const py = player.offset?.y ?? 0;
+        const shooterCenter = {
+            x: px + (TILE_SIZE / 2),
+            y: py + (TILE_SIZE / 2)
+        };
+        const spawn = record.spawn || this.computeRecruitSpawn(record.cityId, null, null, record.slotIndex || 0);
+
+        const makeGoal = (desiredX, desiredY, requiresPathOverride = null) => {
+            const tx = clampTileIndex(desiredX / TILE_SIZE);
+            const ty = clampTileIndex(desiredY / TILE_SIZE);
+            const targetX = clamp(desiredX, 0, MAP_MAX_COORD);
+            const targetY = clamp(desiredY, 0, MAP_MAX_COORD);
+            const requiresPath = requiresPathOverride !== null
+                ? requiresPathOverride
+                : this.isBlocked(targetX, targetY);
+            return {
+                goalTileX: tx,
+                goalTileY: ty,
+                goalPixelX: targetX,
+                goalPixelY: targetY,
+                requiresPath
+            };
+        };
+
+        const targetCenter = target
+            ? {
+                x: (target.offset?.x ?? target.x ?? 0) + (TILE_SIZE / 2),
+                y: (target.offset?.y ?? target.y ?? 0) + (TILE_SIZE / 2)
+            }
+            : null;
+
+        if (mode === 'patrol') {
+            const fallbackDirection = wrapDirection(player.direction ?? 16);
+            const patrol = this.resolveRecruitPatrol(record, px, py, fallbackDirection);
+            if (patrol && patrol.point) {
+                const distance = Math.sqrt(distanceSquared(px, py, patrol.point.x, patrol.point.y));
+                const requiresPath = distance > TILE_SIZE * 1.5 || this.isBlocked(patrol.point.x, patrol.point.y);
+                return makeGoal(patrol.point.x, patrol.point.y, requiresPath);
+            }
+            if (spawn) {
+                return makeGoal(clamp(spawn.x, 0, MAP_MAX_COORD), clamp(spawn.y, 0, MAP_MAX_COORD), false);
+            }
+            return null;
+        }
+
+        if ((mode === 'engage' || mode === 'kite' || mode === 'retreat') && (targetCenter || lastSeen)) {
+            const reference = targetCenter || {
+                x: clamp(lastSeen?.x ?? shooterCenter.x, 0, MAP_PIXEL_SIZE),
+                y: clamp(lastSeen?.y ?? shooterCenter.y, 0, MAP_PIXEL_SIZE)
+            };
+            const directionVector = normalizeVector(shooterCenter.x - reference.x, shooterCenter.y - reference.y) || { dx: 0, dy: -1 };
+            const desiredRange = mode === 'engage'
+                ? OPTIMAL_RANGE_PX
+                : KITE_RANGE_PX;
+            let desiredCenterX = reference.x + (directionVector.dx * desiredRange);
+            let desiredCenterY = reference.y + (directionVector.dy * desiredRange);
+
+            if (mode === 'retreat' && spawn) {
+                desiredCenterX = (desiredCenterX * 0.6) + ((spawn.x + (TILE_SIZE / 2)) * 0.4);
+                desiredCenterY = (desiredCenterY * 0.6) + ((spawn.y + (TILE_SIZE / 2)) * 0.4);
+            }
+
+            const desiredX = clamp(desiredCenterX - (TILE_SIZE / 2), 0, MAP_MAX_COORD);
+            const desiredY = clamp(desiredCenterY - (TILE_SIZE / 2), 0, MAP_MAX_COORD);
+            const requiresPath = !hasLOS || this.isBlocked(desiredX, desiredY) || rangePx > desiredRange * 1.4;
+            return makeGoal(desiredX, desiredY, requiresPath);
+        }
+
+        if (mode === 'flank' && (targetCenter || lastSeen)) {
+            const reference = targetCenter || {
+                x: clamp(lastSeen?.x ?? shooterCenter.x, 0, MAP_PIXEL_SIZE),
+                y: clamp(lastSeen?.y ?? shooterCenter.y, 0, MAP_PIXEL_SIZE)
+            };
+            const baseVector = normalizeVector(shooterCenter.x - reference.x, shooterCenter.y - reference.y) || { dx: 0, dy: -1 };
+            let best = null;
+
+            FLANK_SAMPLE_ANGLES.forEach((angle) => {
+                const rotated = rotateVector(baseVector, angle);
+                if (!rotated) {
+                    return;
+                }
+                const desiredCenterX = reference.x + (rotated.dx * OPTIMAL_RANGE_PX);
+                const desiredCenterY = reference.y + (rotated.dy * OPTIMAL_RANGE_PX);
+                const desiredX = clamp(desiredCenterX - (TILE_SIZE / 2), 0, MAP_MAX_COORD);
+                const desiredY = clamp(desiredCenterY - (TILE_SIZE / 2), 0, MAP_MAX_COORD);
+                const los = this.losTileRaycast(desiredCenterX, desiredCenterY, reference.x, reference.y);
+                const requiresPath = !los || this.isBlocked(desiredX, desiredY);
+                const score = (requiresPath ? 5 : 0) + (los ? 0 : 10) + (distanceSquared(desiredX, desiredY, px, py) / 10000);
+                if (!best || score < best.score) {
+                    best = {
+                        goalTileX: clampTileIndex(desiredX / TILE_SIZE),
+                        goalTileY: clampTileIndex(desiredY / TILE_SIZE),
+                        goalPixelX: desiredX,
+                        goalPixelY: desiredY,
+                        requiresPath,
+                        score
+                    };
+                }
+            });
+
+            if (best) {
+                return {
+                    goalTileX: best.goalTileX,
+                    goalTileY: best.goalTileY,
+                    goalPixelX: best.goalPixelX,
+                    goalPixelY: best.goalPixelY,
+                    requiresPath: best.requiresPath
+                };
+            }
+        }
+
+        if (spawn) {
+            return makeGoal(clamp(spawn.x, 0, MAP_MAX_COORD), clamp(spawn.y, 0, MAP_MAX_COORD), false);
+        }
+        return null;
+    }
+
     resetRecruitPosition(record, player, now = Date.now()) {
         if (!record || !player) {
             return false;
@@ -704,6 +1327,17 @@ class FakeCityManager {
         record.nextShotAt = now + RECRUIT_SHOOT_INTERVAL_MS;
         record.lastMoveTimestamp = now;
         record.stuckCounter = 0;
+        record.path = null;
+        record.pathIndex = 0;
+        record.lastPathBuildAt = 0;
+        record.pathGoalKey = null;
+        record.lastProgressAt = now;
+        record.nextLosCheckAt = now;
+        record.lastLosResult = false;
+        record.visitedTiles = [];
+        record.lastSeenTargetAt = 0;
+        record.lastSeenX = null;
+        record.lastSeenY = null;
         record.lastMoveX = spawn.x;
         record.lastMoveY = spawn.y;
         this.ensureRecruitPatrolState(record);
@@ -892,6 +1526,17 @@ class FakeCityManager {
         record.nextShotAt = now + RECRUIT_SHOOT_INTERVAL_MS;
         record.nextScanAt = now;
         record.nextThinkAt = now + RECRUIT_THINK_INTERVAL_MS;
+        record.path = null;
+        record.pathIndex = 0;
+        record.lastPathBuildAt = 0;
+        record.pathGoalKey = null;
+        record.lastProgressAt = now;
+        record.nextLosCheckAt = now;
+        record.lastLosResult = false;
+        record.lastSeenTargetAt = 0;
+        record.lastSeenX = null;
+        record.lastSeenY = null;
+        record.visitedTiles = [];
         record.targetId = null;
         record.lastBroadcastAt = now;
         record.lastThinkAt = now;
@@ -927,14 +1572,15 @@ class FakeCityManager {
 
         this.ensureRecruitPatrolState(record);
 
+        const players = this.game?.players || {};
         let px = player.offset?.x ?? 0;
         let py = player.offset?.y ?? 0;
         const previousDirection = wrapDirection(player.direction ?? 0);
         const previousMoving = player.isMoving ? 1 : 0;
 
         if (record.targetId) {
-            const existing = this.game?.players?.[record.targetId];
-            if (!this.isValidRecruitTarget(record, existing, px, py)) {
+            const tracked = players[record.targetId];
+            if (!this.isValidRecruitTarget(record, tracked, px, py)) {
                 record.targetId = null;
             }
         }
@@ -942,258 +1588,417 @@ class FakeCityManager {
         if (!record.targetId || !record.nextScanAt || now >= record.nextScanAt) {
             record.targetId = this.acquireRecruitTarget(record, px, py);
             record.nextScanAt = now + RECRUIT_TARGET_REFRESH_MS;
-            if (record.targetId) {
-                this.debug(`[recruit ${record.id}] acquired target ${record.targetId}`);
-            }
         }
 
-        let target = null;
-        if (record.targetId) {
-            const candidate = this.game?.players?.[record.targetId];
-            if (this.isValidRecruitTarget(record, candidate, px, py)) {
-                target = candidate;
-            } else {
-                record.targetId = null;
-            }
-        }
+        const target = record.targetId ? players[record.targetId] : null;
 
+        if (!record.lastThinkAt) {
+            record.lastThinkAt = now;
+        }
         const deltaRaw = now - (record.lastThinkAt || now);
         const deltaMs = Math.max(0, Math.min(deltaRaw, RECRUIT_MAX_TICK_MS));
         record.lastThinkAt = now;
 
-        let movementTarget = null;
-        let movementSpeed = RECRUIT_PATROL_SPEED;
-        let stopDistance = Number.isFinite(record.patrolStopDistance) ? Math.max(0, record.patrolStopDistance) : 0;
-        let desiredDirection = previousDirection;
-        let sequenceDelta = 0;
-        let broadcast = false;
+        const shooterCenter = {
+            x: px + (TILE_SIZE / 2),
+            y: py + (TILE_SIZE / 2)
+        };
 
+        let targetCenter = null;
         if (target) {
-            record.mode = 'engage';
-            const tx = target.offset?.x ?? px;
-            const ty = target.offset?.y ?? py;
-            const dx = tx - px;
-            const dy = ty - py;
-            const rawDirection = vectorToDirection(dx, dy, previousDirection);
-            desiredDirection = stepDirectionTowards(previousDirection, rawDirection, 4);
-            movementSpeed = RECRUIT_PATROL_SPEED * 1.2;
-            stopDistance = Math.max(stopDistance, TILE_SIZE * 0.4);
+            targetCenter = {
+                x: (target.offset?.x ?? target.x ?? 0) + (TILE_SIZE / 2),
+                y: (target.offset?.y ?? target.y ?? 0) + (TILE_SIZE / 2)
+            };
+        }
 
-            const engagePoint = this.selectPatrolIndexForTarget(record, tx, ty);
-            if (engagePoint && engagePoint.point) {
-                record.patrolIndex = engagePoint.index;
-                record.patrolDirection = engagePoint.direction;
-                movementTarget = {
-                    x: engagePoint.point.x,
-                    y: engagePoint.point.y
-                };
-                this.debug(`[recruit ${record.id}] engage target ${record.targetId} patrolIndex=${record.patrolIndex}`);
+        let hasLOS = false;
+        let losChanged = false;
+        const previousLos = record.lastLosResult === true;
+        let lastSeenAge = record.lastSeenTargetAt ? now - record.lastSeenTargetAt : Infinity;
+
+        if (targetCenter) {
+            if (!record.nextLosCheckAt || now >= record.nextLosCheckAt) {
+                const clear = this.losTileRaycast(shooterCenter.x, shooterCenter.y, targetCenter.x, targetCenter.y);
+                record.lastLosResult = !!clear;
+                record.nextLosCheckAt = now + LOS_RECHECK_MS;
+                losChanged = previousLos !== record.lastLosResult;
+            }
+            hasLOS = record.lastLosResult === true;
+            if (hasLOS) {
+                record.lastSeenTargetAt = now;
+                record.lastSeenX = targetCenter.x;
+                record.lastSeenY = targetCenter.y;
+                lastSeenAge = 0;
+            } else if (record.lastSeenTargetAt) {
+                lastSeenAge = now - record.lastSeenTargetAt;
+            }
+        }
+
+        const lastSeen = lastSeenAge <= LAST_SEEN_TIMEOUT_MS
+            ? {
+                x: record.lastSeenX ?? shooterCenter.x,
+                y: record.lastSeenY ?? shooterCenter.y
+            }
+            : null;
+
+        const rangePx = targetCenter
+            ? Math.sqrt(distanceSquared(shooterCenter.x, shooterCenter.y, targetCenter.x, targetCenter.y))
+            : Infinity;
+
+        const hpFrac = Number.isFinite(player.health) ? Math.max(0, Math.min(1, player.health / MAX_HEALTH)) : 1;
+        const targetHpFrac = target && Number.isFinite(target.health)
+            ? Math.max(0, Math.min(1, target.health / MAX_HEALTH))
+            : 1;
+
+        let nearbyAllies = 0;
+        let nearbyEnemies = 0;
+        const allyCenters = [];
+        const recruitIds = this.recruitsByCity.get(record.cityId) || [];
+        for (const recruitId of recruitIds) {
+            if (recruitId === record.id) {
+                continue;
+            }
+            const allyPlayer = players[recruitId];
+            if (!allyPlayer || allyPlayer.health <= 0) {
+                continue;
+            }
+            const ax = allyPlayer.offset?.x ?? 0;
+            const ay = allyPlayer.offset?.y ?? 0;
+            if (distanceSquared(px, py, ax, ay) <= (TILE_SIZE * 20) * (TILE_SIZE * 20)) {
+                nearbyAllies += 1;
+            }
+            allyCenters.push({
+                x: ax + (TILE_SIZE / 2),
+                y: ay + (TILE_SIZE / 2)
+            });
+        }
+
+        for (const candidate of Object.values(players)) {
+            if (!candidate || candidate.id === record.id || candidate.health <= 0) {
+                continue;
+            }
+            const cx = candidate.offset?.x ?? 0;
+            const cy = candidate.offset?.y ?? 0;
+            if (distanceSquared(px, py, cx, cy) > (TILE_SIZE * 20) * (TILE_SIZE * 20)) {
+                continue;
+            }
+            const candidateCity = Number(candidate.city);
+            if (Number.isFinite(candidateCity) && candidateCity === record.cityId) {
+                nearbyAllies += 1;
             } else {
-                movementTarget = null;
+                nearbyEnemies += 1;
             }
+        }
 
-            if (!movementTarget && record.spawn) {
-                movementTarget = {
-                    x: record.spawn.x ?? px,
-                    y: record.spawn.y ?? py
-                };
+        const outnumbered = nearbyEnemies > (nearbyAllies + 1);
+
+        const mode = this.pickMode({
+            target,
+            hasLOS,
+            rangePx,
+            hpFrac,
+            targetHpFrac,
+            outnumbered,
+            lastSeenAge
+        });
+
+        record.mode = mode;
+
+        if (!record.lastProgressAt) {
+            record.lastProgressAt = now;
+        }
+
+        const goal = this.computeGoalTile({
+            mode,
+            record,
+            player,
+            target,
+            hasLOS,
+            rangePx,
+            lastSeen,
+            now
+        });
+
+        let goalKey = null;
+        if (goal && Number.isFinite(goal.goalTileX) && Number.isFinite(goal.goalTileY)) {
+            goalKey = `${goal.goalTileX}_${goal.goalTileY}`;
+        }
+
+        let desiredDirectionHint = previousDirection;
+        if (targetCenter) {
+            const rawDirection = vectorToDirection(targetCenter.x - shooterCenter.x, targetCenter.y - shooterCenter.y, previousDirection);
+            desiredDirectionHint = stepDirectionTowards(previousDirection, rawDirection, hasLOS ? 4 : 2);
+        } else if (goal && Number.isFinite(goal.goalPixelX) && Number.isFinite(goal.goalPixelY)) {
+            const rawDirection = vectorToDirection(goal.goalPixelX - px, goal.goalPixelY - py, previousDirection);
+            desiredDirectionHint = stepDirectionTowards(previousDirection, rawDirection, 2);
+        }
+
+        let shouldRepath = false;
+        if (goalKey && goalKey !== record.pathGoalKey) {
+            shouldRepath = true;
+        }
+        if (losChanged && !hasLOS) {
+            shouldRepath = true;
+        }
+
+        const nav = this.navGrid || this.buildNavGrid();
+        const currentTile = pixelToTile(px, py);
+        let desiredPoint = goal
+            ? {
+                x: goal.goalPixelX ?? px,
+                y: goal.goalPixelY ?? py
             }
+            : null;
 
-            if (!movementTarget) {
-                const fallback = this.resolveFallbackTarget(record, px, py, previousDirection);
-                if (fallback) {
-                    movementTarget = fallback.point;
-                    desiredDirection = fallback.direction ?? desiredDirection;
-                    stopDistance = fallback.stopDistance ?? stopDistance;
-                    this.debug(`[recruit ${record.id}] using engage fallback waypoint (${movementTarget.x.toFixed(1)}, ${movementTarget.y.toFixed(1)})`);
+        if (goal && (goal.requiresPath || shouldRepath || !record.path)) {
+            if (!record.lastPathBuildAt || now - record.lastPathBuildAt >= PATH_REBUILD_COOLDOWN_MS) {
+                if (nav && goalKey) {
+                    const penaltySet = new Set(Array.isArray(record.visitedTiles) ? record.visitedTiles : []);
+                    const computedPath = this.astar({ x: currentTile.x, y: currentTile.y }, { x: goal.goalTileX, y: goal.goalTileY }, nav, { visitedPenalty: penaltySet });
+                    if (computedPath && computedPath.length) {
+                        record.path = computedPath;
+                        record.pathIndex = 0;
+                        record.pathGoalKey = goalKey;
+                        record.lastPathBuildAt = now;
+                    } else if (goal.requiresPath) {
+                        record.path = null;
+                        record.pathIndex = 0;
+                        record.pathGoalKey = null;
+                    }
                 }
             }
-
-        if (!record.nextShotAt || now >= record.nextShotAt) {
-            const aimDelta = directionDelta(desiredDirection, rawDirection);
-            if (aimDelta <= 2) {
-                const fired = this.fireRecruitLaser(record, player, target, rawDirection, now);
-                const delay = fired
-                        ? (RECRUIT_SHOOT_INTERVAL_MS + Math.floor(Math.random() * RECRUIT_SHOOT_JITTER_MS))
-                        : 300;
-                    record.nextShotAt = now + delay;
-                } else {
-                    record.nextShotAt = now + 120;
-                }
-            }
-        } else {
-            record.mode = 'patrol';
-            const fallbackDirection = previousDirection;
-            const patrol = this.resolveRecruitPatrol(record, px, py, fallbackDirection);
-            if (patrol) {
-                movementTarget = patrol.point;
-                const patrolDirection = wrapDirection(patrol.direction ?? fallbackDirection, fallbackDirection);
-                desiredDirection = stepDirectionTowards(previousDirection, patrolDirection, 2);
-                stopDistance = Math.max(0, patrol.stopDistance ?? stopDistance);
-            } else if (record.spawn) {
-                const sx = record.spawn.x ?? px;
-                const sy = record.spawn.y ?? py;
-                movementTarget = { x: sx, y: sy };
-                const rawDirection = vectorToDirection(sx - px, sy - py, record.spawn.direction ?? fallbackDirection);
-                desiredDirection = stepDirectionTowards(previousDirection, rawDirection, 2);
-                stopDistance = TILE_SIZE * 0.5;
-            } else {
-                const baseDirection = record.spawn?.direction ?? 16;
-                desiredDirection = stepDirectionTowards(previousDirection, baseDirection, 2);
-            }
-
-        if (!movementTarget) {
-            const fallback = this.resolveFallbackTarget(record, px, py, fallbackDirection);
-            if (fallback) {
-                movementTarget = fallback.point;
-                desiredDirection = fallback.direction ?? desiredDirection;
-                stopDistance = fallback.stopDistance ?? stopDistance;
-                this.debug(`[recruit ${record.id}] patrol fallback to (${movementTarget.x.toFixed(1)}, ${movementTarget.y.toFixed(1)})`);
-            }
         }
 
-        if (!movementTarget) {
-            this.debug(`[recruit ${record.id}] no movement target; remain idle mode=${record.mode}`);
-        }
-        }
+        const resolveMovementPoint = () => {
+            if (record.path && record.path.length && record.pathIndex < record.path.length) {
+                const waypoint = record.path[record.pathIndex];
+                const origin = tileToOffsetOrigin(waypoint.x, waypoint.y);
+                return {
+                    point: origin,
+                    fromPath: true
+                };
+            }
+            if (desiredPoint) {
+                return {
+                    point: desiredPoint,
+                    fromPath: false
+                };
+            }
+            return null;
+        };
 
+        const movementSpeeds = {
+            engage: RECRUIT_PATROL_SPEED * 1.2,
+            flank: RECRUIT_PATROL_SPEED * 1.1,
+            kite: RECRUIT_PATROL_SPEED * 1.3,
+            retreat: RECRUIT_PATROL_SPEED * 1.35,
+            patrol: RECRUIT_PATROL_SPEED * 1.05
+        };
+        const movementSpeed = movementSpeeds[mode] ?? RECRUIT_PATROL_SPEED;
+
+        let desiredDirection = desiredDirectionHint;
         let moved = false;
-        let lastDirection = desiredDirection;
+        let progressMade = false;
         let resetPerformed = false;
-        player.isMoving = 0;
-        if (movementTarget) {
-            let remainingTime = deltaMs;
-            let iterations = 0;
-            while (remainingTime > 0 && iterations < RECRUIT_MAX_SIM_STEPS) {
-                const stepTime = Math.min(RECRUIT_SIMULATION_STEP_MS, remainingTime);
-                const tx = clamp(movementTarget.x ?? px, 0, MAP_MAX_COORD);
-                const ty = clamp(movementTarget.y ?? py, 0, MAP_MAX_COORD);
-                const dx = tx - px;
-                const dy = ty - py;
-                const distanceSq = (dx * dx) + (dy * dy);
-                const distance = Math.sqrt(distanceSq);
+        let shouldBroadcast = false;
+        let sequenceDelta = 0;
+        let failedMoves = 0;
 
-                if (!Number.isFinite(distance) || distance < 1e-4) {
-                    break;
-                }
+        let remainingTime = deltaMs;
+        let iterations = 0;
 
-                let step = movementSpeed * stepTime;
+        let targetInfo = resolveMovementPoint();
+        if (!targetInfo && !goal) {
+            const fallback = this.resolveFallbackTarget(record, px, py, previousDirection);
+            if (fallback) {
+                desiredPoint = { x: fallback.point.x, y: fallback.point.y };
+                targetInfo = {
+                    point: fallback.point,
+                    fromPath: false
+                };
+            }
+        }
 
-                if (stopDistance > 0 && distance <= stopDistance) {
-                    step = 0;
-                } else if (stopDistance > 0 && distance > stopDistance) {
-                    const remaining = distance - stopDistance;
-                    step = Math.min(step, remaining);
-                } else {
-                    step = Math.min(step, distance);
-                }
-
-                if (step <= 0.05) {
-                    break;
-                }
-
-                const baseVector = normalizeVector(dx, dy);
-                if (!baseVector) {
-                    break;
-                }
-
-                let attempt = this.tryMoveWithVector(px, py, baseVector, step);
-                if (!attempt) {
-                    attempt = this.findAlternateVector(baseVector, px, py, step);
-                }
-                if (!attempt) {
-                    const patrolPath = this.getRecruitPatrolPath(record);
-                    if (Array.isArray(patrolPath) && patrolPath.length) {
-                        const directionStep = (record.patrolDirection === -1) ? -1 : 1;
-                        record.patrolIndex = ((record.patrolIndex + directionStep) % patrolPath.length + patrolPath.length) % patrolPath.length;
+        while (targetInfo && remainingTime > 0 && iterations < RECRUIT_MAX_SIM_STEPS) {
+            const stepTime = Math.min(RECRUIT_SIMULATION_STEP_MS, remainingTime);
+            const targetPoint = targetInfo.point;
+            const baseVelocity = seekArrive({ x: px, y: py }, targetPoint, movementSpeed, ARRIVE_RADIUS_PX);
+            if (!baseVelocity) {
+                if (targetInfo.fromPath) {
+                    record.pathIndex += 1;
+                    if (record.path && record.pathIndex >= record.path.length) {
+                        record.path = null;
+                        record.pathGoalKey = null;
                     }
+                }
+                targetInfo = resolveMovementPoint();
+                if (!targetInfo) {
                     break;
                 }
-
-                const prevX = px;
-                const prevY = py;
-                px = attempt.x;
-                py = attempt.y;
-                lastDirection = attempt.direction;
-                const stepDeltaX = Math.abs(px - prevX);
-                const stepDeltaY = Math.abs(py - prevY);
-                moved = moved || (stepDeltaX > RECRUIT_MIN_MOVEMENT_DELTA || stepDeltaY > RECRUIT_MIN_MOVEMENT_DELTA);
-
-                remainingTime -= stepTime;
                 iterations += 1;
+                continue;
+            }
 
-                if (stopDistance > 0) {
-                    const dxRemaining = tx - px;
-                    const dyRemaining = ty - py;
-                    const remainingDistance = Math.sqrt((dxRemaining * dxRemaining) + (dyRemaining * dyRemaining));
-                    if (!Number.isFinite(remainingDistance) || remainingDistance <= stopDistance) {
-                        break;
-                    }
+            const separation = separationAdjust({ x: px, y: py }, allyCenters, movementSpeed);
+            let velocity = {
+                dx: baseVelocity.dx + separation.dx,
+                dy: baseVelocity.dy + separation.dy
+            };
+            velocity = avoidanceAdjust({ x: px, y: py }, velocity, movementSpeed, nav, (tileX, tileY) => this.isNavTileBlocked(tileX, tileY));
+
+            const speedPerMs = Math.sqrt((velocity.dx * velocity.dx) + (velocity.dy * velocity.dy));
+            if (!Number.isFinite(speedPerMs) || speedPerMs < 1e-4) {
+                failedMoves += 1;
+                break;
+            }
+
+            const unit = {
+                dx: velocity.dx / speedPerMs,
+                dy: velocity.dy / speedPerMs
+            };
+            const step = Math.min(speedPerMs * stepTime, movementSpeed * stepTime);
+            const attempt = this.tryMoveWithVector(px, py, unit, step);
+            if (!attempt) {
+                failedMoves += 1;
+                if (failedMoves >= 2) {
+                    shouldRepath = true;
                 }
+                break;
+            }
+
+            const prevDistanceSq = distanceSquared(px, py, targetPoint.x, targetPoint.y);
+            px = attempt.x;
+            py = attempt.y;
+            desiredDirection = attempt.direction;
+            moved = true;
+
+            const newDistanceSq = distanceSquared(px, py, targetPoint.x, targetPoint.y);
+            if (newDistanceSq + 4 < prevDistanceSq) {
+                progressMade = true;
+            }
+
+            remainingTime -= stepTime;
+            iterations += 1;
+
+            if (targetInfo.fromPath && record.path) {
+                if (newDistanceSq <= (PATH_WAYPOINT_REACH_PX * PATH_WAYPOINT_REACH_PX)) {
+                    record.pathIndex += 1;
+                    if (record.pathIndex >= record.path.length) {
+                        record.path = null;
+                        record.pathGoalKey = null;
+                    }
+                    targetInfo = resolveMovementPoint();
+                }
+            } else if (!targetInfo.fromPath && newDistanceSq <= (PATH_WAYPOINT_REACH_PX * PATH_WAYPOINT_REACH_PX)) {
+                break;
             }
         }
 
         player.offset.x = px;
         player.offset.y = py;
 
-        player.isMoving = moved ? 1 : 0;
         if (moved) {
+            const tile = pixelToTile(px, py);
+            pushVisitedTile(record, tile.x, tile.y);
+            record.lastProgressAt = now;
             record.lastMoveTimestamp = now;
             record.lastMoveX = px;
             record.lastMoveY = py;
             record.stuckCounter = 0;
-            if (Number.isFinite(lastDirection)) {
-                const turnStep = target ? 4 : 2;
-                desiredDirection = stepDirectionTowards(previousDirection, lastDirection, turnStep);
-            }
+            shouldBroadcast = true;
         } else {
             record.stuckCounter = (record.stuckCounter || 0) + 1;
-            const lastMoveAt = record.lastMoveTimestamp || 0;
-            if ((now - lastMoveAt) >= RECRUIT_STUCK_TIMEOUT_MS) {
-                const reset = this.resetRecruitPosition(record, player, now);
-                if (reset) {
-                    px = player.offset.x ?? px;
-                    py = player.offset.y ?? py;
-                    desiredDirection = wrapDirection(player.direction ?? desiredDirection, desiredDirection);
-                    lastDirection = desiredDirection;
-                    player.isMoving = 0;
-                    broadcast = true;
-                    resetPerformed = true;
+        }
+
+        if (!progressMade && (now - (record.lastProgressAt || now)) >= REPATH_STALL_MS) {
+            shouldRepath = true;
+        }
+
+        if (shouldRepath && goal && goalKey && (!record.lastPathBuildAt || now - record.lastPathBuildAt >= PATH_REBUILD_COOLDOWN_MS)) {
+            if (nav) {
+                const penaltySet = new Set(Array.isArray(record.visitedTiles) ? record.visitedTiles : []);
+                const recomputedPath = this.astar(pixelToTile(px, py), { x: goal.goalTileX, y: goal.goalTileY }, nav, { visitedPenalty: penaltySet });
+                if (recomputedPath && recomputedPath.length) {
+                    record.path = recomputedPath;
+                    record.pathIndex = 0;
+                    record.pathGoalKey = goalKey;
+                    record.lastPathBuildAt = now;
+                } else if (!moved && (now - (record.lastMoveTimestamp || now)) >= RECRUIT_STUCK_TIMEOUT_MS) {
+                    const reset = this.resetRecruitPosition(record, player, now);
+                    if (reset) {
+                        px = player.offset.x ?? px;
+                        py = player.offset.y ?? py;
+                        desiredDirection = wrapDirection(player.direction ?? desiredDirection, desiredDirection);
+                        moved = false;
+                        resetPerformed = true;
+                        shouldBroadcast = true;
+                    }
                 }
             }
         }
 
+        player.isMoving = moved ? 1 : 0;
         if (resetPerformed) {
             player.isMoving = 0;
-        } else {
-            player.isMoving = moved ? 1 : 0;
         }
 
         if (directionDelta(previousDirection, desiredDirection) > 0) {
             player.direction = desiredDirection;
             sequenceDelta += 1;
-            broadcast = true;
         }
 
         if (player.isMoving !== previousMoving) {
-            broadcast = true;
-        }
-
-        if (moved) {
             sequenceDelta += 1;
-            broadcast = true;
         }
 
         if (sequenceDelta > 0) {
             player.sequence = (player.sequence || 0) + sequenceDelta;
+            shouldBroadcast = true;
         }
 
-        if (this.debug && (moved || resetPerformed)) {
-            const modeLabel = record.mode || 'unknown';
-            this.debug(`[recruit ${record.id}] mode=${modeLabel} moved=${moved} reset=${resetPerformed} pos=(${player.offset.x.toFixed(1)}, ${player.offset.y.toFixed(1)}) target=${movementTarget ? `${movementTarget.x.toFixed(1)},${movementTarget.y.toFixed(1)}` : 'none'} dir=${player.direction}`);
+        if (target && hasLOS) {
+            if (!record.nextShotAt || now >= record.nextShotAt) {
+                const aimFallback = targetCenter
+                    ? vectorToDirection(targetCenter.x - shooterCenter.x, targetCenter.y - shooterCenter.y, player.direction ?? 16)
+                    : player.direction ?? 16;
+                const aimDirection = leadDirection(player, target, BULLET_SPEED_PX_PER_S, aimFallback);
+                const jitter = Math.random() < 0.5 ? 0 : (Math.random() < 0.5 ? 1 : -1);
+                const finalDirection = wrapDirection(aimDirection + jitter, aimDirection);
+                const deltaAim = directionDelta(desiredDirection, finalDirection);
+                const muzzleUnit = directionToUnitVector(finalDirection);
+                const muzzleX = shooterCenter.x + (muzzleUnit.x * RECRUIT_MUZZLE_OFFSET);
+                const muzzleY = shooterCenter.y + (muzzleUnit.y * RECRUIT_MUZZLE_OFFSET);
+                const muzzleLos = this.losTileRaycast(muzzleX, muzzleY, targetCenter.x, targetCenter.y);
+                const friendlyBlock = hasFriendlyObstruction(shooterCenter, targetCenter, allyCenters);
+
+                if (deltaAim <= 2 && muzzleLos && !friendlyBlock) {
+                    const fired = this.fireRecruitLaser(record, player, target, finalDirection, now);
+                    if (fired) {
+                        if (Math.random() < 0.35) {
+                            record.nextShotAt = now + 140 + Math.floor(Math.random() * 120);
+                        } else {
+                            record.nextShotAt = now + RECRUIT_SHOOT_INTERVAL_MS + Math.floor(Math.random() * RECRUIT_SHOOT_JITTER_MS);
+                        }
+                    } else {
+                        record.nextShotAt = now + 200;
+                    }
+                } else {
+                    record.nextShotAt = now + 100;
+                }
+            }
+        } else if (!target) {
+            record.nextShotAt = now + 200;
         }
 
-        if (broadcast && this.io) {
+        if (!moved && !resetPerformed && (now - (record.lastMoveTimestamp || now)) >= RECRUIT_STUCK_TIMEOUT_MS) {
+            const reset = this.resetRecruitPosition(record, player, now);
+            if (reset) {
+                shouldBroadcast = true;
+            }
+        }
+
+        if (shouldBroadcast && this.io) {
             const cooldown = record.broadcastCooldown ?? 150;
             if (!record.lastBroadcastAt || (now - record.lastBroadcastAt) >= cooldown) {
                 this.io.emit('player', JSON.stringify(player));
@@ -1703,6 +2508,8 @@ class FakeCityManager {
             this.emitDefenseSnapshot(cityId, defenseItemsSnapshot);
         }
 
+        this.buildNavGrid(true);
+
         return true;
     }
 
@@ -1764,8 +2571,38 @@ class FakeCityManager {
         if (this.playerFactory?.emitLobbySnapshot) {
             this.playerFactory.emitLobbySnapshot();
         }
+        this.buildNavGrid(true);
         return true;
     }
 }
 
+/* TEST PLAN
+[
+  {
+    "scenario": "open_field_engage",
+    "inputs": { "mode": "engage", "hasLOS": true, "rangePx": 576, "hpFrac": 1, "targetHpFrac": 1 },
+    "expect": { "mode": "engage", "firstWaypointTile": "direct", "fire": true }
+  },
+  {
+    "scenario": "wall_between",
+    "inputs": { "mode": "flank", "hasLOS": false, "lastSeenAge": 250, "rangePx": 640 },
+    "expect": { "mode": "flank", "pathLength": ">0", "fire": false }
+  },
+  {
+    "scenario": "doorway_crowd",
+    "inputs": { "mode": "engage", "allies": 3, "rangePx": 512 },
+    "expect": { "mode": "engage", "separation": "active", "clumping": "reduced" }
+  },
+  {
+    "scenario": "stall_repath",
+    "inputs": { "mode": "flank", "blocked": true, "stallMs": 700 },
+    "expect": { "mode": "flank", "repath": true, "teleport": "no" }
+  },
+  {
+    "scenario": "low_hp_kite",
+    "inputs": { "mode": "kite", "hpFrac": 0.25, "targetHpFrac": 0.8, "hasLOS": true },
+    "expect": { "mode": "retreat|kite", "rangePx": ">=KITE_RANGE_PX", "fire": "LOS_only" }
+  }
+]
+*/
 module.exports = FakeCityManager;
