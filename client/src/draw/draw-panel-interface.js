@@ -406,15 +406,33 @@ const updateRadar = (game, radarState) => {
 
     const pool = radarState.pool;
     const textures = radarState.textures;
-    const usedSprites = [];
     const baseX = (game.maxMapX || 0) + RADAR_CENTER_OFFSET_X;
     const baseY = RADAR_CENTER_Y;
     const range = RADAR_RANGE_PX;
     const myCity = toFiniteNumber(me.city, null);
+    const hasMyCity = Number.isFinite(myCity);
+    let usedCount = 0;
 
-    const pushSprite = (playerData) => {
-        const dx = playerData.offsetX - myX;
-        const dy = playerData.offsetY - myY;
+    const acquireSprite = (texture, posX, posY) => {
+        let sprite = pool[usedCount];
+        if (!sprite) {
+            sprite = new PIXI.Sprite(texture);
+            sprite.anchor.set(0.5);
+            sprite.scale.set(radarState.spriteScale, radarState.spriteScale);
+            radarState.pointsLayer.addChild(sprite);
+            pool[usedCount] = sprite;
+        }
+        if (sprite.texture !== texture) {
+            sprite.texture = texture;
+        }
+        sprite.visible = true;
+        sprite.position.set(posX - bounds.left, posY - bounds.top);
+        usedCount += 1;
+    };
+
+    const tryPlot = (offsetX, offsetY, cityId, health, isSelf, isAdmin, radarType) => {
+        const dx = offsetX - myX;
+        const dy = offsetY - myY;
         if (Math.abs(dx) > range || Math.abs(dy) > range) {
             return;
         }
@@ -425,100 +443,100 @@ const updateRadar = (game, radarState) => {
         }
 
         let texture = textures.enemy;
-        const sameCity = Number.isFinite(playerData.city) && Number.isFinite(myCity) && playerData.city === myCity;
-        if (playerData.radarType !== 'rogue') {
-            if (playerData.isSelf || sameCity) {
+        if (radarType !== 'rogue') {
+            const numericCity = Number.isFinite(cityId) ? cityId : null;
+            const sameCity = hasMyCity && numericCity !== null && numericCity === myCity;
+            if (isSelf || sameCity) {
                 texture = textures.ally || textures.neutral || texture;
-            } else if (playerData.isAdmin && textures.admin) {
+            } else if (isAdmin && textures.admin) {
                 texture = textures.admin;
-            } else if (!Number.isFinite(playerData.city) && textures.neutral) {
+            } else if (numericCity === null && textures.neutral) {
                 texture = textures.neutral;
             }
         }
-        if (playerData.health !== undefined && playerData.health <= 0 && textures.dead) {
+
+        if (Number.isFinite(health) && health <= 0 && textures.dead) {
             texture = textures.dead;
         }
         if (!texture) {
             return;
         }
 
-        let sprite = pool[usedSprites.length];
-        if (!sprite) {
-            sprite = new PIXI.Sprite(texture);
-            sprite.anchor.set(0.5);
-            sprite.scale.set(radarState.spriteScale, radarState.spriteScale);
-            radarState.pointsLayer.addChild(sprite);
-            pool[usedSprites.length] = sprite;
-        }
-
-        sprite.texture = texture;
-        sprite.visible = true;
-        sprite.position.set(globalX - bounds.left, globalY - bounds.top);
-        usedSprites.push(sprite);
+        acquireSprite(texture, globalX, globalY);
     };
 
     if (!me.isCloaked) {
-        pushSprite({
-            id: me.id || '__self__',
-            city: myCity,
-            offsetX: myX,
-            offsetY: myY,
-            health: me.health,
-            isSelf: true,
-            isAdmin: false,
-        });
+        tryPlot(
+            myX,
+            myY,
+            myCity,
+            toFiniteNumber(me.health, null),
+            true,
+            false,
+            'player'
+        );
     }
 
-    const others = game.otherPlayers || {};
-    Object.keys(others).forEach((key) => {
-        const other = others[key];
-        if (!other || !other.offset || other.isCloaked) {
-            return;
+    const others = game.otherPlayers;
+    if (others) {
+        for (const key in others) {
+            if (!Object.prototype.hasOwnProperty.call(others, key)) {
+                continue;
+            }
+            const other = others[key];
+            if (!other || !other.offset || other.isCloaked) {
+                continue;
+            }
+            const otherX = toFiniteNumber(other.offset.x, null);
+            const otherY = toFiniteNumber(other.offset.y, null);
+            if (!Number.isFinite(otherX) || !Number.isFinite(otherY)) {
+                continue;
+            }
+            tryPlot(
+                otherX,
+                otherY,
+                toFiniteNumber(other.city, null),
+                toFiniteNumber(other.health, null),
+                false,
+                !!other.isAdmin,
+                'player'
+            );
         }
-        const otherX = toFiniteNumber(other.offset.x, null);
-        const otherY = toFiniteNumber(other.offset.y, null);
-        if (!Number.isFinite(otherX) || !Number.isFinite(otherY)) {
-            return;
-        }
-        const otherCity = toFiniteNumber(other.city, null);
-        pushSprite({
-            id: other.id || key,
-            city: otherCity,
-            offsetX: otherX,
-            offsetY: otherY,
-            health: toFiniteNumber(other.health, null),
-            isSelf: false,
-            isAdmin: !!other.isAdmin,
-        });
-    });
+    }
 
     const rogueManager = game.rogueTankManager;
     if (rogueManager && Array.isArray(rogueManager.tanks)) {
-        rogueManager.tanks.forEach((tank, index) => {
+        const tanks = rogueManager.tanks;
+        for (let i = 0; i < tanks.length; i += 1) {
+            const tank = tanks[i];
             if (!tank || !tank.offset) {
-                return;
+                continue;
             }
             const rogueX = toFiniteNumber(tank.offset.x, null);
             const rogueY = toFiniteNumber(tank.offset.y, null);
             if (!Number.isFinite(rogueX) || !Number.isFinite(rogueY)) {
-                return;
+                continue;
             }
-            pushSprite({
-                id: tank.id || `rogue_${index}`,
-                city: null,
-                offsetX: rogueX,
-                offsetY: rogueY,
-                health: toFiniteNumber(tank.health, null),
-                radarType: 'rogue',
-            });
-        });
+            tryPlot(
+                rogueX,
+                rogueY,
+                null,
+                toFiniteNumber(tank.health, null),
+                false,
+                false,
+                'rogue'
+            );
+        }
     }
 
-    for (let i = usedSprites.length; i < pool.length; i += 1) {
-        pool[i].visible = false;
+    for (let i = usedCount; i < pool.length; i += 1) {
+        const sprite = pool[i];
+        if (sprite) {
+            sprite.visible = false;
+        }
     }
 
-    radarState.pointsLayer.visible = usedSprites.length > 0;
+    radarState.pointsLayer.visible = usedCount > 0;
 };
 
 var drawPanel = (game, stage) => {

@@ -25,6 +25,7 @@ const NAME_LABEL_COLORS = Object.freeze({
     rogue: 0xFF7A7A,
     neutral: 0xFFFFFF
 });
+const LABEL_CACHE_TTL_MS = 15000;
 
 const toFiniteCityId = (value) => {
     const numeric = Number(value);
@@ -89,23 +90,74 @@ const determineLabelColor = (entity, referenceCity, options = {}) => {
     return NAME_LABEL_COLORS.enemy;
 };
 
+const ensureNameLabelCache = (game) => {
+    if (!game) {
+        return null;
+    }
+    if (!game.__nameLabelCache) {
+        game.__nameLabelCache = new Map();
+    }
+    return game.__nameLabelCache;
+};
+
+const resolveLabelCacheKey = (entity, options = {}) => {
+    if (options.cacheKey) {
+        return options.cacheKey;
+    }
+    if (entity && entity.id !== undefined && entity.id !== null) {
+        return `entity:${entity.id}`;
+    }
+    if (entity && entity.callsign) {
+        return `callsign:${entity.callsign}`;
+    }
+    return null;
+};
+
 const createNameLabel = (game, entity, options = {}) => {
+    const cache = ensureNameLabelCache(game);
+    if (!cache || !entity) {
+        return null;
+    }
+    const cacheKey = resolveLabelCacheKey(entity, options);
+    if (!cacheKey) {
+        return null;
+    }
     const text = buildRoleLabel(game, entity, options);
-    if (!text || !text.trim().length) {
+    if (!text || !text.trim()) {
         return null;
     }
     const fillColor = determineLabelColor(entity, options.referenceCity, options);
-    const label = new PIXI.Text(text, {
-        fontFamily: 'Arial',
-        fontSize: 12,
-        fontWeight: 'bold',
-        fill: fillColor,
-        align: 'center',
-        stroke: 0x000000,
-        strokeThickness: 3
-    });
-    label.anchor.set(0.5, 1);
-    return label;
+    let record = cache.get(cacheKey);
+    if (!record) {
+        const label = new PIXI.Text(text, {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fontWeight: 'bold',
+            fill: fillColor,
+            align: 'center',
+            stroke: 0x000000,
+            strokeThickness: 3
+        });
+        label.anchor.set(0.5, 1);
+        record = {
+            label,
+            text,
+            fillColor,
+        };
+        cache.set(cacheKey, record);
+    } else {
+        if (record.text !== text) {
+            record.label.text = text;
+            record.text = text;
+        }
+        if (record.fillColor !== fillColor) {
+            record.label.style.fill = fillColor;
+            record.fillColor = fillColor;
+            record.label.dirty = true;
+        }
+    }
+    record.lastUsedTick = game.tick || Date.now();
+    return record.label;
 };
 
 const maybeAddNameLabel = (game, entity, sprite, options = {}) => {
@@ -116,9 +168,11 @@ const maybeAddNameLabel = (game, entity, sprite, options = {}) => {
     if (!label) {
         return;
     }
+    if (label.parent !== sprite) {
+        sprite.addChild(label);
+    }
     label.x = sprite.width / 2;
     label.y = (-sprite.height / 2) - NAME_LABEL_OFFSET_Y;
-    sprite.addChild(label);
 };
 
 const getTankRow = (player, me) => {
@@ -162,7 +216,10 @@ var drawPlayer = (game, stage) => {
     playerTank.x = game.player.defaultOffset.x;
     playerTank.y = game.player.defaultOffset.y;
 
-    maybeAddNameLabel(game, game.player, playerTank, { referenceCity: game.player.city });
+    maybeAddNameLabel(game, game.player, playerTank, {
+        referenceCity: game.player.city,
+        cacheKey: 'player:self'
+    });
 
     stage.addChild(playerTank);
 };
@@ -195,7 +252,8 @@ var drawOtherPlayers = (game, stage) => {
 
         maybeAddNameLabel(game, player, playerTank, {
             referenceCity: game.player.city,
-            isRogue: player.city === -1
+            isRogue: player.city === -1,
+            cacheKey: player.id || id
         });
 
 
@@ -209,7 +267,7 @@ const drawRogueTanks = (game, stage) => {
         return;
     }
 
-    manager.tanks.forEach((tank) => {
+    manager.tanks.forEach((tank, index) => {
         if (!tank || !tank.offset) {
             return;
         }
@@ -217,7 +275,11 @@ const drawRogueTanks = (game, stage) => {
         const sprite = createTankSprite(game, tank, game.player);
         sprite.x = (tank.offset.x) + (game.player.defaultOffset.x - (game.player.offset.x / 48) * 48);
         sprite.y = (tank.offset.y) + (game.player.defaultOffset.y - (game.player.offset.y / 48) * 48);
-        maybeAddNameLabel(game, tank, sprite, { isRogue: true, referenceCity: game.player.city });
+        maybeAddNameLabel(game, tank, sprite, {
+            isRogue: true,
+            referenceCity: game.player.city,
+            cacheKey: tank.id || `rogue:${index}`
+        });
         stage.addChild(sprite);
     });
 };
@@ -323,4 +385,26 @@ export const drawChanging = (game) => {
     drawRogueTanks(game, game.objectContainer);
     drawBullets(game, game.objectContainer);
     drawExplosions(game, game.objectContainer);
+
+    const cache = game.__nameLabelCache;
+    if (cache && cache.size) {
+        const now = game.tick || Date.now();
+        for (const [key, record] of cache.entries()) {
+            if (!record) {
+                cache.delete(key);
+                continue;
+            }
+            const lastUsed = record.lastUsedTick || 0;
+            if ((now - lastUsed) <= LABEL_CACHE_TTL_MS) {
+                continue;
+            }
+            if (record.label) {
+                if (record.label.parent) {
+                    record.label.parent.removeChild(record.label);
+                }
+                record.label.destroy();
+            }
+            cache.delete(key);
+        }
+    }
 };

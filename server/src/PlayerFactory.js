@@ -756,9 +756,14 @@ class PlayerFactory {
     }
 
     cycle(now = Date.now()) {
-        Object.values(this.game.players).forEach((player) => {
+        const players = this.game.players || {};
+        for (const playerId in players) {
+            if (!Object.prototype.hasOwnProperty.call(players, playerId)) {
+                continue;
+            }
+            const player = players[playerId];
             if (!player) {
-                return;
+                continue;
             }
             let statusChanged = false;
             if (player.isCloaked && player.cloakExpiresAt && now >= player.cloakExpiresAt) {
@@ -775,7 +780,7 @@ class PlayerFactory {
             if (statusChanged) {
                 this.emitStatusUpdate(player);
             }
-        });
+        }
     }
 
     getSpawnForCity(cityId) {

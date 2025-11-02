@@ -116,7 +116,6 @@ var movePlayer = (game) => {
             game.player.offset.x = (511) * 48;
             break;
         case COLLISION_BLOCKING:
-            console.log("blocking");
             game.player.offset.x = preUpdate;
             break;
         case COLLISION_MINE:
@@ -150,7 +149,6 @@ var movePlayer = (game) => {
             game.player.offset.y = (511) * 48;
             break;
         case COLLISION_BLOCKING:
-            console.log("blocking y");
             game.player.offset.y = preUpdate;
             break;
         case COLLISION_MINE:
@@ -163,7 +161,12 @@ var movePlayer = (game) => {
             break;
     }
 
-    if (previousX !== game.player.offset.x || previousY !== game.player.offset.y) {
+    const debugMovement = !!(game && game.debug && game.debug.logMovement);
+    if (
+        (import.meta.env && import.meta.env.DEV) &&
+        debugMovement &&
+        (previousX !== game.player.offset.x || previousY !== game.player.offset.y)
+    ) {
         console.log(`Player position: (${game.player.offset.x.toFixed(2)}, ${game.player.offset.y.toFixed(2)})`);
     }
 };

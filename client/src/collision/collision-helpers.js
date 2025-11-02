@@ -9,32 +9,36 @@ import {ITEM_TYPE_MINE} from "../constants";
 import {ITEM_TYPE_DFG} from "../constants";
 
 export const rectangleCollision = (rect1, rect2) => {
-
-    var rect1 = Object.assign({}, rect1);
-    var rect2 = Object.assign({}, rect2);
-
-    rect1.w += rect1.x;
-    rect1.h += rect1.y;
-    rect2.w += rect2.x;
-    rect2.h += rect2.y;
-
-    if (rect1.w <= rect2.x) {
-        return false;
-    }
-    if (rect2.w <= rect1.x) {
+    if (!rect1 || !rect2) {
         return false;
     }
 
-    if (rect1.h <= rect2.y) {
+    const rect1Left = rect1.x;
+    const rect1Top = rect1.y;
+    const rect1Right = rect1Left + rect1.w;
+    const rect1Bottom = rect1Top + rect1.h;
+
+    const rect2Left = rect2.x;
+    const rect2Top = rect2.y;
+    const rect2Right = rect2Left + rect2.w;
+    const rect2Bottom = rect2Top + rect2.h;
+
+    if (rect1Right <= rect2Left) {
+        return false;
+    }
+    if (rect2Right <= rect1Left) {
         return false;
     }
 
-    if (rect2.h <= rect1.y) {
+    if (rect1Bottom <= rect2Top) {
+        return false;
+    }
+
+    if (rect2Bottom <= rect1Top) {
         return false;
     }
 
     return true;
-
 };
 
 export const checkEdges = (rect) => {
