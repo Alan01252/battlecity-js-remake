@@ -3,7 +3,15 @@ import {getPlayerRect} from "./collision-helpers";
 
 
 import {MAP_SQUARE_ROCK} from "../constants";
+import {MAP_SQUARE_BUILDING} from "../constants";
 import {BUILDING_HAS_BAY} from "../constants";
+
+const TILE_SIZE = 48;
+const BULLET_SIZE = 4;
+const BLOCKING_TILE_VALUES = new Set([
+    MAP_SQUARE_ROCK,
+    MAP_SQUARE_BUILDING
+]);
 
 
 var collided = (testRect, bullet)=> {
@@ -18,17 +26,72 @@ var collided = (testRect, bullet)=> {
     return rectangleCollision(testRect, bulletRect);
 };
 
-export const collidedWithRock = (game, bullet) => {
+const createBulletRect = (bullet) => ({
+    x: bullet.x,
+    y: bullet.y,
+    w: BULLET_SIZE,
+    h: BULLET_SIZE
+});
 
-    var tileX = Math.floor((bullet.x + 40) / 48);
-    var tileY = Math.floor((bullet.y + 40) / 48);
+const clampBulletRect = (game, rect) => {
+    const mapWidth = Array.isArray(game.map) ? game.map.length : 0;
+    const mapHeight = mapWidth > 0 && Array.isArray(game.map[0])
+        ? game.map[0].length
+        : 0;
 
-
-    if (tileX > 0 && tileY > 0 && tileX < 512 & tileY < 512) {
-        return game.map[tileX][tileY] == MAP_SQUARE_ROCK;
+    if (!mapWidth || !mapHeight) {
+        return rect;
     }
+
+    const maxX = Math.max(0, (mapWidth * TILE_SIZE) - rect.w);
+    const maxY = Math.max(0, (mapHeight * TILE_SIZE) - rect.h);
+
+    return {
+        x: Math.max(0, Math.min(rect.x, maxX)),
+        y: Math.max(0, Math.min(rect.y, maxY)),
+        w: rect.w,
+        h: rect.h
+    };
+};
+
+const hitsBlockingTile = (game, rect) => {
+    const map = Array.isArray(game.map) ? game.map : null;
+    if (!map || !Array.isArray(map[0])) {
+        return false;
+    }
+
+    const maxTileX = map.length - 1;
+    const maxTileY = Array.isArray(map[0]) ? map[0].length - 1 : -1;
+    if (maxTileX < 0 || maxTileY < 0) {
+        return false;
+    }
+
+    const startTileX = Math.max(0, Math.floor(rect.x / TILE_SIZE));
+    const endTileX = Math.min(maxTileX, Math.floor((rect.x + rect.w - 1) / TILE_SIZE));
+    const startTileY = Math.max(0, Math.floor(rect.y / TILE_SIZE));
+    const endTileY = Math.min(maxTileY, Math.floor((rect.y + rect.h - 1) / TILE_SIZE));
+
+    for (let tileX = startTileX; tileX <= endTileX; tileX += 1) {
+        const column = map[tileX];
+        if (!Array.isArray(column)) {
+            continue;
+        }
+        for (let tileY = startTileY; tileY <= endTileY; tileY += 1) {
+            const value = column[tileY];
+            if (BLOCKING_TILE_VALUES.has(value)) {
+                return true;
+            }
+        }
+    }
+
     return false;
 };
+
+export const collidedWithRock = (game, bullet) => {
+    const rect = clampBulletRect(game, createBulletRect(bullet));
+    return hitsBlockingTile(game, rect);
+};
+
 
 export const collidedWithAnotherPlayer = (game, bullet) => {
 

@@ -44,7 +44,7 @@ const resolveBulletSpeed = (type) => {
     return BULLET_SPEED_UNITS_PER_MS;
 };
 
-const BLOCKING_TILE_VALUES = new Set([1, 2, 3]);
+const BLOCKING_TILE_VALUES = new Set([2, 3]);
 const MAP_SIZE_TILES = 512;
 const MAP_PIXEL_SIZE = MAP_SIZE_TILES * TILE_SIZE;
 const BULLET_BUILDING_PADDING = TILE_SIZE * 0.2;
