@@ -1135,15 +1135,32 @@ class PlayerFactory {
             return;
         }
         const roster = this.ensureCityRoster(player.city);
+        const state = this.computeCityState(player.city);
+        const existingMayorId = (state && state.mayorId && state.mayorId !== player.id)
+            ? state.mayorId
+            : null;
 
-        if (assignment.isMayor) {
+        let finalIsMayor = !!assignment.isMayor;
+        if (finalIsMayor && existingMayorId) {
+            debug(`City ${player.city} already has mayor ${existingMayorId}; converting ${player.id} to recruit`);
+            finalIsMayor = false;
+            assignment.isMayor = false;
+        }
+
+        player.isMayor = finalIsMayor;
+
+        if (finalIsMayor) {
             roster.mayor = player.id;
             roster.recruits = roster.recruits.filter((id) => id !== player.id);
-        } else if (!assignment.overflow) {
-            if (!roster.recruits.includes(player.id)) {
+        } else {
+            if (roster.mayor === player.id) {
+                roster.mayor = null;
+            }
+            if (!assignment.overflow && !roster.recruits.includes(player.id)) {
                 roster.recruits.push(player.id);
             }
         }
+
         this.emitLobbySnapshot();
     }
 

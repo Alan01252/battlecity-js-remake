@@ -1,5 +1,7 @@
 "use strict";
 
+const path = require('path');
+const { spawn } = require('child_process');
 const citySpawns = require('../../shared/citySpawns.json');
 const fakeCityConfig = require('../../shared/fakeCities.json');
 const {
@@ -47,7 +49,7 @@ const SPRITE_GAP = PLAYER_HITBOX_GAP;
 const PLAYER_RECT_SIZE = TILE_SIZE - (SPRITE_GAP * 2);
 const AVOIDANCE_ANGLES = Object.freeze([Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2]);
 const RECRUIT_STUCK_TIMEOUT_MS = 5000;
-const NAV_MAX_NODES = 6000;
+const NAV_MAX_NODES = 3200;
 const ARRIVE_RADIUS_PX = TILE_SIZE * 0.7;
 const REPATH_STALL_MS = 650;
 const LOS_RECHECK_MS = 300;
@@ -57,7 +59,7 @@ const KITE_RANGE_PX = TILE_SIZE * 16;
 const BULLET_SPEED_PX_PER_S = TILE_SIZE * 28;
 const AVOID_PROBE_PX = 20;
 const SEPARATION_MIN_PX = 22;
-const SEPARATION_STRENGTH = 0.6;
+const SEPARATION_STRENGTH = 0.75;
 const PATH_WAYPOINT_REACH_PX = TILE_SIZE * 0.3;
 const LAST_SEEN_TIMEOUT_MS = 2000;
 const VISITED_TILE_LRU_SIZE = 10;
@@ -65,6 +67,12 @@ const FLANK_SAMPLE_ANGLES = Object.freeze([Math.PI / 2, -Math.PI / 2, Math.PI / 
 const RETREAT_HEALTH_FRACTION = 0.3;
 const KITE_HEALTH_FRACTION = 0.55;
 const FRIENDLY_FIRE_BUFFER_PX = TILE_SIZE * 0.5;
+const PATH_MIN_DISTANCE_PX = TILE_SIZE * 4;
+const AWARENESS_RESCAN_MS = 450;
+const AWARENESS_RADIUS_PX = TILE_SIZE * 22;
+const MAX_ALLY_SAMPLE = 6;
+const MAX_REPATH_ATTEMPTS = 3;
+const PATH_JITTER_PX = TILE_SIZE * 0.18;
 
 const RECRUIT_POSITION_PATTERNS = Object.freeze([
     { dx: -TILE_SIZE, dy: TILE_SIZE / 2, direction: 16 },
@@ -573,11 +581,23 @@ class FakeCityManager {
         this.nextEvaluation = 0;
         this.io = null;
         this.defenseSequence = 0;
+        this.botProcesses = new Map();
         this.recruits = new Map();
         this.recruitsByCity = new Map();
-        this.recruitSequence = 0;
         this.navGrid = null;
         this.debug = require('debug')('BattleCity:FakeCityManager');
+
+        process.on('exit', () => {
+            for (const child of this.botProcesses.values()) {
+                try {
+                    if (child && !child.killed) {
+                        child.kill();
+                    }
+                } catch (error) {
+                    this.debug(`[bot] error killing bot during shutdown: ${error.message}`);
+                }
+            }
+        });
     }
 
     setIo(io) {
@@ -585,7 +605,6 @@ class FakeCityManager {
     }
 
     update(now = Date.now()) {
-        this.updateRecruits(now);
         const interval = toFiniteNumber(this.config.evaluationIntervalMs, 10000);
         if (now < this.nextEvaluation) {
             return;
@@ -1338,6 +1357,12 @@ class FakeCityManager {
         record.lastSeenTargetAt = 0;
         record.lastSeenX = null;
         record.lastSeenY = null;
+        record.nextAwarenessScanAt = now;
+        record.cachedAllyCenters = [];
+        record.cachedAllies = 0;
+        record.cachedEnemies = 0;
+        record.repathAttempts = 0;
+        record.motionSeed = Number.isFinite(record.motionSeed) ? record.motionSeed : Math.random();
         record.lastMoveX = spawn.x;
         record.lastMoveY = spawn.y;
         this.ensureRecruitPatrolState(record);
@@ -1537,6 +1562,12 @@ class FakeCityManager {
         record.lastSeenX = null;
         record.lastSeenY = null;
         record.visitedTiles = [];
+        record.nextAwarenessScanAt = now;
+        record.cachedAllyCenters = [];
+        record.cachedAllies = 0;
+        record.cachedEnemies = 0;
+        record.repathAttempts = 0;
+        record.motionSeed = Number.isFinite(record.motionSeed) ? record.motionSeed : Math.random();
         record.targetId = null;
         record.lastBroadcastAt = now;
         record.lastThinkAt = now;
@@ -1651,44 +1682,45 @@ class FakeCityManager {
             ? Math.max(0, Math.min(1, target.health / MAX_HEALTH))
             : 1;
 
-        let nearbyAllies = 0;
-        let nearbyEnemies = 0;
-        const allyCenters = [];
-        const recruitIds = this.recruitsByCity.get(record.cityId) || [];
-        for (const recruitId of recruitIds) {
-            if (recruitId === record.id) {
-                continue;
-            }
-            const allyPlayer = players[recruitId];
-            if (!allyPlayer || allyPlayer.health <= 0) {
-                continue;
-            }
-            const ax = allyPlayer.offset?.x ?? 0;
-            const ay = allyPlayer.offset?.y ?? 0;
-            if (distanceSquared(px, py, ax, ay) <= (TILE_SIZE * 20) * (TILE_SIZE * 20)) {
-                nearbyAllies += 1;
-            }
-            allyCenters.push({
-                x: ax + (TILE_SIZE / 2),
-                y: ay + (TILE_SIZE / 2)
-            });
-        }
+        let nearbyAllies = record.cachedAllies || 0;
+        let nearbyEnemies = record.cachedEnemies || 0;
+        let allyCenters = Array.isArray(record.cachedAllyCenters) ? record.cachedAllyCenters : [];
 
-        for (const candidate of Object.values(players)) {
-            if (!candidate || candidate.id === record.id || candidate.health <= 0) {
-                continue;
+        if (!record.nextAwarenessScanAt || now >= record.nextAwarenessScanAt) {
+            const radiusSq = AWARENESS_RADIUS_PX * AWARENESS_RADIUS_PX;
+            nearbyAllies = 0;
+            nearbyEnemies = 0;
+            allyCenters = [];
+            let allySamples = 0;
+            const allPlayers = Object.values(players);
+            for (let index = 0; index < allPlayers.length; index += 1) {
+                const candidate = allPlayers[index];
+                if (!candidate || candidate.id === record.id || candidate.health <= 0) {
+                    continue;
+                }
+                const cx = candidate.offset?.x ?? candidate.x ?? 0;
+                const cy = candidate.offset?.y ?? candidate.y ?? 0;
+                if (distanceSquared(px, py, cx, cy) > radiusSq) {
+                    continue;
+                }
+                const candidateCity = Number(candidate.city);
+                if (Number.isFinite(candidateCity) && candidateCity === record.cityId) {
+                    nearbyAllies += 1;
+                    if (allySamples < MAX_ALLY_SAMPLE) {
+                        allyCenters.push({
+                            x: cx + (TILE_SIZE / 2),
+                            y: cy + (TILE_SIZE / 2)
+                        });
+                        allySamples += 1;
+                    }
+                } else {
+                    nearbyEnemies += 1;
+                }
             }
-            const cx = candidate.offset?.x ?? 0;
-            const cy = candidate.offset?.y ?? 0;
-            if (distanceSquared(px, py, cx, cy) > (TILE_SIZE * 20) * (TILE_SIZE * 20)) {
-                continue;
-            }
-            const candidateCity = Number(candidate.city);
-            if (Number.isFinite(candidateCity) && candidateCity === record.cityId) {
-                nearbyAllies += 1;
-            } else {
-                nearbyEnemies += 1;
-            }
+            record.cachedAllyCenters = allyCenters;
+            record.cachedAllies = nearbyAllies;
+            record.cachedEnemies = nearbyEnemies;
+            record.nextAwarenessScanAt = now + AWARENESS_RESCAN_MS;
         }
 
         const outnumbered = nearbyEnemies > (nearbyAllies + 1);
@@ -1751,17 +1783,37 @@ class FakeCityManager {
             }
             : null;
 
+        if (goal && goal.requiresPath && desiredPoint) {
+            const goalDistanceSq = distanceSquared(px, py, desiredPoint.x, desiredPoint.y);
+            if (goalDistanceSq <= (PATH_MIN_DISTANCE_PX * PATH_MIN_DISTANCE_PX)) {
+                goal.requiresPath = false;
+            }
+        }
+
         if (goal && (goal.requiresPath || shouldRepath || !record.path)) {
             if (!record.lastPathBuildAt || now - record.lastPathBuildAt >= PATH_REBUILD_COOLDOWN_MS) {
                 if (nav && goalKey) {
-                    const penaltySet = new Set(Array.isArray(record.visitedTiles) ? record.visitedTiles : []);
-                    const computedPath = this.astar({ x: currentTile.x, y: currentTile.y }, { x: goal.goalTileX, y: goal.goalTileY }, nav, { visitedPenalty: penaltySet });
-                    if (computedPath && computedPath.length) {
-                        record.path = computedPath;
-                        record.pathIndex = 0;
-                        record.pathGoalKey = goalKey;
-                        record.lastPathBuildAt = now;
-                    } else if (goal.requiresPath) {
+                    const attempts = record.repathAttempts || 0;
+                    if (attempts < MAX_REPATH_ATTEMPTS) {
+                        const penaltySet = new Set(Array.isArray(record.visitedTiles) ? record.visitedTiles : []);
+                        const computedPath = this.astar({ x: currentTile.x, y: currentTile.y }, { x: goal.goalTileX, y: goal.goalTileY }, nav, { visitedPenalty: penaltySet });
+                        if (computedPath && computedPath.length) {
+                            record.path = computedPath;
+                            record.pathIndex = 0;
+                            record.pathGoalKey = goalKey;
+                            record.lastPathBuildAt = now;
+                            record.repathAttempts = 0;
+                        } else if (goal.requiresPath) {
+                            record.repathAttempts = attempts + 1;
+                            record.path = null;
+                            record.pathIndex = 0;
+                            record.pathGoalKey = null;
+                            if (record.repathAttempts >= MAX_REPATH_ATTEMPTS) {
+                                goal.requiresPath = false;
+                            }
+                        }
+                    } else {
+                        goal.requiresPath = false;
                         record.path = null;
                         record.pathIndex = 0;
                         record.pathGoalKey = null;
@@ -1774,14 +1826,26 @@ class FakeCityManager {
             if (record.path && record.path.length && record.pathIndex < record.path.length) {
                 const waypoint = record.path[record.pathIndex];
                 const origin = tileToOffsetOrigin(waypoint.x, waypoint.y);
+                const jitterBase = (Number.isFinite(record.motionSeed) ? record.motionSeed : 0.5) - 0.5;
+                const jitterX = jitterBase * PATH_JITTER_PX;
+                const jitterY = -jitterBase * PATH_JITTER_PX;
                 return {
-                    point: origin,
+                    point: {
+                        x: clamp(origin.x + jitterX, 0, MAP_MAX_COORD),
+                        y: clamp(origin.y + jitterY, 0, MAP_MAX_COORD)
+                    },
                     fromPath: true
                 };
             }
             if (desiredPoint) {
+                const point = (mode === 'patrol' && Number.isFinite(record.motionSeed))
+                    ? {
+                        x: clamp(desiredPoint.x + ((record.motionSeed - 0.5) * PATH_JITTER_PX), 0, MAP_MAX_COORD),
+                        y: clamp(desiredPoint.y - ((record.motionSeed - 0.5) * PATH_JITTER_PX), 0, MAP_MAX_COORD)
+                    }
+                    : desiredPoint;
                 return {
-                    point: desiredPoint,
+                    point,
                     fromPath: false
                 };
             }
@@ -1845,7 +1909,9 @@ class FakeCityManager {
                 dx: baseVelocity.dx + separation.dx,
                 dy: baseVelocity.dy + separation.dy
             };
-            velocity = avoidanceAdjust({ x: px, y: py }, velocity, movementSpeed, nav, (tileX, tileY) => this.isNavTileBlocked(tileX, tileY));
+            if (!targetInfo.fromPath) {
+                velocity = avoidanceAdjust({ x: px, y: py }, velocity, movementSpeed, nav, (tileX, tileY) => this.isNavTileBlocked(tileX, tileY));
+            }
 
             const speedPerMs = Math.sqrt((velocity.dx * velocity.dx) + (velocity.dy * velocity.dy));
             if (!Number.isFinite(speedPerMs) || speedPerMs < 1e-4) {
@@ -1858,7 +1924,11 @@ class FakeCityManager {
                 dy: velocity.dy / speedPerMs
             };
             const step = Math.min(speedPerMs * stepTime, movementSpeed * stepTime);
-            const attempt = this.tryMoveWithVector(px, py, unit, step);
+            let attempt = this.tryMoveWithVector(px, py, unit, step);
+            if (!attempt) {
+                const alternateStep = Math.min(step + TILE_SIZE * 0.1, TILE_SIZE * 1.2);
+                attempt = this.findAlternateVector(unit, px, py, alternateStep);
+            }
             if (!attempt) {
                 failedMoves += 1;
                 if (failedMoves >= 2) {
@@ -1906,6 +1976,7 @@ class FakeCityManager {
             record.lastMoveX = px;
             record.lastMoveY = py;
             record.stuckCounter = 0;
+            record.repathAttempts = 0;
             shouldBroadcast = true;
         } else {
             record.stuckCounter = (record.stuckCounter || 0) + 1;
@@ -1917,13 +1988,36 @@ class FakeCityManager {
 
         if (shouldRepath && goal && goalKey && (!record.lastPathBuildAt || now - record.lastPathBuildAt >= PATH_REBUILD_COOLDOWN_MS)) {
             if (nav) {
-                const penaltySet = new Set(Array.isArray(record.visitedTiles) ? record.visitedTiles : []);
-                const recomputedPath = this.astar(pixelToTile(px, py), { x: goal.goalTileX, y: goal.goalTileY }, nav, { visitedPenalty: penaltySet });
-                if (recomputedPath && recomputedPath.length) {
-                    record.path = recomputedPath;
-                    record.pathIndex = 0;
-                    record.pathGoalKey = goalKey;
-                    record.lastPathBuildAt = now;
+                const attempts = record.repathAttempts || 0;
+                if (attempts < MAX_REPATH_ATTEMPTS) {
+                    const penaltySet = new Set(Array.isArray(record.visitedTiles) ? record.visitedTiles : []);
+                    const recomputedPath = this.astar(pixelToTile(px, py), { x: goal.goalTileX, y: goal.goalTileY }, nav, { visitedPenalty: penaltySet });
+                    if (recomputedPath && recomputedPath.length) {
+                        record.path = recomputedPath;
+                        record.pathIndex = 0;
+                        record.pathGoalKey = goalKey;
+                        record.lastPathBuildAt = now;
+                        record.repathAttempts = 0;
+                    } else {
+                        record.repathAttempts = attempts + 1;
+                        if (record.repathAttempts >= MAX_REPATH_ATTEMPTS) {
+                            goal.requiresPath = false;
+                            record.path = null;
+                            record.pathIndex = 0;
+                            record.pathGoalKey = null;
+                        }
+                        if (!moved && (now - (record.lastMoveTimestamp || now)) >= RECRUIT_STUCK_TIMEOUT_MS) {
+                            const reset = this.resetRecruitPosition(record, player, now);
+                            if (reset) {
+                                px = player.offset.x ?? px;
+                                py = player.offset.y ?? py;
+                                desiredDirection = wrapDirection(player.direction ?? desiredDirection, desiredDirection);
+                                moved = false;
+                                resetPerformed = true;
+                                shouldBroadcast = true;
+                            }
+                        }
+                    }
                 } else if (!moved && (now - (record.lastMoveTimestamp || now)) >= RECRUIT_STUCK_TIMEOUT_MS) {
                     const reset = this.resetRecruitPosition(record, player, now);
                     if (reset) {
@@ -2170,7 +2264,8 @@ class FakeCityManager {
                 patrolDirection,
                 patrolThreshold,
                 patrolStopDistance,
-                mode: 'pending'
+                mode: 'pending',
+                motionSeed: Math.random()
             };
             this.ensureRecruitPatrolState(record);
             this.recruits.set(id, record);
@@ -2223,6 +2318,83 @@ class FakeCityManager {
             if (record && Array.isArray(record.defenseItems) && record.defenseItems.length) {
                 this.emitDefenseSnapshot(cityId, record.defenseItems, target);
             }
+        }
+    }
+
+    spawnCityBot(cityId) {
+        if (!Number.isFinite(cityId)) {
+            return null;
+        }
+        const numericCity = Math.max(0, Math.floor(cityId));
+        if (this.botProcesses.has(numericCity)) {
+            this.killCityBot(numericCity, 'restart');
+        }
+
+        const scriptPath = path.resolve(__dirname, '../../bot/index.js');
+        const botCwd = path.resolve(__dirname, '../../bot');
+        const serverUrl = process.env.BATTLECITY_SERVER || 'http://localhost:8021';
+
+        try {
+            const child = spawn(
+                process.execPath,
+                [scriptPath, '--city', String(numericCity), '--role', 'recruit'],
+                {
+                    cwd: botCwd,
+                    stdio: ['ignore', 'inherit', 'inherit'],
+                    env: Object.assign({}, process.env, {
+                        BATTLECITY_SERVER: serverUrl
+                    })
+                }
+            );
+
+            child.once('error', (error) => {
+                this.debug(`[bot] spawn failed for city ${numericCity}: ${error.message}`);
+                if (this.botProcesses.get(numericCity) === child) {
+                    this.botProcesses.delete(numericCity);
+                }
+                const record = this.activeCities.get(numericCity);
+                if (record && record.botProcess === child) {
+                    record.botProcess = null;
+                }
+            });
+
+            child.once('exit', (code, signal) => {
+                this.debug(`[bot] city ${numericCity} exited code=${code} signal=${signal || 'null'}`);
+                if (this.botProcesses.get(numericCity) === child) {
+                    this.botProcesses.delete(numericCity);
+                }
+                const record = this.activeCities.get(numericCity);
+                if (record && record.botProcess === child) {
+                    record.botProcess = null;
+                }
+            });
+
+            this.botProcesses.set(numericCity, child);
+            this.debug(`[bot] launched bot for city ${numericCity}`);
+            return child;
+        } catch (error) {
+            this.debug(`[bot] unable to launch bot for city ${numericCity}: ${error.message}`);
+            return null;
+        }
+    }
+
+    killCityBot(cityId, reason = 'unknown') {
+        const numericCity = Number.isFinite(cityId) ? Math.max(0, Math.floor(cityId)) : null;
+        if (numericCity === null) {
+            return;
+        }
+        const child = this.botProcesses.get(numericCity);
+        if (!child) {
+            return;
+        }
+        this.botProcesses.delete(numericCity);
+        try {
+            if (!child.killed) {
+                child.kill();
+            }
+            this.debug(`[bot] terminated bot for city ${numericCity} (${reason})`);
+        } catch (error) {
+            this.debug(`[bot] failed to terminate bot for city ${numericCity}: ${error.message}`);
         }
     }
 
@@ -2486,7 +2658,7 @@ class FakeCityManager {
         const defenseItemsSnapshot = defenses.items.map((item) => ({ ...item }));
         const hazardIdsSnapshot = Array.isArray(defenses.hazardIds) ? [...defenses.hazardIds] : [];
 
-        this.activeCities.set(cityId, {
+        const cityRecord = {
             ownerId,
             config: entry,
             buildingIds: spawnedIds,
@@ -2496,9 +2668,15 @@ class FakeCityManager {
             baseTileY: baseY,
             spawnPoint: spawnPoint || null,
             patrolPath: patrolPath.length ? patrolPath : [],
-        });
+            botProcess: null,
+        };
 
-        this.ensureCityRecruits(cityId, entry, baseX, baseY);
+        const botProcess = this.spawnCityBot(cityId);
+        if (botProcess) {
+            cityRecord.botProcess = botProcess;
+        }
+
+        this.activeCities.set(cityId, cityRecord);
 
         if (this.playerFactory?.emitLobbySnapshot) {
             this.playerFactory.emitLobbySnapshot();
@@ -2534,6 +2712,7 @@ class FakeCityManager {
             return false;
         }
         const record = this.activeCities.get(cityId);
+        this.killCityBot(cityId, 'city_removed');
         this.removeCityRecruits(cityId, { broadcast: true });
         if (record && Array.isArray(record.hazardIds) && this.hazardManager) {
             record.hazardIds.forEach((hazardId) => {

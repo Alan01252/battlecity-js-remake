@@ -26,3 +26,10 @@ Multiplayer will not run without a server running and js changed
 - cd ./server
 - npm start  # Express + Socket.IO on http://localhost:8021
 - npm run dev  # optional: auto-restart with nodemon
+
+## Bot Client
+
+- cd ./bot
+- npm install
+- node index.js --server http://localhost:8021 --city 0  # joins the server as a roaming recruit bot
+- The game server now auto-launches a bot process for each fake city (via the same script), so make sure `npm install` has been run in `bot/` before starting the server.
