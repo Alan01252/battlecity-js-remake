@@ -1,0 +1,40 @@
+repos:
+  # Conventional Commits message check (local hook via npm)
+  - repo: local
+    hooks:
+      - id: commitlint
+        name: commitlint
+        entry: bash -c 'npx --yes @commitlint/cli@17.8.1 --config @commitlint/config-conventional@17.8.1 --edit "$1"' --
+        language: system
+        stages: [commit-msg]
+        pass_filenames: false
+
+  # Pre-commit hygiene: whitespace, EOF, etc.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  # ESLint (uses files regex, not types)
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (js/ts lint)
+        entry: npm run lint
+        language: system
+        pass_filenames: false
+        files: '\.(js|jsx|ts|tsx)$'
+
+  # Prettier (uses files regex, not types_or)
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier (format js/json/ts/md/yaml)
+        entry: npx prettier --write .
+        language: system
+        pass_filenames: false
+        files: '\.(js|jsx|ts|tsx|json|md|yaml|yml)$'
