@@ -141,6 +141,7 @@ stats.showPanel(0);
 document.getElementById("game").appendChild(stats.dom);
 
 var objectContainer = new PIXI.Container();
+var commandCenterLabelLayer = new PIXI.Container();
 var panelContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
@@ -208,6 +209,7 @@ const game = {
     app: app,
     stage: app.stage,
     objectContainer: objectContainer,
+    commandCenterLabelLayer: commandCenterLabelLayer,
     orbHintElement: null,
     lastOrbHintMessage: '',
     nextOrbHintUpdate: 0,
@@ -1465,12 +1467,17 @@ function setup() {
     backgroundTiles = new PIXI.Container();
     iconTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['imageItems'], true);
     itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
+    commandCenterLabelLayer.removeChildren();
+    if (game.commandCenterLabelCache && typeof game.commandCenterLabelCache.clear === 'function') {
+        game.commandCenterLabelCache.clear();
+    }
 
 
      app.stage.addChild(groundTiles);
      app.stage.addChild(backgroundTiles);
      app.stage.addChild(itemTiles);
      app.stage.addChild(iconTiles);
+     app.stage.addChild(commandCenterLabelLayer);
      app.stage.addChild(objectContainer);
      app.stage.addChild(panelContainer);
 

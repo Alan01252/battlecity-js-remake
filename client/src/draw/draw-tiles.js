@@ -10,6 +10,7 @@ import {BUILDING_HOUSE} from "../constants";
 import {BUILDING_REPAIR} from "../constants";
 import {POPULATION_MAX_HOUSE} from "../constants";
 import {POPULATION_MAX_NON_HOUSE} from "../constants";
+import { getCityDisplayName } from '../utils/citySpawns';
 
 var minTX = 0;
 var maxTX = 0;
@@ -19,6 +20,20 @@ var maxTY = 0;
 const TILE_SIZE = 48;
 const REDRAW_RADIUS_TILES = 24;
 const VIEW_RADIUS_TILES = 40;
+const COMMAND_CENTER_LABEL_STYLE = Object.freeze({
+    fontFamily: 'Arial',
+    fontSize: 14,
+    fontWeight: 'bold',
+    fill: 0xF2F6FF,
+    align: 'center',
+    stroke: 0x000000,
+    strokeThickness: 4,
+    lineHeight: 16,
+    wordWrap: true,
+    wordWrapWidth: 120,
+});
+const COMMAND_CENTER_LABEL_RESOLUTION = 2;
+const COMMAND_CENTER_LABEL_OFFSET_Y = -32;
 
 const ensureLayers = (backgroundTiles) => {
     if (!backgroundTiles.tileLayer) {
@@ -32,6 +47,12 @@ const ensureLayers = (backgroundTiles) => {
         backgroundTiles.addChild(overlay);
     } else if (!backgroundTiles.edgeOverlay.parent) {
         backgroundTiles.addChild(backgroundTiles.edgeOverlay);
+    }
+    if (!backgroundTiles.commandCenterLabelLayer) {
+        const labels = new PIXI.Container();
+        labels.name = 'commandCenterLabelLayer';
+        backgroundTiles.commandCenterLabelLayer = labels;
+        backgroundTiles.addChild(labels);
     }
 };
 
@@ -164,6 +185,115 @@ var drawBuilding = (game, tileLayer, i, j, tileX, tileY) => {
 
 };
 
+const toFinite = (value, fallback = 0) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const syncCommandCenterLabels = (game) => {
+    if (!game || !game.buildingFactory) {
+        return;
+    }
+    const labelLayer = game.commandCenterLabelLayer;
+    if (!labelLayer) {
+        return;
+    }
+
+    if (!game.commandCenterLabelCache) {
+        game.commandCenterLabelCache = new Map();
+    }
+    const cache = game.commandCenterLabelCache;
+    const activeKeys = new Set();
+
+    const playerOffsetX = Number.isFinite(game.player?.offset?.x) ? game.player.offset.x : 0;
+    const playerOffsetY = Number.isFinite(game.player?.offset?.y) ? game.player.offset.y : 0;
+    const defaultOffsetX = Number.isFinite(game.player?.defaultOffset?.x) ? game.player.defaultOffset.x : 0;
+    const defaultOffsetY = Number.isFinite(game.player?.defaultOffset?.y) ? game.player.defaultOffset.y : 0;
+    const offsetX = defaultOffsetX - playerOffsetX;
+    const offsetY = defaultOffsetY - playerOffsetY;
+
+    let node = typeof game.buildingFactory.getHead === 'function'
+        ? game.buildingFactory.getHead()
+        : null;
+
+    while (node) {
+        const typeNumeric = Number(node.type);
+        const baseType = Number.isFinite(typeNumeric) ? Math.floor(typeNumeric / 100) : null;
+        const isCommandCenter = typeNumeric === BUILDING_COMMAND_CENTER || baseType === BUILDING_COMMAND_CENTER;
+        if (isCommandCenter) {
+            const key = node.id || `${node.x}_${node.y}`;
+            activeKeys.add(key);
+
+            const baseTileX = toFinite(node.x, 0);
+            const baseTileY = toFinite(node.y, 0);
+            const centerX = (baseTileX + 1.5) * TILE_SIZE;
+            const centerY = (baseTileY + 1.5) * TILE_SIZE;
+            const screenX = centerX + offsetX;
+            const screenY = centerY + offsetY;
+            const cityName = getCityDisplayName(node.city ?? 0);
+
+            const isWithinView =
+                Math.abs(centerX - playerOffsetX) <= VIEW_RADIUS_TILES * TILE_SIZE &&
+                Math.abs(centerY - playerOffsetY) <= VIEW_RADIUS_TILES * TILE_SIZE;
+
+            let record = cache.get(key);
+            if (!record) {
+                const label = new PIXI.Text(cityName, COMMAND_CENTER_LABEL_STYLE);
+                label.anchor.set(0.5);
+                label.resolution = COMMAND_CENTER_LABEL_RESOLUTION;
+                labelLayer.addChild(label);
+                record = { label, text: cityName };
+                cache.set(key, record);
+            } else if (record.text !== cityName) {
+                record.label.text = cityName;
+                record.text = cityName;
+            }
+
+            record.label.visible = isWithinView;
+            record.label.x = screenX;
+            record.label.y = screenY + COMMAND_CENTER_LABEL_OFFSET_Y;
+        }
+        node = node.next;
+    }
+
+    cache.forEach((record, key) => {
+        if (!activeKeys.has(key)) {
+            if (record && record.label) {
+                if (record.label.parent) {
+                    record.label.parent.removeChild(record.label);
+                }
+                record.label.destroy();
+            }
+            cache.delete(key);
+        }
+    });
+};
+
+const pruneCommandCenterLabels = (game) => {
+    if (!game?.commandCenterLabelCache) {
+        return;
+    }
+    const cache = game.commandCenterLabelCache;
+    const now = game.tick || Date.now();
+    cache.forEach((record, key) => {
+        if (!record || !record.label) {
+            cache.delete(key);
+            return;
+        }
+        if (!record.label.visible && (record.lastHiddenAt || 0) && (now - record.lastHiddenAt) > 1000) {
+            if (record.label.parent) {
+                record.label.parent.removeChild(record.label);
+            }
+            record.label.destroy();
+            cache.delete(key);
+        } else if (!record.label.visible) {
+            record.lastHiddenAt = now;
+        } else if (record.lastHiddenAt) {
+            record.lastHiddenAt = null;
+        }
+    });
+};
+
 var setRedrawBoundaries = (game) => {
     const centerTileX = game.player.offset.x / TILE_SIZE;
     const centerTileY = game.player.offset.y / TILE_SIZE;
@@ -200,6 +330,7 @@ export const drawTiles = (game, backgroundTiles) => {
     }
 
     ensureLayers(backgroundTiles);
+    syncCommandCenterLabels(game);
     const tileLayer = backgroundTiles.tileLayer;
     const edgeOverlay = backgroundTiles.edgeOverlay;
     if (!tileLayer || !edgeOverlay) {
@@ -257,4 +388,5 @@ export const drawTiles = (game, backgroundTiles) => {
     }
 
     backgroundTiles.pivot.set(game.player.offset.x, game.player.offset.y);
+    pruneCommandCenterLabels(game);
 };
