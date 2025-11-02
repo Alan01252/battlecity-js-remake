@@ -326,12 +326,12 @@ class PlayerFactory {
         if (hazardType) {
             switch (hazardType) {
                 case 'mine':
-                    return 'Mine';
+                    return `${cityName || 'City'} Mine`;
                 case 'bomb':
-                    return 'Bomb';
+                    return `${cityName || 'City'} Bomb`;
                 case 'dfg':
                 case 'dfg_field':
-                    return 'DFG Field';
+                    return `${cityName || 'City'} DFG Field`;
                 default:
                     break;
             }
@@ -345,7 +345,8 @@ class PlayerFactory {
             killerCallsign: null,
             killerCity: null,
             sourceType: null,
-            hazardType: null
+            hazardType: null,
+            teamId: null
         };
         if (!meta || typeof meta !== 'object') {
             summary.killerLabel = this.describeKillOrigin(summary);
@@ -375,6 +376,18 @@ class PlayerFactory {
         }
         if (meta.type) {
             summary.hazardType = String(meta.type).toLowerCase();
+        }
+        if (summary.teamId === null && summary.killerCity !== null) {
+            summary.teamId = Math.max(0, Math.floor(summary.killerCity));
+        }
+        if (meta.teamId !== undefined && meta.teamId !== null) {
+            const teamNumeric = Number(meta.teamId);
+            if (Number.isFinite(teamNumeric)) {
+                summary.teamId = Math.max(0, Math.floor(teamNumeric));
+            }
+        }
+        if (summary.killerCity === null && summary.teamId !== null) {
+            summary.killerCity = summary.teamId;
         }
         summary.killerLabel = this.describeKillOrigin(summary);
         return summary;
@@ -677,6 +690,7 @@ class PlayerFactory {
                 killerCallsign: killSummary.killerCallsign,
                 killerLabel: killSummary.killerLabel,
                 killerCity: killSummary.killerCity,
+                teamId: killSummary.teamId ?? null,
                 sourceType: killSummary.sourceType,
                 hazardType: killSummary.hazardType
             }));

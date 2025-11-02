@@ -314,12 +314,12 @@ game.describeKillSource = (details = {}) => {
     if (hazardType) {
         switch (hazardType) {
             case 'mine':
-                return 'Mine';
+                return `${cityLabel || 'City'} Mine`;
             case 'bomb':
-                return 'Bomb';
+                return `${cityLabel || 'City'} Bomb`;
             case 'dfg':
             case 'dfg_field':
-                return 'DFG Field';
+                return `${cityLabel || 'City'} DFG Field`;
             default:
                 break;
         }
@@ -1395,6 +1395,15 @@ function setup() {
 
         const sourceType = data.sourceType ?? reason.sourceType ?? null;
         const hazardType = data.hazardType ?? reason.type ?? null;
+        const killerCityNumeric = toFiniteNumber(data.killerCity, null);
+        const reasonTeamNumeric = toFiniteNumber(reason.teamId, null);
+        const dataTeamNumeric = toFiniteNumber(data.teamId, null);
+        const killerCity = Number.isFinite(killerCityNumeric)
+            ? Math.max(0, Math.floor(killerCityNumeric))
+            : (Number.isFinite(reasonTeamNumeric) ? Math.max(0, Math.floor(reasonTeamNumeric)) : null);
+        const fallbackTeamId = Number.isFinite(reasonTeamNumeric)
+            ? Math.max(0, Math.floor(reasonTeamNumeric))
+            : (Number.isFinite(dataTeamNumeric) ? Math.max(0, Math.floor(dataTeamNumeric)) : killerCity);
         const killerIdRaw = data.killerId ?? reason.sourceId ?? reason.shooterId ?? reason.emitterId ?? reason.ownerId ?? null;
         const killerId = killerIdRaw !== null && killerIdRaw !== undefined ? `${killerIdRaw}` : null;
         const victimRecord = isLocal ? game.player : (game.otherPlayers?.[victimKey] || null);
@@ -1414,6 +1423,8 @@ function setup() {
         if (!killerLabel) {
             killerLabel = game.describeKillSource({
                 killerCallsign,
+                killerCity,
+                teamId: fallbackTeamId,
                 sourceType,
                 hazardType
             });
