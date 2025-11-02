@@ -45,10 +45,12 @@ const bulletFactory = new BulletFactory(game, playerFactory);
 bulletFactory.listen(io);
 const buildingFactory = new BuildingFactory(game);
 buildingFactory.listen(io);
+game.buildingFactory = buildingFactory;
 const hazardManager = new HazardManager(game, playerFactory);
 hazardManager.setIo(io);
 const defenseManager = new DefenseManager({ game, playerFactory });
 defenseManager.setIo(io);
+buildingFactory.setManagers({ hazardManager, defenseManager, playerFactory });
 const orbManager = new OrbManager({
     game,
     cityManager: buildingFactory.cityManager,

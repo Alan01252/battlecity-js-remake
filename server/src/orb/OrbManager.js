@@ -111,6 +111,11 @@ class OrbManager {
         if (this.cityManager) {
             this.cityManager.resetCity(targetCity);
             this.cityManager.recordOrbVictory(playerCity, points);
+            if (typeof this.cityManager.releaseOrbHolder === 'function') {
+                this.cityManager.releaseOrbHolder(socket.id, { consume: true });
+            } else if (typeof this.cityManager.consumeOrb === 'function') {
+                this.cityManager.consumeOrb(playerCity, socket.id);
+            }
         }
 
         if (this.playerFactory && typeof this.playerFactory.evictCityPlayers === 'function') {

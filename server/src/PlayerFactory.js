@@ -229,6 +229,11 @@ class PlayerFactory {
                 if (!removedPlayer) {
                     return;
                 }
+                if (this.game.buildingFactory &&
+                    this.game.buildingFactory.cityManager &&
+                    typeof this.game.buildingFactory.cityManager.releaseOrbHolder === 'function') {
+                    this.game.buildingFactory.cityManager.releaseOrbHolder(socket.id, { consume: true });
+                }
                 this.releaseSlot(removedPlayer);
                 delete this.game.players[socket.id];
                 io.emit('player:removed', JSON.stringify({id: removedPlayer.id}));

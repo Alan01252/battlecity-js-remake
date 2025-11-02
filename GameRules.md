@@ -48,6 +48,24 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Cities become *orbable* once they either (a) reach a historical maximum of at least 21 constructed buildings, or (b) have ever operated a Bomb or Orb factory. (server/src/CityManager.js:129)
 - An Orb dropped on an enemy command center now triggers a full city wipe when the target meets the orbable criteria: the command center is destroyed, every building is demolished, all hazards are cleared, and the affected players are sent back to the lobby. (server/src/orb/OrbManager.js:47, server/src/PlayerFactory.js:658)
 - Factory output counts now come entirely from the server snapshot. Each `new_building` payload includes `itemsLeft`, and the client reconciles the expected drops through `syncFactoryItems`. (client/src/SocketListener.js:140, client/src/factories/BuildingFactory.js:538)
+- Factory output now mirrors the original Battle City per-item caps; production stalls once a city's stock hits the legacy limit and resumes only after that item is spent.\
+  | Item | Player inventory cap | Factory stock cap | Notes |
+  | --- | --- | --- | --- |
+  | Cloak | 4 | 4 | Consumed immediately on use |
+  | Rocket/Bazooka | 4 | 4 | |
+  | Medkit | 5 | 20 | |
+  | Bomb | 20 | 20 | Covers armed and unarmed stacks |
+  | Mine | 10 | 10 | |
+  | Orb | 1 | 1 | City must detonate or otherwise consume the active orb |
+  | Flare | 4 | 4 | Matches the legacy walkie cap |
+  | DFG | 5 | 5 | |
+  | Wall | 20 | 20 | |
+  | Turret | 10 | 10 | |
+  | Sleeper | 5 | 5 | |
+  | Plasma | 5 | 5 | |
+  | Laser | 4 | 4 | Parity with rockets for the starter weapon |
+- Orb factories now pin production while the city has an orb in circulation; the server records which socket collected the orb and releases the slot when that player detonates it or disconnects. (server/src/BuildingFactory.js:123, server/src/CityManager.js:121, server/src/orb/OrbManager.js:81, server/src/PlayerFactory.js:232)
+- Demolishing a factory wipes its legacy stock: the server purges matching icons from city inventories, clears deployed hazards/defenses of that type, and cancels any active orb carriers so the production limit stays authoritative. (server/src/BuildingFactory.js:133, server/src/hazards/HazardManager.js:231, server/src/DefenseManager.js:116, client/src/factories/IconFactory.js:71)
 - Inventory stacks repeatable items (bombs, mines, turrets) and shows a count overlay; selecting a bomb arms the stack so drops inherit the armed state. (client/src/factories/IconFactory.js:20, client/src/draw/draw-panel-interface.js:37)
 - Item pickups respect the classic per-city caps (e.g., Cloaks 4, Bombs 20, Turrets 10, Plasma 5, Orb 1); excess inventory is trimmed during restore and additional pickups are blocked once a cap is reached. (client/src/constants.js:90, client/src/factories/IconFactory.js:18)
 - Factory drops now carry their producing city’s team flag; only members of that city can collect the items, preventing players from looting rival (or AI) production lines. (server/src/FactoryBuilding.js:41, client/src/SocketListener.js:131, client/src/factories/IconFactory.js:239)

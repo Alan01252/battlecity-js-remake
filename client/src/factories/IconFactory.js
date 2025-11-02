@@ -317,6 +317,35 @@ class IconFactory {
         return returnIcon;
     }
 
+    purgeCityItems(cityId, itemType = null) {
+        const targetType = Number.isFinite(itemType) ? Math.floor(itemType) : null;
+        const targetCity = Number.isFinite(cityId) ? Math.floor(cityId) : null;
+        let removed = 0;
+        let icon = this.getHead();
+        while (icon) {
+            const matchesType = targetType === null || icon.type === targetType;
+            if (!matchesType) {
+                icon = icon.next;
+                continue;
+            }
+            const iconCity = Number.isFinite(icon.city) ? Math.floor(icon.city) :
+                (Number.isFinite(icon.teamId) ? Math.floor(icon.teamId) : null);
+            if (targetCity !== null && iconCity !== null && iconCity !== targetCity) {
+                icon = icon.next;
+                continue;
+            }
+            icon = this.deleteIcon(icon);
+            removed += 1;
+        }
+        if (removed > 0) {
+            if (targetType === ITEM_TYPE_BOMB && this.game?.player) {
+                this.game.player.bombsArmed = false;
+            }
+            this.game.forceDraw = true;
+        }
+        return removed;
+    }
+
 
     getHead() {
         return this.iconListHead;

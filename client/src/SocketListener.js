@@ -156,6 +156,16 @@ class SocketListener extends EventEmitter2 {
             });
         });
 
+        this.io.on("factory:purge", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data || !this.game || !this.game.iconFactory) {
+                return;
+            }
+            const itemType = this.toFiniteNumber(data.itemType, null);
+            const cityId = this.toFiniteNumber(data.cityId, null);
+            this.game.iconFactory.purgeCityItems(cityId, itemType);
+        });
+
         this.io.on("new_building", (payload) => {
             try {
                 const data = typeof payload === 'string' ? JSON.parse(payload) : payload;

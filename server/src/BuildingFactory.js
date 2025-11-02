@@ -12,6 +12,14 @@ const {
     COST_BUILDING,
 } = require('./constants');
 
+const ITEM_TYPE_ORB = 5;
+const HAZARD_ITEM_TYPES = new Map([
+    [3, 'bomb'],
+    [4, 'mine'],
+    [7, 'dfg'],
+]);
+const DEFENSE_ITEM_TYPES = new Set([8, 9, 10, 11]);
+
 const toFiniteNumber = (value, fallback = null) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
         return value;
@@ -32,6 +40,21 @@ class BuildingFactory {
         this.buildings = new Map();
         this.buildingsBySocket = new Map();
         this.cityManager = new CityManager(game);
+        this.hazardManager = null;
+        this.defenseManager = null;
+        this.playerFactory = null;
+    }
+
+    setManagers({ hazardManager = null, defenseManager = null, playerFactory = null } = {}) {
+        if (hazardManager) {
+            this.hazardManager = hazardManager;
+        }
+        if (defenseManager) {
+            this.defenseManager = defenseManager;
+        }
+        if (playerFactory) {
+            this.playerFactory = playerFactory;
+        }
     }
 
     serializeBuilding(building) {
@@ -122,10 +145,18 @@ class BuildingFactory {
             return;
         }
 
+        const itemType = toFiniteNumber(data.type, null);
         const quantity = Math.max(1, toFiniteNumber(data.quantity, 1) || 1);
         const previous = toFiniteNumber(building.itemsLeft, 0) || 0;
         building.itemsLeft = Math.max(0, previous - quantity);
         this.emitPopulationUpdate(building);
+
+        if (itemType === ITEM_TYPE_ORB &&
+            this.cityManager &&
+            typeof this.cityManager.registerOrbHolder === 'function') {
+            const owningCity = playerCity !== null ? playerCity : buildingCity;
+            this.cityManager.registerOrbHolder(socket.id, owningCity);
+        }
     }
 
     handleNewBuilding(socket, payload) {
@@ -321,6 +352,10 @@ class BuildingFactory {
             });
         }
 
+        if (isFactory(building.type)) {
+            this.handleFactoryDestroyed(building);
+        }
+
         this.buildings.delete(id);
 
         const socketSet = this.buildingsBySocket.get(building.ownerId);
@@ -341,6 +376,49 @@ class BuildingFactory {
         if (broadcast && this.io) {
             this.io.emit('demolish_building', JSON.stringify({ id }));
         }
+    }
+
+    handleFactoryDestroyed(building) {
+        const itemType = Number(building.type % 100);
+        if (!Number.isFinite(itemType)) {
+            return;
+        }
+        const rawCityId = building.cityId ?? building.city;
+        const cityId = toFiniteNumber(rawCityId, null);
+        const normalisedCityId = Number.isFinite(cityId) ? cityId : null;
+        building.itemsLeft = 0;
+
+        if (this.hazardManager &&
+            HAZARD_ITEM_TYPES.has(itemType) &&
+            typeof this.hazardManager.removeHazardsByCityAndItem === 'function') {
+            this.hazardManager.removeHazardsByCityAndItem(normalisedCityId, itemType, 'factory_destroyed');
+        }
+
+        if (this.defenseManager &&
+            DEFENSE_ITEM_TYPES.has(itemType) &&
+            typeof this.defenseManager.removeDefensesByType === 'function') {
+            this.defenseManager.removeDefensesByType(normalisedCityId, itemType, { broadcast: true });
+        }
+
+        if (itemType === ITEM_TYPE_ORB &&
+            this.cityManager &&
+            typeof this.cityManager.clearOrbHoldersForCity === 'function' &&
+            normalisedCityId !== null) {
+            this.cityManager.clearOrbHoldersForCity(normalisedCityId, { consume: true });
+        }
+
+        this.broadcastFactoryPurge(normalisedCityId, itemType);
+    }
+
+    broadcastFactoryPurge(cityId, itemType) {
+        if (!this.io || !Number.isFinite(itemType)) {
+            return;
+        }
+        const payload = {
+            cityId: cityId,
+            itemType: Math.floor(itemType),
+        };
+        this.io.emit('factory:purge', JSON.stringify(payload));
     }
 
     cycle() {

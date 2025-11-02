@@ -240,6 +240,27 @@ class HazardManager {
         this.broadcastHazard("hazard:remove", payload);
     }
 
+    removeHazardsByCityAndItem(cityId, itemType, reason = "factory_destroyed") {
+        const hazardType = this.getHazardTypeFromItem(itemType);
+        if (!hazardType) {
+            return 0;
+        }
+        const numericCityId = Number.isFinite(cityId) ? Math.floor(cityId) : null;
+        let removed = 0;
+        for (const hazard of Array.from(this.hazards.values())) {
+            if (hazard.type !== hazardType) {
+                continue;
+            }
+            const hazardCity = Number.isFinite(hazard.teamId) ? Math.floor(hazard.teamId) : null;
+            if (numericCityId !== null && hazardCity !== numericCityId) {
+                continue;
+            }
+            this.removeHazard(hazard.id, reason);
+            removed += 1;
+        }
+        return removed;
+    }
+
     broadcastHazard(event, hazard) {
         if (!this.io) {
             return;

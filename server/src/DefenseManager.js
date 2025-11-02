@@ -175,6 +175,33 @@ class DefenseManager {
         return this.removeDefense(record.cityId, id, options);
     }
 
+    removeDefensesByType(cityId, type, options = {}) {
+        const numericCityId = normaliseCityId(cityId, null);
+        const numericType = toFiniteNumber(type, null);
+        if (numericCityId === null || numericType === null) {
+            return 0;
+        }
+        const cityDefenses = this.defensesByCity.get(numericCityId);
+        if (!cityDefenses || cityDefenses.size === 0) {
+            return 0;
+        }
+        let removed = 0;
+        for (const [id, record] of Array.from(cityDefenses.entries())) {
+            if (record.type === numericType) {
+                cityDefenses.delete(id);
+                this.defensesById.delete(id);
+                removed += 1;
+            }
+        }
+        if (cityDefenses.size === 0) {
+            this.defensesByCity.delete(numericCityId);
+        }
+        if (removed && options.broadcast !== false) {
+            this.broadcastCity(numericCityId);
+        }
+        return removed;
+    }
+
     removeDefensesBySource(cityId, source, options = {}) {
         const cityDefenses = this.defensesByCity.get(cityId);
         if (!cityDefenses || !source) {

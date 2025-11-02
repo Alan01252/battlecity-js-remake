@@ -5,6 +5,8 @@
 var debug = require('debug')('BattleCity:FactoryBuilding');
 const { POPULATION_MAX_NON_HOUSE, FACTORY_ITEM_LIMITS, COST_ITEM } = require('./constants');
 
+const ITEM_TYPE_ORB = 5;
+
 class FactoryBuilding {
 
     constructor(game, building) {
@@ -23,13 +25,18 @@ class FactoryBuilding {
         }
 
         const limit = FACTORY_ITEM_LIMITS[this.building.type];
-        if (limit !== undefined && (this.building.itemsLeft || 0) >= limit) {
+        const currentProduced = this.building.itemsLeft || 0;
+        if (limit !== undefined && currentProduced >= limit) {
             return;
         }
 
         if (this.game.tick > this.productionTick) {
             const cityManager = factory ? factory.cityManager : null;
             const cityId = this.building.cityId ?? 0;
+            const itemType = this.building.type % 100;
+            if (itemType === ITEM_TYPE_ORB && cityManager && !cityManager.canProduceOrb(cityId, limit !== undefined ? limit : 1)) {
+                return;
+            }
             if (cityManager && !cityManager.trySpendForFactory(cityId, COST_ITEM)) {
                 this.productionTick = this.game.tick + 1000;
                 return;
@@ -53,6 +60,9 @@ class FactoryBuilding {
 
             const current = this.building.itemsLeft || 0;
             this.building.itemsLeft = limit !== undefined ? Math.min(limit, current + 1) : current + 1;
+            if (itemType === ITEM_TYPE_ORB && cityManager) {
+                cityManager.registerOrbProduced(cityId);
+            }
             this.building.smokeActive = true;
             this.building.smokeFrame = 1;
             this.building.smokeTick = this.game.tick + 200;

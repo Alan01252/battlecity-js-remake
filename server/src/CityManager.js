@@ -26,6 +26,7 @@ class CityManager {
         this.game = game;
         this.io = null;
         this.cities = new Map();
+        this.orbHolders = new Map();
     }
 
     setIo(io) {
@@ -69,6 +70,9 @@ class CityManager {
         }
         if (city.destroyedAt === undefined) {
             city.destroyedAt = null;
+        }
+        if (city.activeOrbCount === undefined || city.activeOrbCount === null) {
+            city.activeOrbCount = 0;
         }
         this.updateOrbableState(city);
     }
@@ -153,6 +157,69 @@ class CityManager {
         city.updatedAt = Date.now();
         this.emitFinance(city);
         return true;
+    }
+
+    getActiveOrbCount(cityId) {
+        const city = this.ensureCity(cityId);
+        return Number(city.activeOrbCount) || 0;
+    }
+
+    canProduceOrb(cityId, limit = 1) {
+        const cap = Number.isFinite(limit) ? Math.max(0, limit) : 1;
+        return this.getActiveOrbCount(cityId) < cap;
+    }
+
+    registerOrbProduced(cityId) {
+        const city = this.ensureCity(cityId);
+        city.activeOrbCount = this.getActiveOrbCount(cityId) + 1;
+        city.updatedAt = Date.now();
+        return city.activeOrbCount;
+    }
+
+    registerOrbHolder(socketId, cityId) {
+        if (!socketId) {
+            return null;
+        }
+        const city = this.ensureCity(cityId);
+        this.orbHolders.set(socketId, city.id);
+        return city.id;
+    }
+
+    releaseOrbHolder(socketId, options = {}) {
+        if (!socketId || !this.orbHolders.has(socketId)) {
+            return null;
+        }
+        const cityId = this.orbHolders.get(socketId);
+        this.orbHolders.delete(socketId);
+        if (options.consume !== false) {
+            this.consumeOrb(cityId);
+        }
+        return cityId;
+    }
+
+    consumeOrb(cityId, socketId = null) {
+        const city = this.ensureCity(cityId);
+        city.activeOrbCount = Math.max(0, this.getActiveOrbCount(cityId) - 1);
+        city.updatedAt = Date.now();
+        if (socketId && this.orbHolders.get(socketId) === city.id) {
+            this.orbHolders.delete(socketId);
+        }
+        return city.activeOrbCount;
+    }
+
+    clearOrbHoldersForCity(cityId, options = {}) {
+        const identifiers = [];
+        for (const [socketId, holderCityId] of this.orbHolders.entries()) {
+            if (holderCityId === cityId) {
+                identifiers.push(socketId);
+            }
+        }
+        identifiers.forEach((socketId) => {
+            this.orbHolders.delete(socketId);
+            if (options.consume !== false) {
+                this.consumeOrb(cityId);
+            }
+        });
     }
 
     recordBuildingCost(cityId) {
@@ -304,6 +371,8 @@ class CityManager {
         city.score = 0;
         city.lastOrbBounty = 0;
         city.lastOrbReward = 0;
+        city.activeOrbCount = 0;
+        this.clearOrbHoldersForCity(city.id, { consume: false });
         city.destroyedAt = now;
         city.startedAt = now;
         city.updatedAt = now;

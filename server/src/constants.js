@@ -21,18 +21,19 @@ const isCommandCenter = (type) => type === 0;
 const isHospital = (type) => type === 301 || type === 401;
 
 const FACTORY_ITEM_LIMITS = {
-    112: 4,  // Laser factory
-    109: 4,  // Turret factory
-    103: 5,  // Bomb factory
-    102: 20, // Medkit factory
-    104: 10, // Mine factory
-    105: 1,  // Orb 
-    111: 4,// Plasma factory
-    101: 4,  // Cougar research factory variant
-    110: 5,  // Sleeper factory
-    108: 5,  // Wall factory
-    107: 5,  // DFG factory
-    106: 5,  // Flare factory
+    100: 4,   // Cloak factory (ITEM_TYPE_CLOAK)
+    101: 4,   // Bazooka/Rocket factory (ITEM_TYPE_ROCKET)
+    102: 20,  // Medkit factory (ITEM_TYPE_MEDKIT)
+    103: 20,  // Bomb factory (ITEM_TYPE_BOMB)
+    104: 10,  // Mine factory (ITEM_TYPE_MINE)
+    105: 1,   // Orb factory (ITEM_TYPE_ORB)
+    106: 4,   // Flare factory (legacy walkie)
+    107: 5,   // DFG factory
+    108: 20,  // Wall factory
+    109: 10,  // Turret factory
+    110: 5,   // Sleeper factory
+    111: 5,   // Plasma factory
+    112: 4,   // Laser factory (parity with legacy rocket cap)
 };
 
 module.exports = {
