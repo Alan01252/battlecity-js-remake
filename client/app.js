@@ -1462,7 +1462,7 @@ function setup() {
 
 
     groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
-    backgroundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
+    backgroundTiles = new PIXI.Container();
     iconTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['imageItems'], true);
     itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
 

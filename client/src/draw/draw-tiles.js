@@ -16,31 +16,50 @@ var maxTX = 0;
 var minTY = 0;
 var maxTY = 0;
 
-var drawLava = (game, backgroundTiles, i, j, tileX, tileY) => {
+const TILE_SIZE = 48;
+const REDRAW_RADIUS_TILES = 24;
+const VIEW_RADIUS_TILES = 40;
+
+const ensureLayers = (backgroundTiles) => {
+    if (!backgroundTiles.tileLayer) {
+        backgroundTiles.tileLayer = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
+        backgroundTiles.addChild(backgroundTiles.tileLayer);
+    }
+    if (!backgroundTiles.edgeOverlay) {
+        const overlay = new PIXI.Graphics();
+        overlay.alpha = 1;
+        backgroundTiles.edgeOverlay = overlay;
+        backgroundTiles.addChild(overlay);
+    } else if (!backgroundTiles.edgeOverlay.parent) {
+        backgroundTiles.addChild(backgroundTiles.edgeOverlay);
+    }
+};
+
+var drawLava = (game, tileLayer, i, j, tileX, tileY) => {
     var tmpText = new PIXI.Texture(
         game.textures['lavaTexture'].baseTexture,
-        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
+        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, TILE_SIZE, TILE_SIZE)
     );
 
-    backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+    tileLayer.addFrame(tmpText, i * TILE_SIZE, j * TILE_SIZE);
 };
 
 
-var drawRocks = (game, backgroundTiles, i, j, tileX, tileY) => {
+var drawRocks = (game, tileLayer, i, j, tileX, tileY) => {
     var tmpText = new PIXI.Texture(
         game.textures['rockTexture'].baseTexture,
-        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, 48, 48)
+        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, TILE_SIZE, TILE_SIZE)
     );
-    backgroundTiles.addFrame(tmpText, i * 48, j * 48);
+    tileLayer.addFrame(tmpText, i * TILE_SIZE, j * TILE_SIZE);
 };
 
 
-var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
+var drawBuilding = (game, tileLayer, i, j, tileX, tileY) => {
 
 
     var type = game.tiles[tileX][tileY];
     var subType = type % 100;
-    var baseType = parseInt(type / 100);
+    var baseType = parseInt(type / 100, 10);
 
     const building = game.buildingFactory.getBuildingByCoord(tileX, tileY);
 
@@ -51,7 +70,7 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
         new PIXI.Rectangle(0, baseType * 144, 144, 144, 144)
     );
 
-    backgroundTiles.addFrame(tmpText, i * 48, j * 48, 1, 0);
+    tileLayer.addFrame(tmpText, i * TILE_SIZE, j * TILE_SIZE, 1, 0);
 
     let buildingOverlayTexture = null;
     try {
@@ -66,17 +85,17 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
     if (buildingOverlayTexture) {
         switch (baseType) {
             case BUILDING_RESEARCH:
-                backgroundTiles.addFrame(buildingOverlayTexture, (i * 48) + 14, (j * 48) + 98);
+                tileLayer.addFrame(buildingOverlayTexture, (i * TILE_SIZE) + 14, (j * TILE_SIZE) + 98);
                 break;
             case BUILDING_FACTORY:
-                backgroundTiles.addFrame(buildingOverlayTexture, (i * 48) + 56, (j * 48) + 52);
+                tileLayer.addFrame(buildingOverlayTexture, (i * TILE_SIZE) + 56, (j * TILE_SIZE) + 52);
                 break;
         }
     }
 
     if (building && building.population > 0 && game.textures['population']) {
-        const frameWidth = 48;
-        const frameHeight = 48;
+        const frameWidth = TILE_SIZE;
+        const frameHeight = TILE_SIZE;
         const columns = 7;
         const maxStage = columns - 1; // stages 0-6 per original sprite sheet
         const buildingFamily = building ? Math.floor(Number(building.type) / 100) : baseType;
@@ -107,10 +126,10 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
                 populationOffsets[baseType] ||
                 { x: 96, y: 48 };
 
-            const overlayX = (i * 48) + offsetX;
-            const overlayY = (j * 48) + offsetY;
+            const overlayX = (i * TILE_SIZE) + offsetX;
+            const overlayY = (j * TILE_SIZE) + offsetY;
 
-            backgroundTiles.addFrame(populationTexture, overlayX, overlayY);
+            tileLayer.addFrame(populationTexture, overlayX, overlayY);
         }
     }
 
@@ -120,9 +139,9 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
             game.textures['smoke'].baseTexture,
             new PIXI.Rectangle(0, smokeFrame * 60, 180, 60)
         );
-        const smokeX = (i * 48) + 6;
-        const smokeY = (j * 48) - 15;
-        backgroundTiles.addFrame(smokeTexture, smokeX, smokeY);
+        const smokeX = (i * TILE_SIZE) + 6;
+        const smokeY = (j * TILE_SIZE) - 15;
+        tileLayer.addFrame(smokeTexture, smokeX, smokeY);
     }
 
     if (baseType === BUILDING_FACTORY && building && typeof building.itemsLeft === 'number' && game.textures['blackNumbers']) {
@@ -135,7 +154,7 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
                 game.textures['blackNumbers'].baseTexture,
                 new PIXI.Rectangle(digit * 16, 0, 16, 16)
             );
-            backgroundTiles.addFrame(digitTexture, (i * 48) + offsetX, (j * 48) + 84);
+            tileLayer.addFrame(digitTexture, (i * TILE_SIZE) + offsetX, (j * TILE_SIZE) + 84);
         };
 
         addDigit(tens, 56);
@@ -146,10 +165,12 @@ var drawBuilding = (game, backgroundTiles, i, j, tileX, tileY) => {
 };
 
 var setRedrawBoundaries = (game) => {
-    minTX = (game.player.offset.x / 48) - 20;
-    maxTX = (game.player.offset.x / 48) + 20;
-    minTY = (game.player.offset.y / 48) - 20;
-    maxTY = (game.player.offset.y / 48) + 20;
+    const centerTileX = game.player.offset.x / TILE_SIZE;
+    const centerTileY = game.player.offset.y / TILE_SIZE;
+    minTX = centerTileX - REDRAW_RADIUS_TILES;
+    maxTX = centerTileX + REDRAW_RADIUS_TILES;
+    minTY = centerTileY - REDRAW_RADIUS_TILES;
+    maxTY = centerTileY + REDRAW_RADIUS_TILES;
 };
 
 var needToRedraw = (game) => {
@@ -158,10 +179,13 @@ var needToRedraw = (game) => {
         return true;
     }
 
-    if ((game.player.offset.x / 48) >= maxTX
-        || (game.player.offset.x / 48) <= minTX
-        || (game.player.offset.y / 48) >= maxTY
-        || (game.player.offset.y / 48) <= minTY
+    const playerTileX = game.player.offset.x / TILE_SIZE;
+    const playerTileY = game.player.offset.y / TILE_SIZE;
+
+    if (playerTileX >= maxTX
+        || playerTileX <= minTX
+        || playerTileY >= maxTY
+        || playerTileY <= minTY
     ) {
         return true;
     }
@@ -171,45 +195,65 @@ var needToRedraw = (game) => {
 
 export const drawTiles = (game, backgroundTiles) => {
 
+    if (!game || !backgroundTiles || !game.map || !game.map.length) {
+        return;
+    }
 
-    var offTileX = Math.floor(game.player.offset.x % 48);
-    var offTileY = Math.floor(game.player.offset.y % 48);
+    ensureLayers(backgroundTiles);
+    const tileLayer = backgroundTiles.tileLayer;
+    const edgeOverlay = backgroundTiles.edgeOverlay;
+    if (!tileLayer || !edgeOverlay) {
+        return;
+    }
+
+    var offTileX = Math.floor(game.player.offset.x % TILE_SIZE);
+    var offTileY = Math.floor(game.player.offset.y % TILE_SIZE);
 
 
     if (needToRedraw(game)) {
 
         setRedrawBoundaries(game);
 
-        backgroundTiles.clear();
+        tileLayer.clear();
+        edgeOverlay.clear();
+        edgeOverlay.beginFill(0x000000, 1);
 
-        var exactX = Math.floor(game.player.offset.x / 48);
-        var exactY = Math.floor(game.player.offset.y / 48);
+        var exactX = Math.floor(game.player.offset.x / TILE_SIZE);
+        var exactY = Math.floor(game.player.offset.y / TILE_SIZE);
+        var mapWidth = game.map.length;
+        var mapHeight = Array.isArray(game.map[0]) ? game.map[0].length : 0;
 
-        for (var i = -40; i < 40; i++) {
-            for (var j = -40; j < 40; j++) {
+        for (var i = -VIEW_RADIUS_TILES; i < VIEW_RADIUS_TILES; i++) {
+            for (var j = -VIEW_RADIUS_TILES; j < VIEW_RADIUS_TILES; j++) {
 
                 var tileX = exactX + i;
                 var tileY = exactY + j;
 
 
-                if (tileX >= 0 && tileY >= 0 && tileX < 512 && tileY < 512) {
+                if (tileX < 0 || tileY < 0 || tileX >= mapWidth || tileY >= mapHeight) {
+                    edgeOverlay.drawRect(i * TILE_SIZE, j * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    continue;
+                }
 
-                    if (game.map[tileX][tileY] == MAP_SQUARE_LAVA) {
-                        drawLava(game, backgroundTiles, i, j, tileX, tileY);
-                    }
+                if (game.map[tileX][tileY] == MAP_SQUARE_LAVA) {
+                    drawLava(game, tileLayer, i, j, tileX, tileY);
+                }
 
-                    if (game.map[tileX][tileY] == MAP_SQUARE_ROCK) {
-                        drawRocks(game, backgroundTiles, i, j, tileX, tileY);
-                    }
+                if (game.map[tileX][tileY] == MAP_SQUARE_ROCK) {
+                    drawRocks(game, tileLayer, i, j, tileX, tileY);
+                }
 
-                    if (game.map[tileX][tileY] >= MAP_SQUARE_BUILDING) {
-                        drawBuilding(game, backgroundTiles, i, j, tileX, tileY);
-                    }
+                if (game.map[tileX][tileY] >= MAP_SQUARE_BUILDING) {
+                    drawBuilding(game, tileLayer, i, j, tileX, tileY);
                 }
             }
         }
+        edgeOverlay.endFill();
 
-        backgroundTiles.position.set(game.player.defaultOffset.x + game.player.offset.x - offTileX, game.player.defaultOffset.y + game.player.offset.y - offTileY);
+        backgroundTiles.position.set(
+            game.player.defaultOffset.x + game.player.offset.x - offTileX,
+            game.player.defaultOffset.y + game.player.offset.y - offTileY
+        );
     }
 
     backgroundTiles.pivot.set(game.player.offset.x, game.player.offset.y);
