@@ -1057,9 +1057,15 @@ class PlayerFactory {
         const mayorId = mayorPlayer ? mayorPlayer.id : (roster.mayor || null);
         const hasMayor = !!mayorId;
         const playerCount = players.length;
-        const capacity = 1 + this.maxRecruitsPerCity;
+        const cityState = this.game.cities ? this.game.cities[id] : null;
+        const isFake = !!(cityState && cityState.isFake);
+        let capacity = 1 + this.maxRecruitsPerCity;
+        let openMayor = !hasMayor;
+        if (isFake) {
+            capacity = 1;
+            openMayor = false;
+        }
         const recruitCount = hasMayor ? Math.max(0, playerCount - 1) : playerCount;
-        const openMayor = !hasMayor;
         const openRecruits = Math.max(0, capacity - playerCount);
         return {
             cityId: id,
@@ -1070,7 +1076,8 @@ class PlayerFactory {
             recruitCount,
             openMayor,
             openRecruits,
-            capacity
+            capacity,
+            isFake
         };
     }
 

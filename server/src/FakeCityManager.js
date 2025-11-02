@@ -2671,9 +2671,13 @@ class FakeCityManager {
             botProcess: null,
         };
 
-        const botProcess = this.spawnCityBot(cityId);
-        if (botProcess) {
-            cityRecord.botProcess = botProcess;
+        if (this.botProcesses.size === 0) {
+            const botProcess = this.spawnCityBot(cityId);
+            if (botProcess) {
+                cityRecord.botProcess = botProcess;
+            }
+        } else {
+            this.debug(`[bot] global bot limit reached; skipping bot for city ${cityId}`);
         }
 
         this.activeCities.set(cityId, cityRecord);

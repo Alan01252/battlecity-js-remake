@@ -7,9 +7,12 @@ const { loadMapData } = require("../server/src/utils/mapLoader");
 const {
     TILE_SIZE,
     MAX_HEALTH,
-    PLAYER_HITBOX_GAP
+    PLAYER_HITBOX_GAP,
+    COMMAND_CENTER_WIDTH_TILES,
+    COMMAND_CENTER_HEIGHT_TILES
 } = require("../server/src/gameplay/constants");
 const citySpawns = require("../shared/citySpawns.json");
+const fakeCityConfig = require("../shared/fakeCities.json");
 
 const MAP_SIZE_TILES = 512;
 const MAP_PIXEL_SIZE = MAP_SIZE_TILES * TILE_SIZE;
@@ -86,6 +89,15 @@ const createPlayerRect = (x, y) => ({
     h: PLAYER_RECT_SIZE
 });
 
+const rectanglesIntersect = (a, b) => {
+    return !(
+        a.x + a.w <= b.x ||
+        a.x >= b.x + b.w ||
+        a.y + a.h <= b.y ||
+        a.y >= b.y + b.h
+    );
+};
+
 class BotClient {
     constructor(options = {}) {
         this.serverUrl = options.serverUrl || DEFAULT_SERVER_URL;
@@ -123,6 +135,10 @@ class BotClient {
             },
             motionSeed: Math.random()
         };
+        this.cityGeometryId = null;
+        this.obstacles = [];
+        this.waypoints = [];
+        this.currentWaypoint = 0;
     }
 
     log(...args) {
@@ -144,6 +160,96 @@ class BotClient {
             this.warn(`Unable to load map data: ${error.message}`);
         }
         return [];
+    }
+
+    resolveFakeCityEntry(cityId) {
+        const config = fakeCityConfig || {};
+        if (Array.isArray(config.cities)) {
+            const numeric = Number(cityId);
+            const entry = config.cities.find((city) => Number(city.cityId) === numeric);
+            if (entry) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    initializeCityGeometry(cityId) {
+        if (!Number.isFinite(cityId)) {
+            return;
+        }
+        if (this.cityGeometryId === cityId) {
+            return;
+        }
+        const spawnEntry = citySpawns && citySpawns[String(cityId)];
+        if (!spawnEntry) {
+            return;
+        }
+        const fakeEntry = this.resolveFakeCityEntry(cityId);
+        const baseTileX = Number.isFinite(fakeEntry?.baseTileX)
+            ? fakeEntry.baseTileX
+            : (Number.isFinite(spawnEntry.tileX) ? spawnEntry.tileX : 0);
+        const baseTileY = Number.isFinite(fakeEntry?.baseTileY)
+            ? fakeEntry.baseTileY
+            : (Number.isFinite(spawnEntry.tileY) ? spawnEntry.tileY : 0);
+        const layout = Array.isArray(fakeEntry?.layout) && fakeEntry.layout.length
+            ? fakeEntry.layout
+            : (Array.isArray(fakeCityConfig.layout) ? fakeCityConfig.layout : []);
+
+        this.obstacles = [];
+        layout.forEach((blueprint) => {
+            const dx = Number.isFinite(blueprint?.dx) ? blueprint.dx : 0;
+            const dy = Number.isFinite(blueprint?.dy) ? blueprint.dy : 0;
+            const type = Number.isFinite(blueprint?.type) ? blueprint.type : null;
+            let widthTiles = 1;
+            let heightTiles = 1;
+            if (type === 0) {
+                widthTiles = COMMAND_CENTER_WIDTH_TILES;
+                heightTiles = COMMAND_CENTER_HEIGHT_TILES;
+            }
+            const worldX = (baseTileX + dx) * TILE_SIZE;
+            const worldY = (baseTileY + dy) * TILE_SIZE;
+            this.obstacles.push({
+                x: worldX,
+                y: worldY,
+                w: widthTiles * TILE_SIZE,
+                h: heightTiles * TILE_SIZE
+            });
+        });
+
+        this.buildPatrolWaypoints();
+        this.cityGeometryId = cityId;
+    }
+
+    buildPatrolWaypoints() {
+        this.waypoints = [];
+        this.currentWaypoint = 0;
+        if (!this.spawnPoint) {
+            return;
+        }
+        const radiusTiles = 6;
+        const offsets = [
+            { dx: radiusTiles, dy: 0 },
+            { dx: 0, dy: radiusTiles },
+            { dx: -radiusTiles, dy: 0 },
+            { dx: 0, dy: -radiusTiles }
+        ];
+        offsets.forEach((offset) => {
+            const candidate = {
+                x: clamp(this.spawnPoint.x + (offset.dx * TILE_SIZE), 0, MAP_PIXEL_SIZE - TILE_SIZE),
+                y: clamp(this.spawnPoint.y + (offset.dy * TILE_SIZE), 0, MAP_PIXEL_SIZE - TILE_SIZE)
+            };
+            if (!this.checkBlocked(candidate.x, candidate.y)) {
+                this.waypoints.push(candidate);
+            }
+        });
+        if (!this.waypoints.length) {
+            this.waypoints.push({
+                x: clamp(this.spawnPoint.x, 0, MAP_PIXEL_SIZE - TILE_SIZE),
+                y: clamp(this.spawnPoint.y, 0, MAP_PIXEL_SIZE - TILE_SIZE)
+            });
+        }
+        this.target = { ...this.waypoints[0] };
     }
 
     connect() {
@@ -247,6 +353,7 @@ class BotClient {
             const spawn = this.resolveCitySpawn(this.player.city);
             if (spawn) {
                 this.spawnPoint = spawn;
+                this.initializeCityGeometry(this.player.city);
             }
             this.log(`Assigned to city ${this.player.city} (${spawn ? `${spawn.x.toFixed(1)},${spawn.y.toFixed(1)}` : "spawn unknown"})`);
             if (this.spawnPoint && this.player.offset.x === 0 && this.player.offset.y === 0) {
@@ -256,6 +363,9 @@ class BotClient {
         }
         if (typeof data.role === "string") {
             this.player.isMayor = data.role === "mayor";
+        }
+        if (!this.target && this.waypoints.length) {
+            this.target = { ...this.waypoints[0] };
         }
     }
 
@@ -308,6 +418,7 @@ class BotClient {
                 this.spawnPoint = spawn;
             }
         }
+        this.initializeCityGeometry(this.player.city);
         if (!this.target) {
             this.pickNewTarget("init");
         }
@@ -319,6 +430,9 @@ class BotClient {
     tick() {
         if (!this.socket || this.socket.disconnected || !this.ready) {
             return;
+        }
+        if (Number.isFinite(this.player.city)) {
+            this.initializeCityGeometry(this.player.city);
         }
         if (!this.target || this.reachedTarget()) {
             this.pickNewTarget("reached");
@@ -343,6 +457,16 @@ class BotClient {
     }
 
     pickNewTarget(reason = "random") {
+        if (this.waypoints.length) {
+            if (reason === "init" && !this.target) {
+                this.currentWaypoint = 0;
+            } else {
+                this.currentWaypoint = (this.currentWaypoint + 1) % this.waypoints.length;
+            }
+            const candidate = this.waypoints[this.currentWaypoint];
+            this.target = { x: candidate.x, y: candidate.y };
+            return;
+        }
         const origin = this.spawnPoint || this.player.offset;
         const maxAttempts = 12;
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -361,7 +485,9 @@ class BotClient {
             x: clamp(origin.x + (Math.random() - 0.5) * TILE_SIZE * 2, 0, MAP_PIXEL_SIZE - TILE_SIZE),
             y: clamp(origin.y + (Math.random() - 0.5) * TILE_SIZE * 2, 0, MAP_PIXEL_SIZE - TILE_SIZE)
         };
-        this.log(`Using fallback target after failed attempts (${reason})`);
+        if (reason !== "blocked") {
+            this.log(`Using fallback target after failed attempts (${reason})`);
+        }
     }
 
     seekTowardsTarget() {
@@ -387,6 +513,7 @@ class BotClient {
         if (this.isBlocked(nextX, nextY)) {
             this.player.isMoving = 0;
             this.player.isTurning = 0;
+            this.pickNewTarget("blocked");
             return false;
         }
 
@@ -455,7 +582,7 @@ class BotClient {
         return this.mapData[tileX][tileY] || 0;
     }
 
-    isBlocked(x, y) {
+    checkBlocked(x, y) {
         if (!Number.isFinite(x) || !Number.isFinite(y)) {
             return true;
         }
@@ -479,7 +606,16 @@ class BotClient {
                 }
             }
         }
+        for (const obstacle of this.obstacles) {
+            if (rectanglesIntersect(rect, obstacle)) {
+                return true;
+            }
+        }
         return false;
+    }
+
+    isBlocked(x, y) {
+        return this.checkBlocked(x, y);
     }
 
     safeParse(payload) {
