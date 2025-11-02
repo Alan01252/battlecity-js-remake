@@ -29,6 +29,7 @@ import {drawPanelInterface} from "./src/draw/draw-panel-interface";
 import {getCitySpawn, getCityDisplayName} from "./src/utils/citySpawns";
 import LobbyManager from "./src/lobby/LobbyManager";
 import NotificationManager from "./src/ui/NotificationManager";
+import CallsignRegistry from "./src/utils/callsigns";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -194,7 +195,8 @@ const game = {
         cloakExpiresAt: 0,
         isFrozen: false,
         frozenUntil: 0,
-        frozenBy: null
+        frozenBy: null,
+        callsign: null
     },
     explosions: [],
     panelState: {
@@ -234,12 +236,95 @@ document.body.appendChild(orbHintElement);
 game.orbHintElement = orbHintElement;
 game.lastOrbHintMessage = '';
 
+game.callsignRegistry = new CallsignRegistry();
 game.notificationManager = new NotificationManager();
 game.notify = (payload) => {
     if (!game.notificationManager) {
         return null;
     }
     return game.notificationManager.notify(payload);
+};
+game.resolveCallsign = (id) => {
+    if (id === undefined || id === null) {
+        return null;
+    }
+    const key = `${id}`;
+    const myId = game.player && game.player.id !== undefined ? `${game.player.id}` : null;
+    if (myId && key === myId) {
+        return game.player?.callsign || null;
+    }
+    const other = game.otherPlayers ? game.otherPlayers[key] : null;
+    if (other && typeof other.callsign === 'string' && other.callsign.trim().length) {
+        return other.callsign;
+    }
+    if (game.callsignRegistry && typeof game.callsignRegistry.get === 'function') {
+        const registryName = game.callsignRegistry.get(key);
+        if (registryName) {
+            return registryName;
+        }
+    }
+    return null;
+};
+game.describeKillSource = (details = {}) => {
+    if (!details) {
+        return 'System Hazard';
+    }
+    if (details.killerCallsign) {
+        return details.killerCallsign;
+    }
+    const cityId = Number.isFinite(details.killerCity)
+        ? Math.max(0, Math.floor(details.killerCity))
+        : null;
+    const resolveCityLabel = () => {
+        if (cityId === null) {
+            return null;
+        }
+        const city = Array.isArray(game.cities) ? game.cities[cityId] : null;
+        if (city && typeof city === 'object') {
+            if (typeof city.nameOverride === 'string' && city.nameOverride.trim().length) {
+                return city.nameOverride.trim();
+            }
+            if (typeof city.name === 'string' && city.name.trim().length) {
+                return city.name.trim();
+            }
+        }
+        return getCityDisplayName(cityId);
+    };
+    const cityLabel = resolveCityLabel();
+    const sourceType = details.sourceType ? String(details.sourceType).toLowerCase() : null;
+    if (sourceType) {
+        switch (sourceType) {
+            case 'turret':
+                return `${cityLabel || 'City'} Turret`;
+            case 'plasma':
+            case 'plasma_cannon':
+                return `${cityLabel || 'City'} Plasma Cannon`;
+            case 'sleeper':
+                return `${cityLabel || 'City'} Sleeper Turret`;
+            case 'rogue_tank':
+                return 'Rogue Tank';
+            case 'fake_recruit':
+            case 'city_recruit':
+                return `${cityLabel || 'City'} Recruit`;
+            default:
+                break;
+        }
+    }
+    const hazardType = details.hazardType ? String(details.hazardType).toLowerCase() : null;
+    if (hazardType) {
+        switch (hazardType) {
+            case 'mine':
+                return 'Mine';
+            case 'bomb':
+                return 'Bomb';
+            case 'dfg':
+            case 'dfg_field':
+                return 'DFG Field';
+            default:
+                break;
+        }
+    }
+    return 'System Hazard';
 };
 game.cityFinanceFlags = new Map();
 game.mapOverlayActive = false;
@@ -1287,32 +1372,66 @@ function setup() {
         game.forceDraw = true;
     });
     game.socketListener.on('player:dead', (payload) => {
-        if (!payload || !payload.id || !game.notify) {
+        if (!payload || !game.notify) {
             return;
         }
-        const myId = game.socketListener?.io?.id || null;
-        if (myId && payload.id === myId) {
-            return;
-        }
-        const victim = game.otherPlayers?.[payload.id] || null;
-        const victimCityId = normaliseCityId(victim && victim.city, null);
-        const victimLabel = victimCityId !== null ? getCityDisplayName(victimCityId) : 'A tank';
-        let attackerLabel = null;
-        if (payload.reason && typeof payload.reason === 'object') {
-            const attackerCityId = normaliseCityId(payload.reason.teamId ?? payload.reason.cityId ?? null, null);
-            if (attackerCityId !== null) {
-                attackerLabel = getCityDisplayName(attackerCityId);
+        let data = payload;
+        if (typeof payload === 'string') {
+            try {
+                data = JSON.parse(payload);
+            } catch (error) {
+                console.warn('Failed to parse player:dead payload', error);
+                return;
             }
         }
-        const fragments = [`${victimLabel} tank destroyed.`];
-        if (attackerLabel) {
-            fragments.push(`Attacker: ${attackerLabel}.`);
+        if (!data || !data.id) {
+            return;
         }
+        const reason = (data.reason && typeof data.reason === 'object') ? data.reason : {};
+        const victimIdRaw = data.id;
+        const victimKey = `${victimIdRaw}`;
+        const localId = game.socketListener?.io?.id ? `${game.socketListener.io.id}` : null;
+        const isLocal = localId && victimKey === localId;
+
+        const sourceType = data.sourceType ?? reason.sourceType ?? null;
+        const hazardType = data.hazardType ?? reason.type ?? null;
+        const killerIdRaw = data.killerId ?? reason.sourceId ?? reason.shooterId ?? reason.emitterId ?? reason.ownerId ?? null;
+        const killerId = killerIdRaw !== null && killerIdRaw !== undefined ? `${killerIdRaw}` : null;
+        const victimRecord = isLocal ? game.player : (game.otherPlayers?.[victimKey] || null);
+        const victimCityId = normaliseCityId(victimRecord?.city ?? reason.cityId ?? reason.teamId ?? null, null);
+
+        let victimLabel = data.callsign
+            || game.resolveCallsign(victimKey)
+            || (isLocal ? 'Your Tank' : null);
+        if (!victimLabel) {
+            victimLabel = victimCityId !== null ? `${getCityDisplayName(victimCityId)} Tank` : 'Unknown Tank';
+        }
+
+        const killerCallsign = data.killerCallsign || game.resolveCallsign(killerId);
+        let killerLabel = data.killerLabel && typeof data.killerLabel === 'string'
+            ? data.killerLabel
+            : null;
+        if (!killerLabel) {
+            killerLabel = game.describeKillSource({
+                killerCallsign,
+                sourceType,
+                hazardType
+            });
+        }
+        if (killerId && victimKey === killerId) {
+            killerLabel = 'Self-Inflicted';
+        }
+        if (!killerLabel || !killerLabel.trim().length) {
+            killerLabel = 'Unknown Forces';
+        }
+
+        const variant = isLocal ? 'error' : 'warn';
+        const message = `${victimLabel} killed by ${killerLabel}.`;
         game.notify({
-            title: 'Tank Destroyed',
-            message: fragments.join(' '),
-            variant: 'warn',
-            timeout: 4200
+            title: 'Elimination',
+            message,
+            variant,
+            timeout: 5200
         });
     });
     game.socketListener.on('build:denied', (payload) => {

@@ -23,6 +23,11 @@ class Player {
         this.isFrozen = false;
         this.frozenUntil = 0;
         this.frozenBy = null;
+        this.isSystemControlled = false;
+        this.isFake = false;
+        this.isFakeRecruit = false;
+        this.type = null;
+        this.callsign = this._sanitizeCallsign(player && player.callsign);
         this.lastUpdateAt = now || Date.now();
         this.update(player, this.lastUpdateAt);
     }
@@ -63,6 +68,13 @@ class Player {
             this.isMayor = !!player.isMayor;
         }
 
+        if (player.callsign) {
+            const nextCallsign = this._sanitizeCallsign(player.callsign, this.callsign);
+            if (nextCallsign) {
+                this.callsign = nextCallsign;
+            }
+        }
+
         if (player.sequence !== undefined) {
             const sequenceValue = this._toFiniteNumber(player.sequence, this.sequence);
             if (Number.isFinite(sequenceValue)) {
@@ -94,7 +106,7 @@ class Player {
     }
 
     toJSON() {
-        return {
+        const payload = {
             id: this.id,
             city: this.city,
             isMayor: this.isMayor,
@@ -112,6 +124,25 @@ class Player {
                 y: this.offset.y
             }
         };
+        if (this.isSystemControlled) {
+            payload.isSystemControlled = true;
+        }
+        if (this.isFake) {
+            payload.isFake = true;
+        }
+        if (this.isFakeRecruit) {
+            payload.isFakeRecruit = true;
+        }
+        if (this.type) {
+            payload.type = this.type;
+        }
+        if (this.ownerId !== undefined) {
+            payload.ownerId = this.ownerId;
+        }
+        if (this.callsign) {
+            payload.callsign = this.callsign;
+        }
+        return payload;
     }
 
     _toFiniteNumber(value, fallback) {
@@ -128,6 +159,17 @@ class Player {
             return fallback;
         }
         return 0;
+    }
+
+    _sanitizeCallsign(value, fallback = null) {
+        if (!value || typeof value !== 'string') {
+            return fallback;
+        }
+        const trimmed = value.trim();
+        if (!trimmed.length) {
+            return fallback;
+        }
+        return trimmed.slice(0, 48);
     }
 }
 

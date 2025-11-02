@@ -66,6 +66,7 @@ const fakeCityManager = new FakeCityManager({
     playerFactory,
     hazardManager,
     defenseManager,
+    bulletFactory,
 });
 fakeCityManager.setIo(io);
 

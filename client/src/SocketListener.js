@@ -547,7 +547,11 @@ class SocketListener extends EventEmitter2 {
                 return;
             }
         }
-        this.game.otherPlayers[player.id] = player;
+        const updated = existing ? Object.assign({}, existing, player) : Object.assign({}, player);
+        if (!updated.callsign && existing && existing.callsign) {
+            updated.callsign = existing.callsign;
+        }
+        this.game.otherPlayers[player.id] = updated;
     }
 
     syncLocalPlayer(player, context = {}) {
@@ -569,6 +573,9 @@ class SocketListener extends EventEmitter2 {
         }
 
         me.id = player.id ?? me.id;
+        if (typeof player.callsign === 'string' && player.callsign.trim().length) {
+            me.callsign = player.callsign.trim();
+        }
         const previousCity = Number.isFinite(me.city) ? me.city : null;
         const nextCity = this.toFiniteNumber(player.city, me.city);
         const cityChanged = previousCity !== nextCity;
@@ -703,6 +710,14 @@ class SocketListener extends EventEmitter2 {
             player.frozenBy = player.frozenBy ?? null;
         } else {
             player.frozenBy = null;
+        }
+        if (typeof player.callsign === 'string') {
+            const trimmed = player.callsign.trim();
+            if (trimmed.length) {
+                player.callsign = trimmed;
+            } else {
+                delete player.callsign;
+            }
         }
 
         return player;

@@ -149,6 +149,68 @@ class BulletFactory {
         }
     }
 
+    spawnSystemBullet(payload) {
+        const now = Date.now();
+        const bulletData = this.sanitizeBullet(payload);
+        if (!bulletData) {
+            return null;
+        }
+
+        const shooterId = (payload && typeof payload.shooterId === 'string' && payload.shooterId.length)
+            ? payload.shooterId
+            : ((payload && typeof payload.shooter === 'string' && payload.shooter.length)
+                ? payload.shooter
+                : (bulletData.sourceId || 'system'));
+
+        const sourceId = bulletData.sourceId || shooterId;
+        if (sourceId && !this.canRegisterSourceShot(sourceId, bulletData.sourceType, now)) {
+            return null;
+        }
+        if (sourceId) {
+            this.registerSourceShot(sourceId, now);
+        }
+
+        const id = `bullet_${++bulletCounter}`;
+        const bullet = Object.assign({
+            id,
+            shooterId,
+            emitterId: shooterId,
+            reportedShooterId: bulletData.reportedShooterId ?? shooterId,
+            damage: bulletData.damage ?? BULLET_DAMAGE,
+            lifeMs: 0,
+            maxRange: BULLET_MAX_RANGE,
+            createdAt: now,
+            lastUpdateAt: now,
+        }, bulletData);
+
+        this.bullets.set(id, bullet);
+
+        if (this.io) {
+            const broadcast = {
+                shooter: shooterId,
+                x: bullet.x,
+                y: bullet.y,
+                angle: bullet.angle,
+                type: bullet.type,
+                team: bullet.teamId
+            };
+            if (bullet.sourceId) {
+                broadcast.sourceId = bullet.sourceId;
+            } else if (sourceId && sourceId !== shooterId) {
+                broadcast.sourceId = sourceId;
+            }
+            if (bullet.sourceType) {
+                broadcast.sourceType = bullet.sourceType;
+            }
+            if (bullet.targetId) {
+                broadcast.targetId = bullet.targetId;
+            }
+            this.io.emit('bullet_shot', JSON.stringify(broadcast));
+        }
+
+        return bullet;
+    }
+
     sanitizeBullet(payload) {
         const data = this.parsePayload(payload);
         if (!data) {
@@ -220,12 +282,12 @@ class BulletFactory {
             return false;
         }
         const type = data.sourceType ? String(data.sourceType).toLowerCase() : '';
-        if (type === 'turret' || type === 'plasma' || type === 'sleeper' || type === 'rogue_tank') {
+        if (type === 'turret' || type === 'plasma' || type === 'sleeper' || type === 'rogue_tank' || type === 'fake_recruit' || type === 'city_recruit') {
             return true;
         }
         if (!type && typeof data.sourceId === 'string') {
             const lowered = data.sourceId.toLowerCase();
-            if (lowered.startsWith('rogue_') || lowered.startsWith('fake_defense_')) {
+            if (lowered.startsWith('rogue_') || lowered.startsWith('fake_defense_') || lowered.startsWith('fake_recruit_')) {
                 return true;
             }
         }
@@ -300,6 +362,9 @@ class BulletFactory {
         }
         if (key === 'rogue_tank') {
             return 900;
+        }
+        if (key === 'fake_recruit' || key === 'city_recruit') {
+            return 750;
         }
         return 150;
     }

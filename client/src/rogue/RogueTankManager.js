@@ -132,6 +132,34 @@ class RogueTankManager {
         this.cityRadiusCache = new Map();
     }
 
+    getCallsignRegistry() {
+        return this.game?.callsignRegistry || null;
+    }
+
+    assignCallsign(id) {
+        const registry = this.getCallsignRegistry();
+        if (!registry) {
+            return null;
+        }
+        try {
+            return registry.assign(id);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    releaseCallsign(id) {
+        const registry = this.getCallsignRegistry();
+        if (!registry) {
+            return;
+        }
+        try {
+            registry.release(id);
+        } catch (error) {
+            // no-op
+        }
+    }
+
     sanitizeIdComponent(value) {
         if (!value || typeof value !== 'string') {
             return null;
@@ -306,6 +334,7 @@ class RogueTankManager {
                 engageRadius,
                 nextRadiusRefresh: timestamp + 5000
             };
+            tank.callsign = this.assignCallsign(tankId) || `Rogue ${this.nextId}`;
 
             this.tanks.push(tank);
             this.game.forceDraw = true;
@@ -712,6 +741,67 @@ class RogueTankManager {
         return false;
     }
 
+    resolveBulletKillDetails(bullet) {
+        const details = {
+            killerId: null,
+            killerCallsign: null,
+            sourceType: bullet && bullet.sourceType ? String(bullet.sourceType).toLowerCase() : null,
+            hazardType: null
+        };
+        if (!bullet) {
+            return details;
+        }
+        const candidates = [bullet.sourceId, bullet.shooter];
+        for (let i = 0; i < candidates.length; i += 1) {
+            const candidate = candidates[i];
+            if (candidate === undefined || candidate === null) {
+                continue;
+            }
+            const key = `${candidate}`;
+            details.killerId = key;
+            const callSign = (typeof this.game?.resolveCallsign === 'function')
+                ? this.game.resolveCallsign(key)
+                : null;
+            if (callSign) {
+                details.killerCallsign = callSign;
+                break;
+            }
+        }
+        if (typeof this.game?.describeKillSource === 'function') {
+            details.killerLabel = this.game.describeKillSource(details);
+        } else if (details.killerCallsign) {
+            details.killerLabel = details.killerCallsign;
+        } else {
+            details.killerLabel = 'Unknown Forces';
+        }
+        return details;
+    }
+
+    announceRogueDeath(tank, details) {
+        if (!tank || typeof this.game?.notify !== 'function') {
+            return;
+        }
+        const victimLabel = tank.callsign
+            || (typeof this.game?.resolveCallsign === 'function' ? this.game.resolveCallsign(tank.id) : null)
+            || 'Rogue Tank';
+        let killerLabel = details?.killerLabel;
+        if (details && details.killerId && `${details.killerId}` === `${tank.id}`) {
+            killerLabel = 'Self-Inflicted';
+        }
+        if ((!killerLabel || !killerLabel.trim().length) && typeof this.game?.describeKillSource === 'function') {
+            killerLabel = this.game.describeKillSource(details || {});
+        }
+        if (!killerLabel || !killerLabel.trim().length) {
+            killerLabel = 'Unknown Forces';
+        }
+        this.game.notify({
+            title: 'Elimination',
+            message: `${victimLabel} killed by ${killerLabel}.`,
+            variant: 'warn',
+            timeout: 5200
+        });
+    }
+
     handleBulletCollision(bullet, tank) {
         if (!tank) {
             return;
@@ -725,7 +815,9 @@ class RogueTankManager {
         tank.health -= damage;
 
         if (tank.health <= 0) {
+            const details = this.resolveBulletKillDetails(bullet);
             this.spawnTankExplosion(tank);
+            this.announceRogueDeath(tank, details);
             this.removeTank(tank);
         }
     }
@@ -762,6 +854,9 @@ class RogueTankManager {
         }
         if (this.tanks.length === 0) {
             this.scheduleNextSpawn();
+        }
+        if (tank) {
+            this.releaseCallsign(tank.id);
         }
         this.game.forceDraw = true;
     }

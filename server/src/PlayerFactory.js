@@ -7,6 +7,7 @@ var PlayerStateValidator = require("./validation/PlayerStateValidator");
 var debug = require('debug')('BattleCity:PlayerFactory');
 var { TILE_SIZE, MAX_HEALTH, TIMER_CLOAK, TIMER_DFG } = require('./gameplay/constants');
 var citySpawns = require('../../shared/citySpawns.json');
+var CallsignRegistry = require('./utils/callsigns');
 
 const HALF_TILE = TILE_SIZE / 2;
 const COMMAND_CENTER_WIDTH_TILES = 3;
@@ -87,6 +88,7 @@ class PlayerFactory {
         this.defaultCityPool = spawnKeys.length ? spawnKeys : [0, 1];
         this.citySpawns = citySpawns || {};
         this.lobbyVersion = 0;
+        this.callsigns = new CallsignRegistry();
     }
 
     listen(io) {
@@ -155,6 +157,7 @@ class PlayerFactory {
                     newPlayer.offset.x = spawn.x;
                     newPlayer.offset.y = spawn.y;
                 }
+                newPlayer.callsign = this.callsigns.assign(newPlayer.id, { category: 'human' });
                 this.game.players[socket.id] = newPlayer;
                 this.registerAssignment(newPlayer, assignment);
 
@@ -236,6 +239,7 @@ class PlayerFactory {
                 }
                 this.releaseSlot(removedPlayer);
                 delete this.game.players[socket.id];
+                this.callsigns.release(socket.id);
                 io.emit('player:removed', JSON.stringify({id: removedPlayer.id}));
             });
         });
@@ -250,6 +254,130 @@ class PlayerFactory {
             return player.city;
         }
         return null;
+    }
+
+    getPlayerCallsign(socketId) {
+        if (!socketId && socketId !== 0) {
+            return null;
+        }
+        const player = this.game.players[socketId];
+        if (player && typeof player.callsign === 'string' && player.callsign.trim().length) {
+            return player.callsign;
+        }
+        return this.callsigns.get(socketId);
+    }
+
+    describeKillOrigin(details) {
+        if (!details) {
+            return 'System Hazard';
+        }
+        if (details.killerCallsign) {
+            return details.killerCallsign;
+        }
+        const sourceType = details.sourceType || null;
+        let cityId = null;
+        if (details && Number.isFinite(details.killerCity)) {
+            cityId = Math.max(0, Math.floor(details.killerCity));
+        } else if (details && Number.isFinite(details.teamId)) {
+            cityId = Math.max(0, Math.floor(details.teamId));
+        }
+        const resolveCityName = () => {
+            if (cityId === null) {
+                return null;
+            }
+            if (this.game && Array.isArray(this.game.cities) && this.game.cities[cityId]) {
+                const city = this.game.cities[cityId];
+                if (city.nameOverride && city.nameOverride.trim().length) {
+                    return city.nameOverride.trim();
+                }
+                if (city.name && city.name.trim().length) {
+                    return city.name.trim();
+                }
+            }
+            if (this.citySpawns) {
+                const spawn = this.citySpawns[String(cityId)];
+                if (spawn && spawn.name) {
+                    return spawn.name;
+                }
+            }
+            return `City ${cityId + 1}`;
+        };
+        const cityName = resolveCityName();
+
+        if (sourceType) {
+            switch (sourceType) {
+                case 'turret':
+                    return `${cityName || 'City'} Turret`;
+                case 'plasma':
+                case 'plasma_cannon':
+                    return `${cityName || 'City'} Plasma Cannon`;
+                case 'sleeper':
+                    return `${cityName || 'City'} Sleeper Turret`;
+                case 'rogue_tank':
+                    return 'Rogue Tank';
+                case 'fake_recruit':
+                case 'city_recruit':
+                    return `${cityName || 'City'} Recruit`;
+                default:
+                    break;
+            }
+        }
+        const hazardType = details.hazardType || null;
+        if (hazardType) {
+            switch (hazardType) {
+                case 'mine':
+                    return 'Mine';
+                case 'bomb':
+                    return 'Bomb';
+                case 'dfg':
+                case 'dfg_field':
+                    return 'DFG Field';
+                default:
+                    break;
+            }
+        }
+        return 'System Hazard';
+    }
+
+    resolveKillSummary(player, meta) {
+        const summary = {
+            killerId: null,
+            killerCallsign: null,
+            killerCity: null,
+            sourceType: null,
+            hazardType: null
+        };
+        if (!meta || typeof meta !== 'object') {
+            summary.killerLabel = this.describeKillOrigin(summary);
+            return summary;
+        }
+        const candidateKeys = ['sourceId', 'shooterId', 'emitterId', 'ownerId'];
+        for (let i = 0; i < candidateKeys.length; i += 1) {
+            const key = candidateKeys[i];
+            const candidate = meta[key];
+            if (!candidate && candidate !== 0) {
+                continue;
+            }
+            const candidateId = String(candidate);
+            if (player && player.id && candidateId === player.id) {
+                continue;
+            }
+            summary.killerId = candidateId;
+            summary.killerCallsign = this.getPlayerCallsign(candidateId);
+            const killer = this.game.players[candidateId];
+            if (killer && Number.isFinite(killer.city)) {
+                summary.killerCity = Math.floor(killer.city);
+            }
+            break;
+        }
+        if (meta.sourceType) {
+            summary.sourceType = String(meta.sourceType).toLowerCase();
+        }
+        if (meta.type) {
+            summary.hazardType = String(meta.type).toLowerCase();
+        }
+        summary.killerLabel = this.describeKillOrigin(summary);
+        return summary;
     }
 
     getPlayer(socketId) {
@@ -271,6 +399,80 @@ class PlayerFactory {
             return sockets[socketId];
         }
         return null;
+    }
+
+    createSystemPlayer(data, options = {}) {
+        if (!data || !data.id) {
+            return null;
+        }
+        const id = String(data.id);
+        if (!id.length) {
+            return null;
+        }
+        if (this.game.players[id]) {
+            const existing = this.game.players[id];
+            if (!existing.callsign) {
+                existing.callsign = this.callsigns.assign(id, { category: options.isFakeRecruit ? 'recruit' : 'npc' });
+            }
+            return existing;
+        }
+        const payload = Object.assign({}, data, {
+            id,
+            city: Number.isFinite(data.city) ? data.city : (options.city ?? 0),
+            isMayor: false
+        });
+        const now = Date.now();
+        const player = new Player(id, payload, now);
+        const healthOverride = Number.isFinite(data.health) ? data.health : options.health;
+        if (Number.isFinite(healthOverride)) {
+            player.health = Math.max(0, Math.floor(healthOverride));
+        }
+        player.isSystemControlled = true;
+        if (options.isFake !== undefined) {
+            player.isFake = !!options.isFake;
+        } else if (data.isFake !== undefined) {
+            player.isFake = !!data.isFake;
+        }
+        if (options.isFakeRecruit !== undefined) {
+            player.isFakeRecruit = !!options.isFakeRecruit;
+        } else if (data.isFakeRecruit !== undefined) {
+            player.isFakeRecruit = !!data.isFakeRecruit;
+        }
+        if (options.type || data.type) {
+            player.type = options.type || data.type;
+        }
+        if (options.ownerId || data.ownerId) {
+            player.ownerId = options.ownerId || data.ownerId;
+        }
+        if (options.maxHealth !== undefined && Number.isFinite(options.maxHealth)) {
+            player.maxHealth = Math.max(1, Math.floor(options.maxHealth));
+        }
+        if (options.sequence !== undefined && Number.isFinite(options.sequence)) {
+            player.sequence = Math.max(0, Math.floor(options.sequence));
+        }
+        player.callsign = this.callsigns.assign(id, { category: options.isFakeRecruit ? 'recruit' : 'npc' });
+        this.game.players[id] = player;
+        if (options.broadcast !== false && this.io) {
+            this.io.emit('player', JSON.stringify(player));
+        }
+        return player;
+    }
+
+    removeSystemPlayer(id, options = {}) {
+        if (!id && id !== 0) {
+            return false;
+        }
+        const key = String(id);
+        const player = this.game.players[key];
+        if (!player || !player.isSystemControlled) {
+            return false;
+        }
+        delete this.game.players[key];
+        this.callsigns.release(key);
+        if (options.broadcast !== false && this.io) {
+            this.io.emit('player:removed', JSON.stringify({ id: player.id }));
+        }
+        return true;
     }
 
     evictCityPlayers(cityId, options = {}) {
@@ -464,25 +666,24 @@ class PlayerFactory {
             player.frozenBy = null;
             this.emitStatusUpdate(player);
         }
+        const killSummary = this.resolveKillSummary(player, meta);
+        const victimCallsign = player.callsign || this.getPlayerCallsign(player.id);
         if (this.io) {
             this.io.emit('player:dead', JSON.stringify({
                 id: player.id,
-                reason: meta || null
+                callsign: victimCallsign || null,
+                reason: meta || null,
+                killerId: killSummary.killerId,
+                killerCallsign: killSummary.killerCallsign,
+                killerLabel: killSummary.killerLabel,
+                killerCity: killSummary.killerCity,
+                sourceType: killSummary.sourceType,
+                hazardType: killSummary.hazardType
             }));
         }
 
         const socket = this.getSocket(socketId);
-        const attackerId = meta && typeof meta === 'object' ? meta.shooterId ?? null : null;
-        let attackerCity = null;
-        if (attackerId) {
-            const attacker = this.game.players[attackerId];
-            if (attacker) {
-                const attackerCityNumeric = Number(attacker.city);
-                if (Number.isFinite(attackerCityNumeric)) {
-                    attackerCity = Math.floor(attackerCityNumeric);
-                }
-            }
-        }
+        let attackerCity = killSummary.killerCity ?? null;
         if (attackerCity === null && meta && typeof meta === 'object') {
             const metaTeam = Number(meta.teamId);
             if (Number.isFinite(metaTeam)) {
@@ -492,14 +693,16 @@ class PlayerFactory {
         const playerCityNumeric = Number(player.city);
         const playerCityId = Number.isFinite(playerCityNumeric) ? Math.floor(playerCityNumeric) : null;
 
-        this.releaseSlot(player);
+        if (!player.isSystemControlled) {
+            this.releaseSlot(player);
+        }
         delete this.game.players[socketId];
 
         if (this.io) {
             this.io.emit('player:removed', JSON.stringify({ id: player.id }));
         }
 
-        if (socket) {
+        if (socket && !player.isSystemControlled) {
             socket.emit('lobby:evicted', JSON.stringify({
                 city: playerCityId,
                 reason: 'death',
@@ -927,6 +1130,9 @@ class PlayerFactory {
 
     releaseSlot(player) {
         if (!player) {
+            return;
+        }
+        if (player.isSystemControlled) {
             return;
         }
 

@@ -18,36 +18,107 @@ const EXPLOSION_VARIANTS = {
     }
 };
 const EXPLOSION_FRAME_DURATION = 100;
-const MAYOR_BADGE_OFFSET_Y = 8;
-const MAYOR_FRIENDLY_COLOR = 0x1E5AAF;
-const MAYOR_ENEMY_COLOR = 0xE74C3C;
+const NAME_LABEL_OFFSET_Y = -6;
+const NAME_LABEL_COLORS = Object.freeze({
+    ally: 0xF2F6FF,
+    enemy: 0xFFD166,
+    rogue: 0xFF7A7A,
+    neutral: 0xFFFFFF
+});
 
-const createMayorBadge = (cityId, isAlly) => {
-    const container = new PIXI.Container();
-    const cityName = getCityDisplayName(cityId);
-    const label = new PIXI.Text(`Mayor of ${cityName}`, {
+const toFiniteCityId = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return null;
+    }
+    return Math.max(0, Math.floor(numeric));
+};
+
+const getEntityCallsign = (game, entity) => {
+    if (!entity) {
+        return null;
+    }
+    if (typeof entity.callsign === 'string' && entity.callsign.trim().length) {
+        return entity.callsign.trim();
+    }
+    if (entity.id && typeof game?.resolveCallsign === 'function') {
+        const resolved = game.resolveCallsign(entity.id);
+        if (typeof resolved === 'string' && resolved.trim().length) {
+            return resolved.trim();
+        }
+    }
+    return null;
+};
+
+const buildRoleLabel = (game, entity, options = {}) => {
+    const callsign = getEntityCallsign(game, entity);
+    const cityId = toFiniteCityId(entity?.city);
+    const cityName = Number.isFinite(cityId) ? getCityDisplayName(cityId) : null;
+    const isRogue = options.isRogue === true || (entity?.city === -1);
+    const isMayor = !!entity?.isMayor;
+    let rolePrefix;
+    if (isRogue) {
+        rolePrefix = 'Rogue';
+    } else if (isMayor) {
+        rolePrefix = 'Mayor';
+    } else {
+        rolePrefix = 'Recruit';
+    }
+    const namePart = callsign || 'Unit';
+    if (isRogue) {
+        return `${rolePrefix} ${namePart}`;
+    }
+    if (cityName) {
+        return `${rolePrefix} ${namePart} of ${cityName}`;
+    }
+    return `${rolePrefix} ${namePart}`;
+};
+
+const determineLabelColor = (entity, referenceCity, options = {}) => {
+    if (options.isRogue) {
+        return NAME_LABEL_COLORS.rogue;
+    }
+    const entityCity = toFiniteCityId(entity?.city);
+    const refCity = toFiniteCityId(referenceCity);
+    if (entityCity !== null && refCity !== null && entityCity === refCity) {
+        return NAME_LABEL_COLORS.ally;
+    }
+    if (entityCity === null) {
+        return NAME_LABEL_COLORS.neutral;
+    }
+    return NAME_LABEL_COLORS.enemy;
+};
+
+const createNameLabel = (game, entity, options = {}) => {
+    const text = buildRoleLabel(game, entity, options);
+    if (!text || !text.trim().length) {
+        return null;
+    }
+    const fillColor = determineLabelColor(entity, options.referenceCity, options);
+    const label = new PIXI.Text(text, {
         fontFamily: 'Arial',
         fontSize: 12,
         fontWeight: 'bold',
-        fill: isAlly ? MAYOR_FRIENDLY_COLOR : MAYOR_ENEMY_COLOR,
+        fill: fillColor,
         align: 'center',
         stroke: 0x000000,
-        strokeThickness: 2
+        strokeThickness: 3
     });
-    label.anchor.set(0.5, 0);
-    container.addChild(label);
-    return container;
+    label.anchor.set(0.5, 1);
+    return label;
 };
 
-const maybeAddMayorBadge = (player, sprite, referenceCity) => {
-    if (!player || !player.isMayor) {
+const maybeAddNameLabel = (game, entity, sprite, options = {}) => {
+    if (!sprite || !entity) {
         return;
     }
-    const isAlly = referenceCity === undefined ? true : player.city === referenceCity;
-    const badge = createMayorBadge(player.city, isAlly);
-    badge.x = sprite.width / 2;
-    badge.y = -sprite.height / 2 - MAYOR_BADGE_OFFSET_Y;
-    sprite.addChild(badge);
+    const label = createNameLabel(game, entity, options);
+    if (!label) {
+        return;
+    }
+    label.x = sprite.width / 2;
+    label.y = (-sprite.height / 2) - NAME_LABEL_OFFSET_Y;
+    sprite.addChild(label);
 };
 
 const getTankRow = (player, me) => {
@@ -91,7 +162,7 @@ var drawPlayer = (game, stage) => {
     playerTank.x = game.player.defaultOffset.x;
     playerTank.y = game.player.defaultOffset.y;
 
-    maybeAddMayorBadge(game.player, playerTank, game.player.city);
+    maybeAddNameLabel(game, game.player, playerTank, { referenceCity: game.player.city });
 
     stage.addChild(playerTank);
 };
@@ -122,7 +193,10 @@ var drawOtherPlayers = (game, stage) => {
         playerTank.y = ((player.offset.y) + (game.player.defaultOffset.y - (game.player.offset.y / 48) * 48));
 
 
-        maybeAddMayorBadge(player, playerTank, game.player.city);
+        maybeAddNameLabel(game, player, playerTank, {
+            referenceCity: game.player.city,
+            isRogue: player.city === -1
+        });
 
 
         stage.addChild(playerTank);
@@ -143,6 +217,7 @@ const drawRogueTanks = (game, stage) => {
         const sprite = createTankSprite(game, tank, game.player);
         sprite.x = (tank.offset.x) + (game.player.defaultOffset.x - (game.player.offset.x / 48) * 48);
         sprite.y = (tank.offset.y) + (game.player.defaultOffset.y - (game.player.offset.y / 48) * 48);
+        maybeAddNameLabel(game, tank, sprite, { isRogue: true, referenceCity: game.player.city });
         stage.addChild(sprite);
     });
 };
