@@ -7,7 +7,6 @@ import {MAP_SQUARE_BUILDING} from "../constants.js";
 import {BUILDING_COMMAND_CENTER} from "../constants.js";
 import {BUILDING_REPAIR} from "../constants.js";
 import {BUILDING_FACTORY} from "../constants";
-import {resolveBuildingFamily} from "../../../shared/buildingTypes.js";
 import {isHospitalBuilding} from "../utils/buildings";
 
 const TILE_SIZE = 48;
