@@ -1,7 +1,7 @@
 "use strict";
 
 const { TILE_SIZE, DAMAGE_MINE, DAMAGE_BOMB, BOMB_TIMER_MS, BOMB_EXPLOSION_TILE_RADIUS, TIMER_DFG } = require("../gameplay/constants");
-const { ITEM_TYPES } = require("../items");
+const { ITEM_TYPES, normalizeItemType } = require("../items");
 const { rectangleCollision } = require("../gameplay/geometry");
 
 const HAZARD_TYPES = {
@@ -23,6 +23,19 @@ const HAZARD_TYPE_TO_ITEM = new Map([
     [HAZARD_TYPES.MINE, ITEM_TYPES.MINE],
     [HAZARD_TYPES.DFG, ITEM_TYPES.DFG],
 ]);
+
+const toCityId = (value) => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return Math.max(0, Math.floor(value));
+    }
+    if (typeof value === "string" && value.trim().length > 0) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return Math.max(0, Math.floor(parsed));
+        }
+    }
+    return null;
+};
 
 class HazardManager {
 
@@ -504,6 +517,30 @@ class HazardManager {
             removed += 1;
         }
         return removed;
+    }
+
+    getOutstandingCount(cityId, itemType) {
+        const numericCity = toCityId(cityId);
+        const normalizedType = normalizeItemType(itemType, null);
+        if (numericCity === null || normalizedType === null) {
+            return 0;
+        }
+        const hazardType = this.getHazardTypeFromItem(normalizedType);
+        if (!hazardType) {
+            return 0;
+        }
+        let total = 0;
+        for (const hazard of this.hazards.values()) {
+            if (hazard.type !== hazardType) {
+                continue;
+            }
+            const hazardCity = toCityId(hazard.teamId);
+            if (hazardCity === null || hazardCity !== numericCity) {
+                continue;
+            }
+            total += 1;
+        }
+        return total;
     }
 }
 

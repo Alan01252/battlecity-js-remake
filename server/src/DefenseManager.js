@@ -1,6 +1,7 @@
 "use strict";
 
 const { TILE_SIZE } = require("./gameplay/constants");
+const { normalizeItemType } = require("./items");
 
 const ALLOWED_DEFENSE_TYPES = new Set([8, 9, 10, 11]);
 
@@ -200,6 +201,28 @@ class DefenseManager {
             this.broadcastCity(numericCityId);
         }
         return removed;
+    }
+
+    getOutstandingCount(cityId, itemType) {
+        const numericCity = normaliseCityId(cityId, null);
+        const normalizedType = normalizeItemType(itemType, null);
+        if (numericCity === null || normalizedType === null) {
+            return 0;
+        }
+        if (!ALLOWED_DEFENSE_TYPES.has(normalizedType)) {
+            return 0;
+        }
+        const cityDefenses = this.defensesByCity.get(numericCity);
+        if (!cityDefenses || cityDefenses.size === 0) {
+            return 0;
+        }
+        let total = 0;
+        for (const defense of cityDefenses.values()) {
+            if (defense.type === normalizedType) {
+                total += 1;
+            }
+        }
+        return total;
     }
 
     removeDefensesBySource(cityId, source, options = {}) {
