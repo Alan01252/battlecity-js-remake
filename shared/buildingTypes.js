@@ -21,7 +21,7 @@ const isFactory = (type) => resolveBuildingFamily(type) === 1 && Number(type) !=
 const isCommandCenter = (type) => resolveBuildingFamily(type) === 0;
 const isHospital = (type) => resolveBuildingFamily(type) === 2;
 
-module.exports = {
+const buildingTypes = {
     resolveBuildingFamily,
     isHouse,
     isResearch,
@@ -29,3 +29,6 @@ module.exports = {
     isCommandCenter,
     isHospital,
 };
+
+module.exports = buildingTypes;
+module.exports.default = buildingTypes;
