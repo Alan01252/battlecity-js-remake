@@ -6,6 +6,8 @@ const CHAT_MAX_LENGTH = 240;
 const CONTROL_CHAR_PATTERN = /[\u0000-\u001F\u007F]/g;
 const DEFAULT_CHAT_SCOPE = 'team';
 
+import {updateBotWaypoints} from "./draw/draw-bot-debug";
+
 class SocketListener extends EventEmitter2 {
 
     constructor(game) {
@@ -13,6 +15,10 @@ class SocketListener extends EventEmitter2 {
         this.game = game;
         this.sequenceCounter = 0;
         this.lastServerSequence = 0;
+
+        this.on('bot:debug', (data) => {
+            updateBotWaypoints(data);
+        });
     }
 
     listen() {

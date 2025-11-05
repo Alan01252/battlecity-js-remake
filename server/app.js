@@ -271,6 +271,32 @@ app.get('/api/users/:id', (req, res) => {
     res.json(user);
 });
 
+const shutdown = () => {
+    const botProcesses = fakeCityManager.getBotProcesses();
+    for (const processes of botProcesses.values()) {
+        if (!processes) {
+            continue;
+        }
+        const children = processes instanceof Set
+            ? Array.from(processes)
+            : (Array.isArray(processes) ? processes : [processes]);
+        for (const child of children) {
+            try {
+                if (child && !child.killed) {
+                    child.kill();
+                }
+            } catch (error) {
+                console.error(`[bot] error killing bot during shutdown: ${error.message}`);
+            }
+        }
+    }
+    process.exit(0);
+};
+
+process.on('SIGUSR2', shutdown); // nodemon restart
+process.on('SIGINT', shutdown); // Ctrl+C
+process.on('SIGTERM', shutdown); // kill
+
 const toFiniteNumber = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
         return value;
@@ -438,6 +464,9 @@ io.on('connection', (socket) => {
     });
     socket.on('disconnect', () => {
         hazardManager.onDisconnect(socket.id);
+    });
+    socket.on('bot:debug', (data) => {
+        socket.broadcast.emit('bot:debug', data);
     });
     hazardManager.sendSnapshot(socket);
     fakeCityManager.sendSnapshot(socket);

@@ -170,6 +170,12 @@ class PlayerFactory {
                 var newPlayer = new Player(socket.id, initialState, validation.timestamp);
                 newPlayer.city = assignment.city;
                 newPlayer.isMayor = assignment.isMayor;
+                if (parsedPlayer && parsedPlayer.isFake) {
+                    newPlayer.isFake = true;
+                }
+                if (parsedPlayer && parsedPlayer.isFakeRecruit) {
+                    newPlayer.isFakeRecruit = true;
+                }
                 if (spawn) {
                     newPlayer.offset.x = spawn.x;
                     newPlayer.offset.y = spawn.y;
@@ -211,7 +217,38 @@ class PlayerFactory {
                 }
 
                 var parsedPlayer = this.safeParse(player);
-                var validation = this.validator.validatePlayerUpdate(existingPlayer, parsedPlayer, { now: Date.now() });
+                const now = Date.now();
+                if (parsedPlayer && (existingPlayer.isFake || existingPlayer.isSystemControlled || existingPlayer.isFakeRecruit)) {
+                    if (parsedPlayer.sequence !== undefined && Number.isFinite(parsedPlayer.sequence)) {
+                        if (existingPlayer.sequence !== undefined && parsedPlayer.sequence <= existingPlayer.sequence) {
+                            return;
+                        }
+                        existingPlayer.sequence = Math.max(existingPlayer.sequence || 0, Math.floor(parsedPlayer.sequence));
+                    }
+                    if (parsedPlayer.offset && typeof parsedPlayer.offset === 'object') {
+                        const x = Number(parsedPlayer.offset.x);
+                        const y = Number(parsedPlayer.offset.y);
+                        if (Number.isFinite(x)) existingPlayer.offset.x = x;
+                        if (Number.isFinite(y)) existingPlayer.offset.y = y;
+                    }
+                    if (parsedPlayer.direction !== undefined) {
+                        const dir = Number(parsedPlayer.direction);
+                        if (Number.isFinite(dir)) existingPlayer.direction = Math.round(dir) % 32;
+                    }
+                    if (parsedPlayer.isMoving !== undefined) {
+                        existingPlayer.isMoving = parsedPlayer.isMoving;
+                    }
+                    if (parsedPlayer.isTurning !== undefined) {
+                        existingPlayer.isTurning = parsedPlayer.isTurning;
+                    }
+                    existingPlayer.lastUpdateAt = now;
+                    if (this.io) {
+                        this.io.emit('player', JSON.stringify(existingPlayer));
+                    }
+                    return;
+                }
+
+                var validation = this.validator.validatePlayerUpdate(existingPlayer, parsedPlayer, { now });
                 if (!validation) {
                     return;
                 }

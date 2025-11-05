@@ -15,6 +15,7 @@ import {setupMouseInputs} from './src/input/input-mouse';
 import {drawGround} from "./src/draw/draw-ground";
 import {drawTiles} from "./src/draw/draw-tiles";
 import {drawChanging} from "./src/draw/draw-changing"
+import {drawBotDebug} from "./src/draw/draw-bot-debug";
 
 import BuildingFactory from "./src/factories/BuildingFactory";
 import BulletFactory from "./src/factories/BulletFactory"
@@ -226,6 +227,7 @@ const game = {
         offsetX: 0,
         offsetY: 0,
     },
+    gBotDebug: null,
 };
 
 const orbHintElement = document.createElement('div');
@@ -1514,6 +1516,9 @@ function setup() {
      app.stage.addChild(objectContainer);
      app.stage.addChild(panelContainer);
 
+     game.gBotDebug = new PIXI.Graphics();
+     app.stage.addChild(game.gBotDebug);
+
 
      setupBuildingMenu(game);
 
@@ -1573,6 +1578,8 @@ function gameLoop() {
     drawBuilding(game);
     drawIcons(game, iconTiles);
     drawPanelInterface(game, panelContainer);
+    game.gBotDebug.clear();
+    drawBotDebug(game, game.gBotDebug);
     play(game);
 
     if (typeof game.updateOrbHint === 'function') {

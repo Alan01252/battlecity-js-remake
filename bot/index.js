@@ -6,9 +6,16 @@ const { io } = require("socket.io-client");
 const {
   DEFAULT_SERVER_URL,
   MAX_HEALTH,
-  TICK_INTERVAL_MS
+  TICK_INTERVAL_MS,
+  TILE_SIZE
 } = require("./config");
-const { wrapDirection, safeParse } = require("./helpers");
+const {
+  wrapDirection,
+  safeParse,
+  directionDelta,
+  vectorToDirection,
+  distance2
+} = require("./helpers");
 const { WorldState } = require("./world");
 const { NavigationController, NavigationState } = require("./navigation");
 
@@ -43,10 +50,20 @@ class BotClient {
     this.ready = false;
     this.debug = process.env.BOT_DEBUG === "1";
 
+    this.otherPlayers = new Map();
+    this.currentEnemyId = null;
+    this.currentEnemyLastSeen = 0;
+    this.nextShootAt = 0;
+    this.enemyChaseRadiusPx = TILE_SIZE * 20;
+    this.enemyHoldMs = 6000;
+    this.lastEnemyPathAt = 0;
+
     this.player = {
       id: null,
       city: this.cityPreference ?? 0,
       isMayor: false,
+      isFake: true,
+      isFakeRecruit: true,
       health: MAX_HEALTH,
       direction: 16,
       isTurning: 0,
@@ -121,6 +138,7 @@ class BotClient {
     this.socket.on("new_building", (p) => this.onNewBuilding(p));
     this.socket.on("demolish_building", (p) => this.onDemolishBuilding(p));
     this.socket.on("connect_error", (err) => this.warn(`Connection error: ${err?.message || err}`));
+    this.socket.on("player:removed", (p) => this.onPlayerRemoved(p));
   }
 
   _startLoop() {
@@ -141,6 +159,8 @@ class BotClient {
       id: this.player.id,
       city: this.cityPreference ?? this.player.city ?? 0,
       isMayor: false,
+      isFake: true,
+      isFakeRecruit: true,
       health: this.player.health,
       direction: wrapDirection(this.player.direction),
       isTurning: 0,
@@ -209,7 +229,12 @@ class BotClient {
   onPlayerPayload(payload, ctx = {}) {
     const d = safeParse(payload, (...args) => this.warn(...args));
     if (!d || !d.id) return;
-    if (!this.socket || !this.socket.id || d.id !== this.socket.id) return;
+    if (!this.socket || !this.socket.id) return;
+
+    if (d.id !== this.socket.id) {
+      this.updateOtherPlayer(d);
+      return;
+    }
 
     if (Number.isFinite(d.city)) this.player.city = Math.max(0, Math.floor(d.city));
     if (typeof d.isMayor === "boolean") this.player.isMayor = d.isMayor;
@@ -238,9 +263,190 @@ class BotClient {
     if (ctx.source === "enter_game") this.log("Successfully entered game");
   }
 
+  updateOtherPlayer(data) {
+    const id = data?.id;
+    if (!id) return;
+    const prev = this.otherPlayers.get(id) || {};
+    const now = Date.now();
+    const offset = (data.offset && Number.isFinite(data.offset.x) && Number.isFinite(data.offset.y))
+      ? { x: data.offset.x, y: data.offset.y }
+      : prev.offset || null;
+    if (!offset) return;
+
+    this.otherPlayers.set(id, {
+      id,
+      city: Number.isFinite(data.city) ? Math.max(0, Math.floor(data.city)) : (prev.city ?? null),
+      isFake: data.isFake ?? prev.isFake ?? false,
+      isFakeRecruit: data.isFakeRecruit ?? prev.isFakeRecruit ?? false,
+      isSystemControlled: data.isSystemControlled ?? prev.isSystemControlled ?? false,
+      isSpectator: data.isSpectator ?? prev.isSpectator ?? false,
+      isCloaked: data.isCloaked ?? prev.isCloaked ?? false,
+      offset,
+      lastUpdate: now
+    });
+  }
+
+  onPlayerRemoved(payload) {
+    const data = safeParse(payload, (...args) => this.warn(...args));
+    if (!data) return;
+    const id = typeof data === "string" ? data : data.id;
+    if (!id) return;
+    this.otherPlayers.delete(id);
+    if (this.currentEnemyId === id) {
+      this.releaseEnemy();
+    }
+  }
+
+  pruneOtherPlayers(now) {
+    const expiryMs = 10000;
+    for (const [id, info] of this.otherPlayers.entries()) {
+      if (!info || !info.lastUpdate || now - info.lastUpdate > expiryMs) {
+        this.otherPlayers.delete(id);
+        if (this.currentEnemyId === id) {
+          this.releaseEnemy();
+        }
+      }
+    }
+  }
+
+  selectEnemyTarget(now) {
+    const selfOffset = this.player.offset || { x: 0, y: 0 };
+    const selfCity = Number.isFinite(this.player.city) ? Math.max(0, Math.floor(this.player.city)) : null;
+    const detectionSq = this.enemyChaseRadiusPx * this.enemyChaseRadiusPx;
+    let best = null;
+    let bestDist = detectionSq;
+
+    if (this.currentEnemyId) {
+      const existing = this.otherPlayers.get(this.currentEnemyId);
+      if (existing && existing.isFake) {
+        this.releaseEnemy();
+      } else if (existing && now - existing.lastUpdate <= this.enemyHoldMs) {
+        if (!Number.isFinite(existing.city) || existing.city !== selfCity) {
+          const dist = distance2(
+            selfOffset.x + TILE_SIZE / 2,
+            selfOffset.y + TILE_SIZE / 2,
+            existing.offset.x + TILE_SIZE / 2,
+            existing.offset.y + TILE_SIZE / 2
+          );
+          if (dist <= detectionSq * 1.5) {
+            best = existing;
+            bestDist = dist;
+          }
+        }
+      } else {
+        this.releaseEnemy();
+      }
+    }
+
+    for (const info of this.otherPlayers.values()) {
+      if (!info || !info.offset) continue;
+      if (info.isFake) continue;
+      if (info.id === this.player.id) continue;
+      if (info.isSpectator) continue;
+      if (info.isCloaked) continue;
+      if (Number.isFinite(info.city) && Number.isFinite(selfCity) && info.city === selfCity) continue;
+
+      const dist = distance2(
+        selfOffset.x + TILE_SIZE / 2,
+        selfOffset.y + TILE_SIZE / 2,
+        info.offset.x + TILE_SIZE / 2,
+        info.offset.y + TILE_SIZE / 2
+      );
+      if (dist > detectionSq) continue;
+      if (!best || dist < bestDist) {
+        best = info;
+        bestDist = dist;
+      }
+    }
+
+    return best;
+  }
+
+  focusEnemy(enemy, now) {
+    if (!enemy || !enemy.offset) return;
+    this.currentEnemyId = enemy.id;
+    this.currentEnemyLastSeen = now;
+    const targetPos = { x: enemy.offset.x, y: enemy.offset.y };
+    const currentTarget = this.navigation.target;
+    const distToCurrent = currentTarget
+      ? Math.hypot(currentTarget.x - targetPos.x, currentTarget.y - targetPos.y)
+      : Infinity;
+    const shouldReplan = !currentTarget || distToCurrent > TILE_SIZE * 0.75 || now - this.lastEnemyPathAt > 600;
+    if (shouldReplan) {
+      this.navigation.target = targetPos;
+      this.navigation.recalcPath("enemy");
+      this.lastEnemyPathAt = now;
+    } else {
+      this.navigation.target = targetPos;
+    }
+  }
+
+  releaseEnemy() {
+    this.currentEnemyId = null;
+    this.currentEnemyLastSeen = 0;
+    this.lastEnemyPathAt = 0;
+    this.navigation.target = null;
+  }
+
+  tryShoot(enemy, now) {
+    if (!enemy || !enemy.offset) return;
+    if (now < this.nextShootAt) return;
+
+    const selfCenterX = this.player.offset.x + TILE_SIZE / 2;
+    const selfCenterY = this.player.offset.y + TILE_SIZE / 2;
+    const enemyCenterX = enemy.offset.x + TILE_SIZE / 2;
+    const enemyCenterY = enemy.offset.y + TILE_SIZE / 2;
+    const dx = enemyCenterX - selfCenterX;
+    const dy = enemyCenterY - selfCenterY;
+    const distSq = dx * dx + dy * dy;
+    const maxRangePx = TILE_SIZE * 22;
+    if (distSq > maxRangePx * maxRangePx) return;
+
+    const facing = vectorToDirection(dx, dy, this.player.direction);
+    const faceDelta = directionDelta(this.player.direction, facing);
+    if (faceDelta > 4) return;
+
+    if (!this.world.lineOfSight(selfCenterX, selfCenterY, enemyCenterX, enemyCenterY)) return;
+
+    this.fireLaser(facing);
+    this.nextShootAt = now + 900;
+  }
+
+  fireLaser(direction) {
+    const facing = wrapDirection(direction);
+    this.player.direction = facing;
+    const angleRadians = (facing / 32) * (Math.PI * 2);
+    const xComp = Math.sin(angleRadians);
+    const yComp = Math.cos(angleRadians) * -1;
+    const originX = this.player.offset.x + TILE_SIZE / 2 + xComp * 30;
+    const originY = this.player.offset.y + TILE_SIZE / 2 + yComp * 30;
+    const packet = {
+      shooter: this.player.id,
+      x: originX,
+      y: originY,
+      type: 0,
+      angle: -facing,
+      team: this.player.city ?? null
+    };
+    if (this.socket && !this.socket.disconnected) {
+      this.socket.emit("bullet_shot", JSON.stringify(packet));
+    }
+  }
+
   tick() {
     if (!this.socket || this.socket.disconnected || !this.ready) return;
-    this.navigation.tick(Date.now());
+    const now = Date.now();
+    this.pruneOtherPlayers(now);
+    const enemy = this.selectEnemyTarget(now);
+    if (enemy) {
+      this.focusEnemy(enemy, now);
+    } else if (this.currentEnemyId && now - this.currentEnemyLastSeen > this.enemyHoldMs) {
+      this.releaseEnemy();
+    }
+    this.navigation.tick(now);
+    if (enemy) {
+      this.tryShoot(enemy, now);
+    }
     this._emitPlayerUpdate();
   }
 
@@ -252,6 +458,8 @@ class BotClient {
       id: p.id,
       city: p.city,
       isMayor: p.isMayor,
+      isFake: true,
+      isFakeRecruit: true,
       health: p.health,
       direction: wrapDirection(p.direction),
       isTurning: 0,
