@@ -7,7 +7,10 @@ import {
     ITEM_TYPE_ROCKET,
     ITEM_TYPE_FLARE,
     ITEM_TYPE_MEDKIT,
-    ITEM_TYPE_CLOAK
+    ITEM_TYPE_CLOAK,
+    ITEM_TYPE_TURRET,
+    ITEM_TYPE_PLASMA,
+    ITEM_TYPE_SLEEPER
 } from "../constants";
 /**
  * Created by alan on 27/03/17.
@@ -135,13 +138,21 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
 
         var dropInfo = game.iconFactory.dropSelectedIcon();
 
+        // Place turrets/plasma/sleeper directly below the tank to avoid conflicts with building icons
+        var x2, y2;
+        if (dropInfo && (dropInfo.type === ITEM_TYPE_TURRET || dropInfo.type === ITEM_TYPE_PLASMA || dropInfo.type === ITEM_TYPE_SLEEPER)) {
+            // Place directly at tank position (centered)
+            x2 = game.player.offset.x + 12;
+            y2 = game.player.offset.y + 24;
+        } else {
+            // For other items (bombs, mines, etc.), use directional placement
+            var angle = -game.player.direction;
+            var x = (Math.sin((angle / 16) * 3.14) * -1);
+            var y = (Math.cos((angle / 16) * 3.14) * -1);
 
-        var angle = -game.player.direction;
-        var x = (Math.sin((angle / 16) * 3.14) * -1);
-        var y = (Math.cos((angle / 16) * 3.14) * -1);
-
-        var x2 = ((game.player.offset.x)) + (x * 20);
-        var y2 = ((game.player.offset.y) + 20) + (y * 20);
+            x2 = ((game.player.offset.x)) + (x * 20);
+            y2 = ((game.player.offset.y) + 20) + (y * 20);
+        }
 
         if (dropInfo) {
             var item = game.itemFactory.newItem(dropInfo, x2, y2, dropInfo.type);
