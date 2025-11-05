@@ -19,9 +19,25 @@ const DIRECT_DROP_TYPES = new Set([
     ITEM_TYPE_SLEEPER,
 ]);
 
-
-
 var lastShot = 0;
+
+const isInteractiveTarget = (event) => {
+    if (!event) {
+        return false;
+    }
+    const target = event.target;
+    if (!target) {
+        return false;
+    }
+    const tagName = target.tagName ? target.tagName.toLowerCase() : '';
+    if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+        return true;
+    }
+    if (target.isContentEditable) {
+        return true;
+    }
+    return false;
+};
 
 const hasEquippedItem = (game, type) => {
     if (!game || !game.player || game.player.id === undefined || game.player.id === null) {
@@ -55,22 +71,28 @@ var keyboard = (keyCode) => {
     key.release = undefined;
     //The `downHandler`
     key.downHandler = function (event) {
+        if (isInteractiveTarget(event)) {
+            return;
+        }
         if (event.keyCode === key.code) {
             if (key.isUp && key.press) key.press();
             key.isDown = true;
             key.isUp = false;
+            event.preventDefault();
         }
-        event.preventDefault();
     };
 
     //The `upHandler`
     key.upHandler = function (event) {
+        if (isInteractiveTarget(event)) {
+            return;
+        }
         if (event.keyCode === key.code) {
             if (key.isDown && key.release) key.release();
             key.isDown = false;
             key.isUp = true;
+            event.preventDefault();
         }
-        event.preventDefault();
     };
 
     //Attach event listeners

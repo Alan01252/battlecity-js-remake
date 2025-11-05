@@ -2,6 +2,10 @@ import { io } from 'socket.io-client';
 import { EventEmitter2 } from 'eventemitter2';
 import { getCitySpawn } from './utils/citySpawns';
 
+const CHAT_MAX_LENGTH = 240;
+const CONTROL_CHAR_PATTERN = /[\u0000-\u001F\u007F]/g;
+const DEFAULT_CHAT_SCOPE = 'team';
+
 class SocketListener extends EventEmitter2 {
 
     constructor(game) {
@@ -29,6 +33,21 @@ class SocketListener extends EventEmitter2 {
             console.warn("socket disconnected", reason);
             this.lastServerSequence = 0;
             this.emit('disconnected', reason);
+        });
+
+        this.io.on('chat:message', (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('chat:message', data);
+        });
+
+        this.io.on('chat:history', (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('chat:history', data);
+        });
+
+        this.io.on('chat:rate_limit', (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('chat:rate_limit', data);
         });
 
         this.io.on('lobby:snapshot', (payload) => {
@@ -796,6 +815,62 @@ class SocketListener extends EventEmitter2 {
         if (myId && update.id === myId) {
             this.game.forceDraw = true;
         }
+    }
+
+    sendChatMessage(payload = {}) {
+        if (!this.io || !this.io.connected) {
+            return false;
+        }
+        const data = this.normaliseOutgoingChatPayload(payload);
+        if (!data) {
+            return false;
+        }
+        this.io.emit('chat:message', JSON.stringify(data));
+        return true;
+    }
+
+    normaliseOutgoingChatPayload(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return null;
+        }
+        const scope = this.normaliseChatScope(payload.scope);
+        const message = this.sanitiseChatText(payload.message ?? payload.text ?? '');
+        if (!message) {
+            return null;
+        }
+        return {
+            scope,
+            message
+        };
+    }
+
+    normaliseChatScope(scope) {
+        if (typeof scope === 'string') {
+            const trimmed = scope.trim().toLowerCase();
+            if (trimmed === 'global' || trimmed === 'all') {
+                return 'global';
+            }
+            if (trimmed === 'team' || trimmed === 'city') {
+                return 'team';
+            }
+        }
+        return DEFAULT_CHAT_SCOPE;
+    }
+
+    sanitiseChatText(message) {
+        if (message === null || message === undefined) {
+            return '';
+        }
+        let text = String(message);
+        text = text.replace(CONTROL_CHAR_PATTERN, '');
+        text = text.replace(/\s+/g, ' ').trim();
+        if (!text.length) {
+            return '';
+        }
+        if (text.length > CHAT_MAX_LENGTH) {
+            text = text.slice(0, CHAT_MAX_LENGTH);
+        }
+        return text;
     }
 
     safeParse(payload) {

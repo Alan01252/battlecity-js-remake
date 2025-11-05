@@ -89,6 +89,7 @@ class PlayerFactory {
         this.citySpawns = citySpawns || {};
         this.lobbyVersion = 0;
         this.callsigns = new CallsignRegistry();
+        this.chatManager = null;
     }
 
     listen(io) {
@@ -160,6 +161,10 @@ class PlayerFactory {
                 newPlayer.callsign = this.callsigns.assign(newPlayer.id, { category: 'human' });
                 this.game.players[socket.id] = newPlayer;
                 this.registerAssignment(newPlayer, assignment);
+
+                if (this.chatManager && typeof this.chatManager.sendHistoryForSocket === 'function') {
+                    this.chatManager.sendHistoryForSocket(socket.id);
+                }
 
                 debug(`Assigned player ${socket.id} -> city ${assignment.city} (${assignment.isMayor ? 'mayor' : 'recruit'})${assignment.overflow ? ' [overflow]' : ''} (${assignment.source || 'auto'})`);
 
@@ -243,6 +248,10 @@ class PlayerFactory {
                 io.emit('player:removed', JSON.stringify({id: removedPlayer.id}));
             });
         });
+    }
+
+    setChatManager(chatManager) {
+        this.chatManager = chatManager;
     }
 
     getPlayerTeam(socketId) {

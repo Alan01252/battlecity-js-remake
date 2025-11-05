@@ -22,6 +22,7 @@ var OrbManager = require('./src/orb/OrbManager');
 var FakeCityManager = require('./src/FakeCityManager');
 var DefenseManager = require('./src/DefenseManager');
 var { loadMapData } = require('./src/utils/mapLoader');
+var ChatManager = require('./src/chat/ChatManager');
 
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -83,6 +84,13 @@ const fakeCityManager = new FakeCityManager({
     bulletFactory,
 });
 fakeCityManager.setIo(io);
+
+const chatManager = new ChatManager({
+    game,
+    playerFactory,
+});
+chatManager.listen(io);
+playerFactory.setChatManager(chatManager);
 
 const toFiniteNumber = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
