@@ -14,7 +14,6 @@ const {
     COMMAND_CENTER_HEIGHT_TILES
 } = require("./gameplay/constants");
 const { createBulletRect, getPlayerRect, rectangleCollision } = require("./gameplay/geometry");
-const { isCommandCenter, isHospital, isHouse } = require('./constants');
 
 let bulletCounter = 0;
 
@@ -51,6 +50,33 @@ const DEFAULT_BUILDING_WIDTH_TILES = COMMAND_CENTER_WIDTH_TILES;
 const DEFAULT_BUILDING_HEIGHT_TILES = COMMAND_CENTER_HEIGHT_TILES;
 const OPEN_BAY_HEIGHT_TILES = 1;
 const BULLET_BUILDING_PADDING = 0;
+const BUILDING_FAMILY_COMMAND_CENTER = 0;
+const BUILDING_FAMILY_REPAIR = 2;
+const BUILDING_FAMILY_HOUSE = 3;
+
+const parseBuildingType = (type) => {
+    if (Number.isFinite(type)) {
+        return type;
+    }
+    if (typeof type === 'string' && type.trim() !== '') {
+        const parsed = Number.parseInt(type, 10);
+        if (!Number.isNaN(parsed)) {
+            return parsed;
+        }
+    }
+    return null;
+};
+
+const resolveBuildingFamily = (type) => {
+    const numericType = parseBuildingType(type);
+    if (numericType === null) {
+        return null;
+    }
+    if (numericType < 100) {
+        return numericType;
+    }
+    return Math.floor(numericType / 100);
+};
 
 class BulletFactory {
 
@@ -474,15 +500,15 @@ class BulletFactory {
         if (explicitWidth !== null && explicitHeight !== null) {
             return { width: explicitWidth, height: explicitHeight };
         }
-        const type = Number.isFinite(building.type) ? building.type : null;
-        if (type !== null) {
-            if (isCommandCenter(type) || isHospital(type)) {
+        const buildingFamily = resolveBuildingFamily(building.type);
+        if (buildingFamily !== null) {
+            if (buildingFamily === BUILDING_FAMILY_COMMAND_CENTER || buildingFamily === BUILDING_FAMILY_REPAIR) {
                 return {
                     width: COMMAND_CENTER_WIDTH_TILES,
                     height: COMMAND_CENTER_HEIGHT_TILES
                 };
             }
-            if (isHouse(type)) {
+            if (buildingFamily === BUILDING_FAMILY_HOUSE) {
                 return { width: 1, height: 1 };
             }
         }
@@ -493,11 +519,11 @@ class BulletFactory {
     }
 
     hasOpenBay(building) {
-        const type = Number.isFinite(building?.type) ? building.type : null;
-        if (type === null) {
+        const buildingFamily = resolveBuildingFamily(building?.type);
+        if (buildingFamily === null) {
             return false;
         }
-        return isCommandCenter(type) || isHospital(type);
+        return buildingFamily === BUILDING_FAMILY_COMMAND_CENTER || buildingFamily === BUILDING_FAMILY_REPAIR;
     }
 
     createBuildingHitboxes(building) {

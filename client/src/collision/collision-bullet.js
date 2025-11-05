@@ -14,6 +14,30 @@ const BLOCKING_TILE_VALUES = new Set([
     MAP_SQUARE_BUILDING
 ]);
 
+const parseBuildingType = (type) => {
+    if (Number.isFinite(type)) {
+        return type;
+    }
+    if (typeof type === 'string' && type.trim() !== '') {
+        const parsed = Number.parseInt(type, 10);
+        if (!Number.isNaN(parsed)) {
+            return parsed;
+        }
+    }
+    return null;
+};
+
+const getBuildingFamily = (type) => {
+    const numericType = parseBuildingType(type);
+    if (numericType === null) {
+        return null;
+    }
+    if (numericType < 100) {
+        return numericType;
+    }
+    return Math.floor(numericType / 100);
+};
+
 
 var collided = (testRect, bullet)=> {
 
@@ -202,7 +226,8 @@ export const collidedWithBuilding = (game, bullet) => {
             h: 96,
         };
 
-        if (building.type === BUILDING_COMMAND_CENTER || building.type === BUILDING_REPAIR) {
+        const buildingFamily = getBuildingFamily(building.type);
+        if (buildingFamily === BUILDING_COMMAND_CENTER || buildingFamily === BUILDING_REPAIR) {
             buildingRect.h = buildingRect.h - 48;
         }
         if (collided(buildingRect, bullet)) {

@@ -6,6 +6,7 @@ import {
     BUILDING_COMMAND_CENTER,
     BUILDING_FACTORY,
     BUILDING_REPAIR,
+    CAN_BUILD_HOSPITAL,
     MAP_SQUARE_BUILDING,
     MAP_SQUARE_ROCK,
 } from '../src/constants.js';
@@ -81,6 +82,14 @@ describe('collidedWithBuilding', () => {
 
     it('allows shots through hospital bays while protecting the rest of the structure', () => {
         const building = createBuildingNode(5, 7, BUILDING_REPAIR);
+        const game = createGame({buildingFactory: createFactory(building)});
+
+        assert.equal(collidedWithBuilding(game, walkwayBullet), false);
+        assert.equal(collidedWithBuilding(game, upperBullet), true);
+    });
+
+    it('treats build-tree hospital codes the same as hospital structures', () => {
+        const building = createBuildingNode(5, 7, CAN_BUILD_HOSPITAL);
         const game = createGame({buildingFactory: createFactory(building)});
 
         assert.equal(collidedWithBuilding(game, walkwayBullet), false);

@@ -61,6 +61,15 @@ describe("BulletFactory structure collisions", () => {
         assert.equal(bulletFactory.checkStructureCollision({ ...upperBullet }), true);
     });
 
+    it("recognises hospital bays when the build tree type is provided", () => {
+        const bulletFactory = createBulletFactory([
+            { x: baseTileX, y: baseTileY, type: '200' },
+        ]);
+
+        assert.equal(bulletFactory.checkStructureCollision({ ...walkwayBullet }), false);
+        assert.equal(bulletFactory.checkStructureCollision({ ...upperBullet }), true);
+    });
+
     it("applies bay rules to structure-fired bullets such as turrets", () => {
         const bulletFactory = createBulletFactory([
             { x: baseTileX, y: baseTileY, type: 0 },
