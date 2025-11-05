@@ -6,9 +6,10 @@ import {MAP_SQUARE_ROCK} from "../constants.js";
 import {MAP_SQUARE_BUILDING} from "../constants.js";
 import {BUILDING_COMMAND_CENTER} from "../constants.js";
 import {BUILDING_REPAIR} from "../constants.js";
+import {BUILDING_FACTORY} from "../constants";
 import buildingTypes from "../../../shared/buildingTypes.js";
-
-const {resolveBuildingFamily} = buildingTypes;
+const {resolveBuildingFamily} = buildingTypes;;
+import {isHospitalBuilding} from "../utils/buildings";
 
 const TILE_SIZE = 48;
 const BULLET_SIZE = 4;
@@ -205,8 +206,21 @@ export const collidedWithBuilding = (game, bullet) => {
             h: 96,
         };
 
-        const buildingFamily = resolveBuildingFamily(building.type);
-        if (buildingFamily === BUILDING_COMMAND_CENTER || buildingFamily === BUILDING_REPAIR) {
+        const numericType = Number.isFinite(building.type)
+            ? building.type
+            : parseInt(building.type, 10);
+        const baseType = Number.isFinite(numericType)
+            ? Math.floor(numericType / 100)
+            : NaN;
+        const isCommandCenter = numericType === BUILDING_COMMAND_CENTER;
+        const isFactory = baseType === BUILDING_FACTORY;
+        const isHospital = isHospitalBuilding(building);
+        const hasDriveableBay = isCommandCenter
+            || isFactory
+            || isHospital
+            || baseType === BUILDING_REPAIR;
+
+        if (hasDriveableBay) {
             buildingRect.h = buildingRect.h - 48;
         }
         if (collided(buildingRect, bullet)) {

@@ -6,8 +6,11 @@ var PlayerStateValidator = require("./validation/PlayerStateValidator");
 
 var debug = require('debug')('BattleCity:PlayerFactory');
 var { TILE_SIZE, MAX_HEALTH, TIMER_CLOAK, TIMER_DFG } = require('./gameplay/constants');
+var { rectangleCollision, getPlayerRect } = require('./gameplay/geometry');
+var { isHospitalBuilding, getHospitalDriveableRect } = require('./utils/buildings');
 var citySpawns = require('../../shared/citySpawns.json');
 var CallsignRegistry = require('./utils/callsigns');
+const { ITEM_TYPES } = require('./items');
 
 const HALF_TILE = TILE_SIZE / 2;
 const COMMAND_CENTER_WIDTH_TILES = 3;
@@ -17,6 +20,8 @@ const PLAYER_SPRITE_SIZE = 48;
 const PLAYER_SPRITE_HALF = PLAYER_SPRITE_SIZE / 2;
 const PLAYER_SPAWN_ADJUST_X = 6.5;
 const PLAYER_SPAWN_ADJUST_Y = 5.5;
+const HOSPITAL_HEAL_INTERVAL = 150;
+const HOSPITAL_HEAL_AMOUNT = 2;
 
 const toFiniteNumber = (value, fallback = null) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -74,7 +79,7 @@ const shortenId = (value) => {
 
 class PlayerFactory {
 
-    constructor(game) {
+    constructor(game, options = {}) {
         this.game = game;
         this.validator = new PlayerStateValidator();
         this.io = null;
@@ -90,6 +95,7 @@ class PlayerFactory {
         this.lobbyVersion = 0;
         this.callsigns = new CallsignRegistry();
         this.chatManager = null;
+        this.userStore = options.userStore || null;
     }
 
     listen(io) {
@@ -109,11 +115,15 @@ class PlayerFactory {
                 debug("Player entered game " + socket.id);
                 const existing = this.game.players[socket.id];
                 if (existing) {
+                    if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
+                        this.game.buildingFactory.cityManager.releasePlayerInventory(socket.id);
+                    }
                     this.releaseSlot(existing);
                     delete this.game.players[socket.id];
                 }
 
                 const parsedPlayer = this.safeParse(player);
+                const identity = this.resolveIdentityFromPayload(parsedPlayer);
                 const preferences = this.extractAssignmentPreferences(parsedPlayer);
                 const assignment = this.assignCityAndRole(socket.id, preferences);
                 if (assignment.overflow) {
@@ -151,14 +161,26 @@ class PlayerFactory {
                     };
                 }
 
-                var newPlayer = new Player(socket.id, validation.sanitized, validation.timestamp);
+                const initialState = Object.assign({}, validation.sanitized);
+                if (identity) {
+                    initialState.userId = identity.id;
+                    initialState.callsign = identity.name;
+                }
+
+                var newPlayer = new Player(socket.id, initialState, validation.timestamp);
                 newPlayer.city = assignment.city;
                 newPlayer.isMayor = assignment.isMayor;
+                if (parsedPlayer && parsedPlayer.isFake) {
+                    newPlayer.isFake = true;
+                }
+                if (parsedPlayer && parsedPlayer.isFakeRecruit) {
+                    newPlayer.isFakeRecruit = true;
+                }
                 if (spawn) {
                     newPlayer.offset.x = spawn.x;
                     newPlayer.offset.y = spawn.y;
                 }
-                newPlayer.callsign = this.callsigns.assign(newPlayer.id, { category: 'human' });
+                this.applyIdentityToPlayer(newPlayer, identity);
                 this.game.players[socket.id] = newPlayer;
                 this.registerAssignment(newPlayer, assignment);
 
@@ -195,7 +217,38 @@ class PlayerFactory {
                 }
 
                 var parsedPlayer = this.safeParse(player);
-                var validation = this.validator.validatePlayerUpdate(existingPlayer, parsedPlayer, { now: Date.now() });
+                const now = Date.now();
+                if (parsedPlayer && (existingPlayer.isFake || existingPlayer.isSystemControlled || existingPlayer.isFakeRecruit)) {
+                    if (parsedPlayer.sequence !== undefined && Number.isFinite(parsedPlayer.sequence)) {
+                        if (existingPlayer.sequence !== undefined && parsedPlayer.sequence <= existingPlayer.sequence) {
+                            return;
+                        }
+                        existingPlayer.sequence = Math.max(existingPlayer.sequence || 0, Math.floor(parsedPlayer.sequence));
+                    }
+                    if (parsedPlayer.offset && typeof parsedPlayer.offset === 'object') {
+                        const x = Number(parsedPlayer.offset.x);
+                        const y = Number(parsedPlayer.offset.y);
+                        if (Number.isFinite(x)) existingPlayer.offset.x = x;
+                        if (Number.isFinite(y)) existingPlayer.offset.y = y;
+                    }
+                    if (parsedPlayer.direction !== undefined) {
+                        const dir = Number(parsedPlayer.direction);
+                        if (Number.isFinite(dir)) existingPlayer.direction = Math.round(dir) % 32;
+                    }
+                    if (parsedPlayer.isMoving !== undefined) {
+                        existingPlayer.isMoving = parsedPlayer.isMoving;
+                    }
+                    if (parsedPlayer.isTurning !== undefined) {
+                        existingPlayer.isTurning = parsedPlayer.isTurning;
+                    }
+                    existingPlayer.lastUpdateAt = now;
+                    if (this.io) {
+                        this.io.emit('player', JSON.stringify(existingPlayer));
+                    }
+                    return;
+                }
+
+                var validation = this.validator.validatePlayerUpdate(existingPlayer, parsedPlayer, { now });
                 if (!validation) {
                     return;
                 }
@@ -228,6 +281,32 @@ class PlayerFactory {
                 io.emit('player', JSON.stringify(existingPlayer));
             });
 
+            socket.on('identity:update', (payload) => {
+                const player = this.game.players[socket.id];
+                if (!player) {
+                    return;
+                }
+                const request = this.safeParse(payload);
+                if (request && Object.prototype.hasOwnProperty.call(request, 'identity') && request.identity === null) {
+                    this.applyIdentityToPlayer(player, null);
+                    if (this.io) {
+                        this.io.emit('player', JSON.stringify(player));
+                    }
+                    socket.emit('identity:ack', JSON.stringify({ status: 'ok', id: null, name: null }));
+                    return;
+                }
+                const identity = this.resolveIdentityFromPayload(request);
+                if (!identity) {
+                    socket.emit('identity:ack', JSON.stringify({ status: 'error', reason: 'not_found' }));
+                    return;
+                }
+                this.applyIdentityToPlayer(player, identity);
+                if (this.io) {
+                    this.io.emit('player', JSON.stringify(player));
+                }
+                socket.emit('identity:ack', JSON.stringify({ status: 'ok', id: identity.id, name: identity.name }));
+            });
+
             socket.on('item:use', (payload) => {
                 this.handleItemUse(socket, payload);
             });
@@ -236,6 +315,9 @@ class PlayerFactory {
                 var removedPlayer = this.game.players[socket.id];
                 if (!removedPlayer) {
                     return;
+                }
+                if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
+                    this.game.buildingFactory.cityManager.releasePlayerInventory(socket.id);
                 }
                 if (this.game.buildingFactory &&
                     this.game.buildingFactory.cityManager &&
@@ -409,6 +491,28 @@ class PlayerFactory {
         return this.game.players[socketId] || null;
     }
 
+    adjustCityInventory(socketId, itemType, delta) {
+        if (!this.game || !this.game.buildingFactory || !this.game.buildingFactory.cityManager) {
+            return 0;
+        }
+        if (!Number.isFinite(delta) || delta === 0) {
+            return 0;
+        }
+        const player = this.game.players[socketId];
+        if (!player || player.city === undefined || player.city === null) {
+            return 0;
+        }
+        const cityId = Number(player.city);
+        if (!Number.isFinite(cityId)) {
+            return 0;
+        }
+        const cityManager = this.game.buildingFactory.cityManager;
+        if (delta > 0) {
+            return cityManager.recordInventoryPickup(socketId, cityId, itemType, delta);
+        }
+        return cityManager.recordInventoryConsumption(socketId, cityId, itemType, Math.abs(delta));
+    }
+
     getSocket(socketId) {
         const sockets = this.io && this.io.sockets && this.io.sockets.sockets;
         if (!sockets) {
@@ -537,6 +641,9 @@ class PlayerFactory {
                 }));
             }
 
+            if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
+                this.game.buildingFactory.cityManager.releasePlayerInventory(socketId);
+            }
             this.releaseSlot(player);
             delete this.game.players[socketId];
             if (this.io) {
@@ -599,10 +706,14 @@ class PlayerFactory {
 
         switch (type) {
             case 'medkit':
-                this.applyHealing(socketId, MAX_HEALTH, { type: 'medkit', iconId: data.iconId ?? null });
+                if (this.applyHealing(socketId, MAX_HEALTH, { type: 'medkit', iconId: data.iconId ?? null })) {
+                    this.adjustCityInventory(socketId, ITEM_TYPES.MEDKIT, -1);
+                }
                 break;
             case 'cloak':
-                this.applyCloak(socketId, Number.isFinite(data.duration) ? data.duration : TIMER_CLOAK);
+                if (this.applyCloak(socketId, Number.isFinite(data.duration) ? data.duration : TIMER_CLOAK)) {
+                    this.adjustCityInventory(socketId, ITEM_TYPES.CLOAK, -1);
+                }
                 break;
             default:
                 break;
@@ -612,13 +723,13 @@ class PlayerFactory {
     applyHealing(socketId, targetHealth, meta) {
         const player = this.game.players[socketId];
         if (!player) {
-            return;
+            return false;
         }
         const previousHealth = player.health;
         const resolvedHealth = Number.isFinite(targetHealth) ? targetHealth : MAX_HEALTH;
         const clamped = Math.min(MAX_HEALTH, Math.max(previousHealth, Math.floor(resolvedHealth)));
         if (clamped <= previousHealth) {
-            return;
+            return false;
         }
         player.health = clamped;
         if (this.io) {
@@ -629,17 +740,19 @@ class PlayerFactory {
                 source: meta || null
             }));
         }
+        return true;
     }
 
     applyCloak(socketId, durationMs = TIMER_CLOAK) {
         const player = this.game.players[socketId];
         if (!player) {
-            return;
+            return false;
         }
         const duration = Number.isFinite(durationMs) ? Math.max(0, durationMs) : TIMER_CLOAK;
         player.isCloaked = true;
         player.cloakExpiresAt = Date.now() + duration;
         this.emitStatusUpdate(player);
+        return true;
     }
 
     clearCloak(socketId) {
@@ -719,6 +832,9 @@ class PlayerFactory {
         if (!player.isSystemControlled) {
             this.releaseSlot(player);
         }
+        if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
+            this.game.buildingFactory.cityManager.releasePlayerInventory(socketId);
+        }
         delete this.game.players[socketId];
 
         if (this.io) {
@@ -732,6 +848,39 @@ class PlayerFactory {
                 attackerCity,
                 points: null
             }));
+        }
+    }
+
+    resolveIdentityFromPayload(payload) {
+        if (!this.userStore || typeof this.userStore.get !== 'function') {
+            return null;
+        }
+        if (!payload || typeof payload !== 'object') {
+            return null;
+        }
+        const identity = payload.identity && typeof payload.identity === 'object'
+            ? payload.identity
+            : null;
+        const candidate = identity && identity.id
+            ? identity.id
+            : (payload.userId || payload.identityId || null);
+        if (!candidate || (typeof candidate !== 'string' && typeof candidate !== 'number')) {
+            return null;
+        }
+        return this.userStore.get(String(candidate));
+    }
+
+    applyIdentityToPlayer(player, identity) {
+        if (!player) {
+            return;
+        }
+        this.callsigns.release(player.id);
+        if (identity) {
+            player.userId = identity.id;
+            player.callsign = identity.name;
+        } else {
+            player.userId = null;
+            player.callsign = this.callsigns.assign(player.id, { category: 'human' });
         }
     }
 
@@ -789,7 +938,71 @@ class PlayerFactory {
             if (statusChanged) {
                 this.emitStatusUpdate(player);
             }
+
+            this.applyHospitalHealingForPlayer(player, now);
         }
+    }
+
+    applyHospitalHealingForPlayer(player, now = Date.now()) {
+        if (!player || player.health <= 0) {
+            return false;
+        }
+        if (!this.game || !this.game.buildingFactory) {
+            return false;
+        }
+        if (!Number.isFinite(player.health) || player.health >= MAX_HEALTH) {
+            return false;
+        }
+        const factory = this.game.buildingFactory;
+        const buildings = factory && factory.buildings;
+        if (!buildings || typeof buildings.values !== 'function') {
+            return false;
+        }
+
+        const playerRect = getPlayerRect(player);
+        const referenceTime = Number.isFinite(now) ? now : Date.now();
+
+        for (const building of buildings.values()) {
+            if (!building || !isHospitalBuilding(building)) {
+                continue;
+            }
+            const healZone = getHospitalDriveableRect(building);
+            if (!healZone) {
+                continue;
+            }
+            if (!rectangleCollision(playerRect, healZone)) {
+                continue;
+            }
+            const lastHeal = Number.isFinite(player.lastHospitalHealAt) ? player.lastHospitalHealAt : 0;
+            if (referenceTime < (lastHeal + HOSPITAL_HEAL_INTERVAL)) {
+                return false;
+            }
+
+            const previousHealth = player.health;
+            const nextHealth = Math.min(MAX_HEALTH, previousHealth + HOSPITAL_HEAL_AMOUNT);
+            if (nextHealth <= previousHealth) {
+                return false;
+            }
+
+            player.health = nextHealth;
+            player.lastHospitalHealAt = referenceTime;
+
+            if (this.io) {
+                this.io.emit('player:health', JSON.stringify({
+                    id: player.id,
+                    health: player.health,
+                    previousHealth,
+                    source: {
+                        type: 'hospital',
+                        buildingId: building.id || null,
+                    }
+                }));
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     getSpawnForCity(cityId) {

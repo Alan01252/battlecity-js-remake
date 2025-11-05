@@ -1,10 +1,12 @@
 import {COLLISION_BLOCKING} from "../constants";
 import {getPlayerRect} from "./collision-helpers";
 import {rectangleCollision} from "./collision-helpers";
-import {BUILDING_HAS_BAY} from "../constants";
+import {BUILDING_COMMAND_CENTER} from "../constants";
+import {BUILDING_FACTORY} from "../constants";
 import {checkTiles} from "./collision-helpers";
 import {checkEdges} from "./collision-helpers";
 import {checkItems} from "./collision-helpers";
+import {isHospitalBuilding} from "../utils/buildings";
 
 
 var checkBuildings = (game, playerRect) => {
@@ -19,8 +21,12 @@ var checkBuildings = (game, playerRect) => {
             h: 144,
         };
 
-        if (building.type == 0 || parseInt(building.type / 100) == 1) {
-            buildingRect.h = buildingRect.h - 48;
+        const typeValue = Number(building.type);
+        const baseType = Number.isFinite(typeValue) ? Math.floor(typeValue / 100) : NaN;
+        const isCommandCenter = typeValue === BUILDING_COMMAND_CENTER;
+        const isFactory = baseType === BUILDING_FACTORY;
+        if (isCommandCenter || isFactory || isHospitalBuilding(typeValue)) {
+            buildingRect.h = Math.max(0, buildingRect.h - 48);
         }
 
         if (rectangleCollision(playerRect, buildingRect)) {

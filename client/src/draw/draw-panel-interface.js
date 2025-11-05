@@ -585,35 +585,16 @@ var drawFinance = (game, stage) => {
         fontWeight: 'bold',
         fill: gross < 0 ? 0xE74C3C : 0x2ECC71,
         stroke: 0x000000,
-        strokeThickness: 2,
+        strokeThickness: 1,
     });
-    cashText.x = game.maxMapX + 21;
+    cashText.x = game.maxMapX + 24;
     cashText.y = 226;
     stage.addChild(cashText);
 
-    const scoreValue = Number.isFinite(city.score) ? city.score : parseInt(city.score, 10) || 0;
-    const scoreText = new PIXI.Text(`Score: ${scoreValue}`, {
-        fontFamily: 'Arial',
-        fontSize: 12,
-        fill: 0xFDFEFE,
-        stroke: 0x000000,
-        strokeThickness: 2,
-    });
-    scoreText.x = game.maxMapX + 21;
-    scoreText.y = 244;
-    stage.addChild(scoreText);
-
-    const orbCount = Number.isFinite(city.orbs) ? city.orbs : parseInt(city.orbs, 10) || 0;
-    const orbText = new PIXI.Text(`Orbs: ${orbCount}`, {
-        fontFamily: 'Arial',
-        fontSize: 12,
-        fill: 0xFDFEFE,
-        stroke: 0x000000,
-        strokeThickness: 2,
-    });
-    orbText.x = game.maxMapX + 21;
-    orbText.y = 258;
-    stage.addChild(orbText);
+    // The finance panel previously surfaced score and orb totals alongside the inventory slots,
+    // but these numbers cluttered the interface and duplicated information that is available in
+    // other dedicated views.  Drop the text nodes entirely so the inventory grid focuses solely
+    // on item icons.
 };
 
 var drawItems = (game, stage) => {

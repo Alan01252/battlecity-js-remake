@@ -81,6 +81,8 @@ const RECRUIT_POSITION_PATTERNS = Object.freeze([
     { dx: TILE_SIZE / 2, dy: -TILE_SIZE / 2, direction: 16 },
 ]);
 
+const DEFAULT_BOTS_PER_CITY = 2;
+
 const clamp = (value, min, max) => {
     if (!Number.isFinite(value)) {
         return min;
@@ -205,6 +207,13 @@ const toFiniteNumber = (value, fallback = 0) => {
         }
     }
     return fallback;
+};
+
+const resolveBotsPerCity = (entry, config) => {
+    const perEntry = entry ? toFiniteNumber(entry.botsPerCity, null) : null;
+    const global = config ? toFiniteNumber(config.botsPerCity, null) : null;
+    const desired = perEntry ?? global ?? DEFAULT_BOTS_PER_CITY;
+    return Math.max(0, Math.round(desired));
 };
 
 const normalizeVector = (dx, dy) => {
@@ -587,17 +596,10 @@ class FakeCityManager {
         this.navGrid = null;
         this.debug = require('debug')('BattleCity:FakeCityManager');
 
-        process.on('exit', () => {
-            for (const child of this.botProcesses.values()) {
-                try {
-                    if (child && !child.killed) {
-                        child.kill();
-                    }
-                } catch (error) {
-                    this.debug(`[bot] error killing bot during shutdown: ${error.message}`);
-                }
-            }
-        });
+    }
+
+    getBotProcesses() {
+        return this.botProcesses;
     }
 
     setIo(io) {
@@ -612,7 +614,7 @@ class FakeCityManager {
         this.nextEvaluation = now + interval;
 
         const humanCount = this.getHumanPlayerCount();
-        const minPlayers = Math.max(0, toFiniteNumber(this.config.minPlayers, 16));
+        const minPlayers = Math.max(0, toFiniteNumber(this.config.minPlayers, 1));
         const configured = this.getConfiguredCities();
         const maxActive = Math.min(configured.length, Math.max(0, toFiniteNumber(this.config.maxActive, configured.length)));
         const desired = Math.min(maxActive, Math.max(0, minPlayers - humanCount));
@@ -623,6 +625,14 @@ class FakeCityManager {
             this.removeFakeCities(this.activeCities.size - desired);
         }
     }
+
+    spawnBotInCity(cityId, desiredCount = null) {
+        this.debug(`[bot] ensure bots for city ${cityId}`);
+        const entry = this.findCityConfig(cityId);
+        const target = Number.isFinite(desiredCount) ? Math.max(0, Math.floor(desiredCount)) : this.resolveDesiredBotCount(cityId, entry);
+        this.ensureCityBotCount(cityId, target);
+    }
+
 
     getHumanPlayerCount() {
         const players = this.game?.players || {};
@@ -639,12 +649,69 @@ class FakeCityManager {
             }
             count += 1;
         }
-        return count;
+        const botProcessCount = Array.from(this.botProcesses.values())
+            .reduce((acc, processes) => {
+                if (!processes) {
+                    return acc;
+                }
+                if (processes instanceof Set) {
+                    return acc + processes.size;
+                }
+                if (Array.isArray(processes)) {
+                    return acc + processes.length;
+                }
+                return acc + 1;
+            }, 0);
+        return Math.max(0, count - botProcessCount);
     }
 
     getConfiguredCities() {
         const entries = Array.isArray(this.config.cities) ? this.config.cities : [];
         return entries.filter((entry) => Number.isFinite(toFiniteNumber(entry?.cityId, NaN)));
+    }
+
+    findCityConfig(cityId) {
+        if (!Number.isFinite(cityId)) {
+            return null;
+        }
+        const numericCity = Math.max(0, Math.floor(cityId));
+        return this.getConfiguredCities().find((entry) => toFiniteNumber(entry?.cityId, null) === numericCity) || null;
+    }
+
+    resolveDesiredBotCount(cityId, entry = null) {
+        const resolvedEntry = entry || this.findCityConfig(cityId);
+        return resolveBotsPerCity(resolvedEntry, this.config);
+    }
+
+    ensureCityBotCount(cityId, desiredCount = DEFAULT_BOTS_PER_CITY) {
+        if (!Number.isFinite(cityId)) {
+            return 0;
+        }
+        const numericCity = Math.max(0, Math.floor(cityId));
+        const target = Math.max(0, Math.floor(desiredCount));
+
+        const record = this.activeCities.get(numericCity);
+        if (!record || !Array.isArray(record.buildingIds) || record.buildingIds.length === 0) {
+            this.killCityBot(numericCity, 'no_buildings');
+            return 0;
+        }
+
+        if (target === 0) {
+            this.killCityBot(numericCity, 'desired_zero');
+            return 0;
+        }
+
+        let spawned = 0;
+        while ((this.botProcesses.get(numericCity)?.size || 0) < target) {
+            const index = (this.botProcesses.get(numericCity)?.size || 0) + 1;
+            const nameHint = `bot-${numericCity}-${index}`;
+            const child = this.spawnCityBot(numericCity, { name: nameHint });
+            if (!child) {
+                break;
+            }
+            spawned += 1;
+        }
+        return spawned;
     }
 
     buildPatrolPath(entry, baseTileX, baseTileY, layout) {
@@ -2193,8 +2260,9 @@ class FakeCityManager {
 
     computeRecruitSpawn(cityId, baseTileX = null, baseTileY = null, slotIndex = 0) {
         const record = this.activeCities.get(cityId);
-        const resolvedBaseX = toFiniteNumber(baseTileX, toFiniteNumber(record?.baseTileX, 0));
-        const resolvedBaseY = toFiniteNumber(baseTileY, toFiniteNumber(record?.baseTileY, 0));
+        const spawnInfo = citySpawns[String(cityId)];
+        const resolvedBaseX = toFiniteNumber(baseTileX, toFiniteNumber(record?.baseTileX, spawnInfo?.tileX ?? 0));
+        const resolvedBaseY = toFiniteNumber(baseTileY, toFiniteNumber(record?.baseTileY, spawnInfo?.tileY ?? 0));
         const spawnPoint = record?.spawnPoint;
         let originX = Number.isFinite(spawnPoint?.x) ? spawnPoint.x : null;
         let originY = Number.isFinite(spawnPoint?.y) ? spawnPoint.y : null;
@@ -2214,6 +2282,7 @@ class FakeCityManager {
             y: clamp(originY + offsetY, 0, mapMax),
             direction: pattern.direction ?? 16
         };
+        this.debug(`[bot] computed spawn for city ${cityId} at (${spawn.x}, ${spawn.y})`);
         return this.ensureSpawnIsClear(spawn);
     }
 
@@ -2321,23 +2390,25 @@ class FakeCityManager {
         }
     }
 
-    spawnCityBot(cityId) {
+    spawnCityBot(cityId, options = {}) {
         if (!Number.isFinite(cityId)) {
             return null;
         }
         const numericCity = Math.max(0, Math.floor(cityId));
-        if (this.botProcesses.has(numericCity)) {
-            this.killCityBot(numericCity, 'restart');
-        }
 
         const scriptPath = path.resolve(__dirname, '../../bot/index.js');
         const botCwd = path.resolve(__dirname, '../../bot');
         const serverUrl = process.env.BATTLECITY_SERVER || 'http://localhost:8021';
+        const role = typeof options.role === 'string' ? options.role : 'recruit';
+        const args = [scriptPath, '--city', String(numericCity), '--role', role];
+        if (options.name) {
+            args.push('--name', String(options.name));
+        }
 
         try {
             const child = spawn(
                 process.execPath,
-                [scriptPath, '--city', String(numericCity), '--role', 'recruit'],
+                args,
                 {
                     cwd: botCwd,
                     stdio: ['ignore', 'inherit', 'inherit'],
@@ -2347,30 +2418,50 @@ class FakeCityManager {
                 }
             );
 
-            child.once('error', (error) => {
-                this.debug(`[bot] spawn failed for city ${numericCity}: ${error.message}`);
-                if (this.botProcesses.get(numericCity) === child) {
-                    this.botProcesses.delete(numericCity);
+            let cleaned = false;
+            const cleanup = () => {
+                if (cleaned) {
+                    return;
+                }
+                cleaned = true;
+                const cityBots = this.botProcesses.get(numericCity);
+                if (cityBots) {
+                    cityBots.delete(child);
+                    if (cityBots.size === 0) {
+                        this.botProcesses.delete(numericCity);
+                    }
                 }
                 const record = this.activeCities.get(numericCity);
-                if (record && record.botProcess === child) {
-                    record.botProcess = null;
+                if (record && Array.isArray(record.botProcesses)) {
+                    record.botProcesses = record.botProcesses.filter((proc) => proc !== child);
                 }
+            };
+
+            child.once('error', (error) => {
+                this.debug(`[bot] spawn failed for city ${numericCity}: ${error.message}`);
+                cleanup();
             });
 
             child.once('exit', (code, signal) => {
-                this.debug(`[bot] city ${numericCity} exited code=${code} signal=${signal || 'null'}`);
-                if (this.botProcesses.get(numericCity) === child) {
-                    this.botProcesses.delete(numericCity);
-                }
-                const record = this.activeCities.get(numericCity);
-                if (record && record.botProcess === child) {
-                    record.botProcess = null;
-                }
+                this.debug(
+                    `[bot] city ${numericCity} bot exited code=${code} signal=${signal || 'null'}`
+                );
+                cleanup();
             });
 
-            this.botProcesses.set(numericCity, child);
-            this.debug(`[bot] launched bot for city ${numericCity}`);
+            const cityBots = this.botProcesses.get(numericCity) || new Set();
+            cityBots.add(child);
+            this.botProcesses.set(numericCity, cityBots);
+
+            const record = this.activeCities.get(numericCity);
+            if (record) {
+                if (!Array.isArray(record.botProcesses)) {
+                    record.botProcesses = [];
+                }
+                record.botProcesses.push(child);
+            }
+
+            this.debug(`[bot] launched bot for city ${numericCity}${options.name ? ` (${options.name})` : ''}`);
             return child;
         } catch (error) {
             this.debug(`[bot] unable to launch bot for city ${numericCity}: ${error.message}`);
@@ -2383,18 +2474,31 @@ class FakeCityManager {
         if (numericCity === null) {
             return;
         }
-        const child = this.botProcesses.get(numericCity);
-        if (!child) {
+        const bots = this.botProcesses.get(numericCity);
+        if (!bots || bots.size === 0) {
             return;
         }
         this.botProcesses.delete(numericCity);
-        try {
-            if (!child.killed) {
-                child.kill();
+        const record = this.activeCities.get(numericCity);
+        if (record) {
+            record.botProcesses = [];
+        }
+        let terminated = 0;
+        for (const child of bots) {
+            if (!child) {
+                continue;
             }
-            this.debug(`[bot] terminated bot for city ${numericCity} (${reason})`);
-        } catch (error) {
-            this.debug(`[bot] failed to terminate bot for city ${numericCity}: ${error.message}`);
+            try {
+                if (!child.killed) {
+                    child.kill();
+                }
+                terminated += 1;
+            } catch (error) {
+                this.debug(`[bot] failed to terminate bot for city ${numericCity}: ${error.message}`);
+            }
+        }
+        if (terminated > 0) {
+            this.debug(`[bot] terminated ${terminated} bot(s) for city ${numericCity} (${reason})`);
         }
     }
 
@@ -2668,19 +2772,13 @@ class FakeCityManager {
             baseTileY: baseY,
             spawnPoint: spawnPoint || null,
             patrolPath: patrolPath.length ? patrolPath : [],
-            botProcess: null,
+            botProcesses: [],
         };
 
-        if (this.botProcesses.size === 0) {
-            const botProcess = this.spawnCityBot(cityId);
-            if (botProcess) {
-                cityRecord.botProcess = botProcess;
-            }
-        } else {
-            this.debug(`[bot] global bot limit reached; skipping bot for city ${cityId}`);
-        }
-
         this.activeCities.set(cityId, cityRecord);
+
+        const desiredBots = this.resolveDesiredBotCount(cityId, entry);
+        this.ensureCityBotCount(cityId, desiredBots);
 
         if (this.playerFactory?.emitLobbySnapshot) {
             this.playerFactory.emitLobbySnapshot();

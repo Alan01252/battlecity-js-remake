@@ -5,6 +5,7 @@ const debug = require('debug')('BattleCity:BuildingFactory');
 const Building = require('./Building');
 const FactoryBuilding = require('./FactoryBuilding');
 const CityManager = require('./CityManager');
+const { ITEM_TYPES, normalizeItemType } = require('./items');
 const {
     isHouse,
     isFactory,
@@ -12,7 +13,7 @@ const {
     COST_BUILDING,
 } = require('./constants');
 
-const ITEM_TYPE_ORB = 5;
+const ITEM_TYPE_ORB = ITEM_TYPES.ORB;
 const HAZARD_ITEM_TYPES = new Map([
     [3, 'bomb'],
     [4, 'mine'],
@@ -61,7 +62,13 @@ class BuildingFactory {
         const { FACTORY_ITEM_LIMITS } = require('./constants');
         const limit = FACTORY_ITEM_LIMITS ? FACTORY_ITEM_LIMITS[building.type] : undefined;
         const produced = building.itemsLeft || 0;
-        const itemsRemaining = limit !== undefined ? Math.max(0, limit - produced) : 0;
+        let outstanding = produced;
+        if (isFactory(building.type) && typeof this.getCityOutstandingItemCount === 'function') {
+            const itemType = building.type % 100;
+            const cityId = building.cityId ?? building.city ?? 0;
+            outstanding = this.getCityOutstandingItemCount(cityId, itemType);
+        }
+        const itemsRemaining = limit !== undefined ? Math.max(0, limit - outstanding) : 0;
         return {
             id: building.id,
             ownerId: building.ownerId,
@@ -150,6 +157,14 @@ class BuildingFactory {
         const previous = toFiniteNumber(building.itemsLeft, 0) || 0;
         building.itemsLeft = Math.max(0, previous - quantity);
         this.emitPopulationUpdate(building);
+
+        const owningCity = playerCity !== null ? playerCity : buildingCity;
+        if (itemType !== ITEM_TYPE_ORB &&
+            this.cityManager &&
+            Number.isFinite(owningCity) &&
+            itemType !== null) {
+            this.cityManager.recordInventoryPickup(socket.id, owningCity, itemType, quantity);
+        }
 
         if (itemType === ITEM_TYPE_ORB &&
             this.cityManager &&
@@ -430,6 +445,10 @@ class BuildingFactory {
             this.cityManager.clearOrbHoldersForCity(normalisedCityId, { consume: true });
         }
 
+        if (this.cityManager && normalisedCityId !== null) {
+            this.cityManager.clearInventoryForType(normalisedCityId, itemType);
+        }
+
         this.broadcastFactoryPurge(normalisedCityId, itemType);
     }
 
@@ -591,7 +610,51 @@ class BuildingFactory {
             this.removeBuilding(building.id, broadcast);
             removed += 1;
         }
+        if (this.cityManager) {
+            this.cityManager.clearCityInventory(numericId);
+        }
         return removed;
+    }
+
+    getCityFactoryStock(cityId, itemType = null) {
+        const numericCity = toFiniteNumber(cityId, null);
+        const targetType = itemType !== null ? normalizeItemType(itemType, null) : null;
+        if (numericCity === null) {
+            return 0;
+        }
+        let total = 0;
+        for (const building of this.buildings.values()) {
+            if (!isFactory(building.type)) {
+                continue;
+            }
+            const buildingCity = toFiniteNumber(building.cityId ?? building.city, null);
+            if (buildingCity !== numericCity) {
+                continue;
+            }
+            const buildingType = normalizeItemType(building.type % 100, null);
+            if (targetType !== null && buildingType !== targetType) {
+                continue;
+            }
+            const itemsLeft = toFiniteNumber(building.itemsLeft, 0) || 0;
+            if (itemsLeft > 0) {
+                total += itemsLeft;
+            }
+        }
+        return total;
+    }
+
+    getCityOutstandingItemCount(cityId, itemType) {
+        const numericCity = toFiniteNumber(cityId, null);
+        const targetType = normalizeItemType(itemType, null);
+        if (numericCity === null || targetType === null) {
+            return 0;
+        }
+        const factoryStock = this.getCityFactoryStock(numericCity, targetType);
+        let inventoryStock = 0;
+        if (this.cityManager && typeof this.cityManager.getInventoryCount === 'function') {
+            inventoryStock = this.cityManager.getInventoryCount(numericCity, targetType);
+        }
+        return factoryStock + inventoryStock;
     }
 }
 

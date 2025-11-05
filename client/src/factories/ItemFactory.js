@@ -281,6 +281,7 @@ class ItemFactory {
             return;
         }
         item.active = false;
+        item.armed = false;
         item.hidden = true;
         this.freezeCurrentPlayer();
         this.game.forceDraw = true;
@@ -811,6 +812,7 @@ class ItemFactory {
             return;
         }
         item.active = false;
+        item.armed = false;
         item.hidden = true;
         this.game.forceDraw = true;
     }
@@ -909,6 +911,16 @@ class ItemFactory {
             if (Number.isFinite(nextLife)) {
                 item.life = nextLife;
             }
+        }
+        if (hazard.revealedAt !== undefined) {
+            const revealedTick = this.toFiniteNumber(hazard.revealedAt, item.revealedAt ?? null);
+            item.revealedAt = Number.isFinite(revealedTick) ? revealedTick : null;
+        }
+        if (hazard.triggeredBy !== undefined) {
+            item.triggeredBy = hazard.triggeredBy ?? null;
+        }
+        if (hazard.triggeredTeam !== undefined) {
+            item.triggeredTeam = hazard.triggeredTeam ?? null;
         }
         this.ensureItemDurability(item);
     }

@@ -15,6 +15,7 @@ import {setupMouseInputs} from './src/input/input-mouse';
 import {drawGround} from "./src/draw/draw-ground";
 import {drawTiles} from "./src/draw/draw-tiles";
 import {drawChanging} from "./src/draw/draw-changing"
+import {drawBotDebug} from "./src/draw/draw-bot-debug";
 
 import BuildingFactory from "./src/factories/BuildingFactory";
 import BulletFactory from "./src/factories/BulletFactory"
@@ -33,6 +34,7 @@ import LobbyManager from "./src/lobby/LobbyManager";
 import NotificationManager from "./src/ui/NotificationManager";
 import CallsignRegistry from "./src/utils/callsigns";
 import ChatManager from "./src/ui/ChatManager";
+import IdentityManager from "./src/identity/IdentityManager";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -200,7 +202,8 @@ const game = {
         isFrozen: false,
         frozenUntil: 0,
         frozenBy: null,
-        callsign: null
+        callsign: null,
+        userId: null
     },
     explosions: [],
     panelState: {
@@ -208,6 +211,7 @@ const game = {
         lines: [...DEFAULT_PANEL_MESSAGE.lines],
     },
     defenseItems: new Map(),
+    identity: null,
     lobby: null,
     app: app,
     stage: app.stage,
@@ -223,6 +227,7 @@ const game = {
         offsetX: 0,
         offsetY: 0,
     },
+    gBotDebug: null,
 };
 
 const orbHintElement = document.createElement('div');
@@ -258,6 +263,8 @@ game.notify = (payload) => {
     return game.notificationManager.notify(payload);
 };
 game.chatManager = new ChatManager({ game });
+game.identityManager = new IdentityManager(game);
+game.identityManager.loadFromStorage();
 game.resolveCallsign = (id) => {
     if (id === undefined || id === null) {
         return null;
@@ -973,8 +980,20 @@ game.socketListener = new SocketListener(game);
 if (game.chatManager) {
     game.chatManager.bindSocket(game.socketListener);
 }
+if (game.identityManager) {
+    game.identityManager.bindSocket(game.socketListener);
+}
 game.lobby = new LobbyManager(game);
 game.lobby.attachSocket(game.socketListener);
+if (game.identityManager) {
+    game.lobby.attachIdentityManager(game.identityManager);
+    game.lobby.updateIdentityDisplay(game.identityManager.getIdentity());
+    if (typeof game.identityManager.initialise === 'function') {
+        game.identityManager.initialise().catch((error) => {
+            console.warn('[identity] Failed to initialise identity manager:', error?.message || error);
+        });
+    }
+}
 game.iconFactory = new IconFactory(game);
 game.itemFactory = new ItemFactory(game);
 game.rogueTankManager = new RogueTankManager(game);
@@ -1497,6 +1516,9 @@ function setup() {
      app.stage.addChild(objectContainer);
      app.stage.addChild(panelContainer);
 
+     game.gBotDebug = new PIXI.Graphics();
+     app.stage.addChild(game.gBotDebug);
+
 
      setupBuildingMenu(game);
 
@@ -1556,6 +1578,8 @@ function gameLoop() {
     drawBuilding(game);
     drawIcons(game, iconTiles);
     drawPanelInterface(game, panelContainer);
+    game.gBotDebug.clear();
+    drawBotDebug(game, game.gBotDebug);
     play(game);
 
     if (typeof game.updateOrbHint === 'function') {

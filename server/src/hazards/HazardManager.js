@@ -1,6 +1,7 @@
 "use strict";
 
 const { TILE_SIZE, DAMAGE_MINE, DAMAGE_BOMB, BOMB_TIMER_MS, BOMB_EXPLOSION_TILE_RADIUS, TIMER_DFG } = require("../gameplay/constants");
+const { ITEM_TYPES } = require("../items");
 const { rectangleCollision } = require("../gameplay/geometry");
 
 const HAZARD_TYPES = {
@@ -9,11 +10,19 @@ const HAZARD_TYPES = {
     DFG: "dfg"
 };
 
+const HAZARD_REVEAL_DURATION_MS = 750;
+
 const ITEM_TYPE_MAP = {
     3: HAZARD_TYPES.BOMB,
     4: HAZARD_TYPES.MINE,
     7: HAZARD_TYPES.DFG
 };
+
+const HAZARD_TYPE_TO_ITEM = new Map([
+    [HAZARD_TYPES.BOMB, ITEM_TYPES.BOMB],
+    [HAZARD_TYPES.MINE, ITEM_TYPES.MINE],
+    [HAZARD_TYPES.DFG, ITEM_TYPES.DFG],
+]);
 
 class HazardManager {
 
@@ -43,7 +52,10 @@ class HazardManager {
                 teamId: hazard.teamId,
                 active: !!hazard.active,
                 armed: !!hazard.armed,
-                detonateAt: hazard.detonateAt || null
+                detonateAt: hazard.detonateAt || null,
+                revealedAt: hazard.revealedAt || null,
+                triggeredBy: hazard.triggeredBy || null,
+                triggeredTeam: hazard.triggeredTeam ?? null
             }));
         }
     }
@@ -92,7 +104,12 @@ class HazardManager {
             createdAt: Date.now(),
             active: type === HAZARD_TYPES.MINE,
             armed: type === HAZARD_TYPES.MINE,
-            detonateAt: null
+            detonateAt: null,
+            revealedAt: null,
+            cleanupAt: null,
+            pendingRemovalReason: null,
+            triggeredBy: null,
+            triggeredTeam: null
         };
 
         if (type === HAZARD_TYPES.BOMB) {
@@ -129,6 +146,7 @@ class HazardManager {
         this.pendingIdsBySocket.get(socket.id).add(hazard.id);
 
         this.broadcastHazard("hazard:spawn", hazard);
+        this.recordInventoryConsumption(socket.id, hazard);
         return hazard;
     }
 
@@ -170,7 +188,12 @@ class HazardManager {
             createdAt: Date.now(),
             active: type === HAZARD_TYPES.MINE ? true : !!payload.active,
             armed: type === HAZARD_TYPES.MINE ? true : !!payload.armed,
-            detonateAt: null
+            detonateAt: null,
+            revealedAt: null,
+            cleanupAt: null,
+            pendingRemovalReason: null,
+            triggeredBy: null,
+            triggeredTeam: null
         };
 
         if (type === HAZARD_TYPES.BOMB) {
@@ -240,6 +263,22 @@ class HazardManager {
         this.broadcastHazard("hazard:remove", payload);
     }
 
+    recordInventoryConsumption(socketId, hazard) {
+        if (!hazard || !this.game || !this.game.buildingFactory || !this.game.buildingFactory.cityManager) {
+            return;
+        }
+        const itemType = HAZARD_TYPE_TO_ITEM.get(hazard.type);
+        if (itemType === undefined) {
+            return;
+        }
+        const cityId = Number.isFinite(hazard.teamId) ? Math.floor(hazard.teamId) : null;
+        if (cityId === null) {
+            return;
+        }
+        const ownerId = socketId || (typeof hazard.ownerId === "string" ? hazard.ownerId : null);
+        this.game.buildingFactory.cityManager.recordInventoryConsumption(ownerId, cityId, itemType, 1);
+    }
+
     removeHazardsByCityAndItem(cityId, itemType, reason = "factory_destroyed") {
         const hazardType = this.getHazardTypeFromItem(itemType);
         if (!hazardType) {
@@ -275,7 +314,10 @@ class HazardManager {
             active: !!hazard.active,
             armed: !!hazard.armed,
             detonateAt: hazard.detonateAt || null,
-            reason: hazard.reason || undefined
+            reason: hazard.reason || undefined,
+            revealedAt: hazard.revealedAt || null,
+            triggeredBy: hazard.triggeredBy || null,
+            triggeredTeam: hazard.triggeredTeam ?? null
         };
         this.io.emit(event, JSON.stringify(payload));
     }
@@ -288,21 +330,27 @@ class HazardManager {
         const now = Date.now();
 
         for (const hazard of Array.from(this.hazards.values())) {
+            if (!hazard.active && hazard.cleanupAt && now >= hazard.cleanupAt) {
+                const reason = hazard.pendingRemovalReason || hazard.reason || "expired";
+                this.removeHazard(hazard.id, reason);
+                continue;
+            }
+
+            if (!hazard.active) {
+                continue;
+            }
+
             if (hazard.type === HAZARD_TYPES.BOMB) {
                 this.updateBomb(hazard, now);
             } else if (hazard.type === HAZARD_TYPES.MINE) {
-                this.updateMine(hazard);
+                this.updateMine(hazard, now);
             } else if (hazard.type === HAZARD_TYPES.DFG) {
-                this.updateDFG(hazard);
+                this.updateDFG(hazard, now);
             }
         }
     }
 
-    updateMine(hazard) {
-        if (!hazard.active) {
-            return;
-        }
-
+    updateMine(hazard, now) {
         const players = this.game.players;
         const bulletRect = {
             x: hazard.x,
@@ -319,9 +367,15 @@ class HazardManager {
                 this.applyDamage(socketId, DAMAGE_MINE, {
                     type: hazard.type,
                     hazardId: hazard.id,
-                    ownerId: hazard.ownerId
+                    ownerId: hazard.ownerId,
+                    teamId: hazard.teamId ?? null
                 });
-                this.removeHazard(hazard.id, "mine_triggered");
+                this.onHazardTriggered(hazard, {
+                    now,
+                    reason: "mine_triggered",
+                    socketId,
+                    player
+                });
                 break;
             }
         }
@@ -375,11 +429,7 @@ class HazardManager {
         return true;
     }
 
-    updateDFG(hazard) {
-        if (!hazard.active) {
-            return;
-        }
-
+    updateDFG(hazard, now) {
         const players = this.game.players;
         const hazardRect = {
             x: hazard.x,
@@ -400,12 +450,26 @@ class HazardManager {
                         ownerId: hazard.ownerId
                     });
                 }
-                hazard.triggeredBy = player.id;
-                hazard.triggeredTeam = this.playerFactory?.getPlayerTeam(socketId) ?? null;
-                this.removeHazard(hazard.id, "dfg_triggered");
+                this.onHazardTriggered(hazard, {
+                    now,
+                    reason: "dfg_triggered",
+                    socketId,
+                    player
+                });
                 break;
             }
         }
+    }
+
+    onHazardTriggered(hazard, { now, reason, socketId, player }) {
+        hazard.active = false;
+        hazard.armed = false;
+        hazard.revealedAt = now;
+        hazard.cleanupAt = now + HAZARD_REVEAL_DURATION_MS;
+        hazard.pendingRemovalReason = reason;
+        hazard.triggeredBy = player?.id || socketId;
+        hazard.triggeredTeam = this.playerFactory?.getPlayerTeam(socketId) ?? null;
+        this.broadcastHazard("hazard:update", hazard);
     }
 
     playerIntersectsRect(player, rect) {

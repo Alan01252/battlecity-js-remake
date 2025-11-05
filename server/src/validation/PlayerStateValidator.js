@@ -70,7 +70,12 @@ class PlayerStateValidator {
         const elapsed = Math.max(1, now - (previousState.lastUpdateAt || now));
         const maxAxisMovement = this._computeAxisLimit(elapsed);
         const totalDistance = Math.sqrt((delta.x * delta.x) + (delta.y * delta.y));
-        const maxDistance = Math.min(this.axisHardCap, Math.max(maxAxisMovement, this.options.maxAxisDelta));
+        const isFake = !!(previousState.isFake || previousState.isFakeRecruit || previousState.isSystemControlled);
+        let maxDistance = Math.min(this.axisHardCap, Math.max(maxAxisMovement, this.options.maxAxisDelta));
+        if (isFake) {
+            const boost = elapsed < 200 ? this.options.maxAxisDelta * 4 : this.options.maxAxisDelta * 2;
+            maxDistance = Math.min(this.axisHardCap, Math.max(maxDistance, boost));
+        }
 
         if (Math.abs(delta.x) > maxDistance || Math.abs(delta.y) > maxDistance || totalDistance > (maxDistance + 8)) {
             result.valid = false;
@@ -83,7 +88,8 @@ class PlayerStateValidator {
         }
 
         const directionDelta = this._directionDelta(previousState.direction, sanitized.direction);
-        if (directionDelta > this.options.maxTurnDelta) {
+        const maxTurn = isFake ? this.options.maxTurnDelta * 4 : this.options.maxTurnDelta;
+        if (directionDelta > maxTurn) {
             result.valid = false;
             result.reasons.push("direction/exceeds_threshold");
             sanitized.direction = previousState.direction;

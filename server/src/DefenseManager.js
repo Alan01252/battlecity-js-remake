@@ -329,6 +329,7 @@ class DefenseManager {
             return;
         }
         this.addDefense(record);
+        this.recordInventoryConsumption(socket.id, record);
     }
 
     handleRemove(_socket, payload) {
@@ -341,6 +342,19 @@ class DefenseManager {
             return;
         }
         this.removeDefenseById(id);
+}
+
+    recordInventoryConsumption(socketId, record) {
+        if (!record || !this.game || !this.game.buildingFactory || !this.game.buildingFactory.cityManager) {
+            return;
+        }
+        const cityId = normaliseCityId(record.cityId, null);
+        const type = toFiniteNumber(record.type, null);
+        if (cityId === null || type === null) {
+            return;
+        }
+        const ownerId = socketId || record.ownerId || null;
+        this.game.buildingFactory.cityManager.recordInventoryConsumption(ownerId, cityId, type, 1);
     }
 }
 

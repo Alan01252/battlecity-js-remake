@@ -12,14 +12,25 @@ const COST_ITEM = 750000;
 const COST_INCOME_POPULATION = 10000;
 const COST_UPKEEP_HOSPITAL = 2000000;
 
-const {
-    resolveBuildingFamily,
-    isHouse,
-    isResearch,
-    isFactory,
-    isCommandCenter,
-    isHospital,
-} = require("../../shared/buildingTypes.js");
+const getFamilyCode = (type) => Math.floor(type / 100);
+
+const isHouse = (type) => getFamilyCode(type) === 3;
+const isResearch = (type) => getFamilyCode(type) === 4;
+const isFactory = (type) => getFamilyCode(type) === 1 && type !== 100;
+const isCommandCenter = (type) => type === 0;
+const HOSPITAL_TYPE_CODES = new Set([200, 301, 401]);
+
+const isHospital = (type) => {
+    const numeric = Number.isFinite(type) ? type : Number(type);
+    if (!Number.isFinite(numeric)) {
+        return false;
+    }
+    if (HOSPITAL_TYPE_CODES.has(numeric)) {
+        return true;
+    }
+    const family = getFamilyCode(numeric);
+    return family === 2 && numeric >= 200 && numeric < 300;
+};
 
 const FACTORY_ITEM_LIMITS = {
     100: 4,   // Cloak factory (ITEM_TYPE_CLOAK)

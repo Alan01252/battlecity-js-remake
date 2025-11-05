@@ -6,6 +6,8 @@ const CHAT_MAX_LENGTH = 240;
 const CONTROL_CHAR_PATTERN = /[\u0000-\u001F\u007F]/g;
 const DEFAULT_CHAT_SCOPE = 'team';
 
+import {updateBotWaypoints} from "./draw/draw-bot-debug";
+
 class SocketListener extends EventEmitter2 {
 
     constructor(game) {
@@ -13,6 +15,10 @@ class SocketListener extends EventEmitter2 {
         this.game = game;
         this.sequenceCounter = 0;
         this.lastServerSequence = 0;
+
+        this.on('bot:debug', (data) => {
+            updateBotWaypoints(data);
+        });
     }
 
     listen() {
@@ -25,6 +31,9 @@ class SocketListener extends EventEmitter2 {
             this.lastServerSequence = 0;
             this.emit("connected");
             this.requestLobbySnapshot();
+            if (this.game && this.game.identityManager && typeof this.game.identityManager.handleSocketConnected === 'function') {
+                this.game.identityManager.handleSocketConnected();
+            }
         });
         this.io.on("connect_error", (err) => {
             console.error("socket connect_error", err?.message ?? err);
@@ -58,6 +67,11 @@ class SocketListener extends EventEmitter2 {
         this.io.on('lobby:update', (payload) => {
             const data = this.safeParse(payload);
             this.emit('lobby:update', data);
+        });
+
+        this.io.on('identity:ack', (payload) => {
+            const data = this.safeParse(payload);
+            this.emit('identity:ack', data);
         });
 
         this.io.on('lobby:assignment', (payload) => {
@@ -531,13 +545,29 @@ class SocketListener extends EventEmitter2 {
         this.io.emit('orb:drop', payload);
     }
 
+    sendIdentityUpdate(identity) {
+        if (!this.io || this.io.disconnected) {
+            return;
+        }
+        const payload = {};
+        if (identity && identity.id) {
+            payload.identity = { id: identity.id };
+            if (identity.name) {
+                payload.identity.name = identity.name;
+            }
+        } else {
+            payload.identity = null;
+        }
+        this.io.emit('identity:update', JSON.stringify(payload));
+    }
+
     createPlayerPayload() {
         const player = this.game.player;
         const isMovingValue = Number.isFinite(player.isMoving) ? player.isMoving : Number(player.isMoving);
         const normalizedMoving = Number.isFinite(isMovingValue) ? Math.max(-1, Math.min(1, isMovingValue)) : 0;
         const isTurningValue = Number.isFinite(player.isTurning) ? player.isTurning : Number(player.isTurning);
         const normalizedTurning = Number.isFinite(isTurningValue) ? Math.max(-1, Math.min(1, Math.round(isTurningValue))) : 0;
-        return {
+        const payload = {
             id: player.id,
             city: player.city,
             isMayor: player.isMayor,
@@ -556,6 +586,13 @@ class SocketListener extends EventEmitter2 {
                 y: player.offset?.y ?? 0
             }
         };
+        if (this.game && this.game.identity && this.game.identity.id) {
+            payload.identity = { id: this.game.identity.id };
+        }
+        if (this.game && this.game.identity && this.game.identity.name) {
+            payload.callsign = this.game.identity.name;
+        }
+        return payload;
     }
 
     applyPlayerUpdate(player, context = {}) {
@@ -576,6 +613,9 @@ class SocketListener extends EventEmitter2 {
         const updated = existing ? Object.assign({}, existing, player) : Object.assign({}, player);
         if (!updated.callsign && existing && existing.callsign) {
             updated.callsign = existing.callsign;
+        }
+        if (!updated.userId && existing && existing.userId) {
+            updated.userId = existing.userId;
         }
         this.game.otherPlayers[player.id] = updated;
     }
@@ -601,6 +641,9 @@ class SocketListener extends EventEmitter2 {
         me.id = player.id ?? me.id;
         if (typeof player.callsign === 'string' && player.callsign.trim().length) {
             me.callsign = player.callsign.trim();
+        }
+        if (typeof player.userId === 'string' && player.userId.trim().length) {
+            me.userId = player.userId.trim();
         }
         const previousCity = Number.isFinite(me.city) ? me.city : null;
         const nextCity = this.toFiniteNumber(player.city, me.city);
@@ -746,6 +789,15 @@ class SocketListener extends EventEmitter2 {
             }
         }
 
+        if (player.userId !== undefined && player.userId !== null) {
+            const idString = String(player.userId).trim();
+            if (idString.length) {
+                player.userId = idString;
+            } else {
+                delete player.userId;
+            }
+        }
+
         return player;
     }
 
@@ -764,7 +816,10 @@ class SocketListener extends EventEmitter2 {
             active: !!data.active,
             armed: !!data.armed,
             detonateAt: data.detonateAt ?? null,
-            reason: data.reason ?? null
+            reason: data.reason ?? null,
+            revealedAt: data.revealedAt ?? null,
+            triggeredBy: data.triggeredBy ?? null,
+            triggeredTeam: data.triggeredTeam ?? null
         };
     }
 

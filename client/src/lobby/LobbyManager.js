@@ -10,6 +10,23 @@ class LobbyManager {
         this.waitingRole = null;
         this.visible = false;
         this.inGame = false;
+        this.identityManager = null;
+        this.identityBusy = false;
+        this.identityFormVisible = false;
+        this.identityInput = null;
+        this.identityForm = null;
+        this.identitySummary = null;
+        this.identityToggle = null;
+        this.identityFeedback = null;
+        this.identitySave = null;
+        this.identityCancel = null;
+        this.identitySignOut = null;
+        this.googleContainer = null;
+        this.googleButtonTarget = null;
+        this.googleFeedback = null;
+        this.googleScriptPromise = null;
+        this.googleInitialized = false;
+        this.googleBusy = false;
 
         this.onLobbySnapshot = (snapshot) => this.updateSnapshot(snapshot);
         this.onLobbyUpdate = (snapshot) => this.updateSnapshot(snapshot);
@@ -133,9 +150,18 @@ class LobbyManager {
                 cursor: pointer;
                 transition: background 0.15s, border-color 0.15s, transform 0.15s;
             }
+            .lobby-btn--secondary {
+                background: #181d2a;
+                border-color: #2f374a;
+                color: #d4daec;
+            }
             .lobby-btn:hover:not(:disabled) {
                 background: #2a3245;
                 border-color: #4f5d7c;
+            }
+            .lobby-btn--secondary:hover:not(:disabled) {
+                background: #232b3d;
+                border-color: #42506d;
             }
             .lobby-btn:active:not(:disabled) {
                 transform: translateY(1px);
@@ -155,6 +181,101 @@ class LobbyManager {
                 display: flex;
                 gap: 10px;
                 flex-wrap: wrap;
+            }
+            .lobby-identity {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                align-items: flex-end;
+                min-width: 220px;
+            }
+            .lobby-identity-summary {
+                font-size: 13px;
+                color: #9aa3b8;
+                text-align: right;
+            }
+            .lobby-identity-form {
+                display: none;
+                flex-direction: column;
+                gap: 8px;
+                width: 100%;
+            }
+            .lobby-identity-form.visible {
+                display: flex;
+            }
+            .lobby-identity-controls {
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+                flex-wrap: wrap;
+            }
+            .lobby-identity-signout {
+                color: #f6b6b6;
+            }
+            .lobby-identity-signout:hover:not(:disabled) {
+                background: #2c1b1b;
+                border-color: #6b2a2a;
+                color: #ffd6d6;
+            }
+            .lobby-google {
+                display: none;
+                flex-direction: column;
+                gap: 6px;
+                align-items: flex-end;
+                width: 100%;
+            }
+            .lobby-google.visible {
+                display: flex;
+            }
+            .lobby-google.busy {
+                opacity: 0.6;
+                pointer-events: none;
+            }
+            .lobby-google-button > div {
+                display: inline-flex;
+            }
+            .lobby-google-feedback {
+                font-size: 12px;
+                color: #9aa3b8;
+                text-align: right;
+                min-height: 16px;
+            }
+            .lobby-google-feedback[data-type="error"] {
+                color: #ff8484;
+            }
+            .lobby-google-feedback[data-type="success"] {
+                color: #7fe3a0;
+            }
+            .lobby-identity-input {
+                width: 100%;
+                padding: 8px 10px;
+                border: 1px solid #384156;
+                border-radius: 4px;
+                background: #0f131d;
+                color: #e1e6f6;
+                font-size: 13px;
+            }
+            .lobby-identity-input:focus {
+                outline: none;
+                border-color: #5c9eff;
+                box-shadow: 0 0 0 1px rgba(92, 158, 255, 0.25);
+            }
+            .lobby-identity-actions {
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+            }
+            .lobby-identity-feedback {
+                font-size: 12px;
+                min-height: 16px;
+                color: #9aa3b8;
+                text-align: right;
+            }
+            .lobby-identity-feedback[data-type="error"] {
+                color: #ff8080;
+            }
+            .lobby-identity-feedback[data-type="success"] {
+                color: #7be17d;
             }
             .lobby-status {
                 font-size: 13px;
@@ -221,6 +342,89 @@ class LobbyManager {
 
         actions.appendChild(leftGroup);
 
+        const identityContainer = document.createElement('div');
+        identityContainer.className = 'lobby-identity';
+
+        this.identitySummary = document.createElement('div');
+        this.identitySummary.className = 'lobby-identity-summary';
+        this.identitySummary.textContent = 'Playing as Guest';
+
+        const identityControls = document.createElement('div');
+        identityControls.className = 'lobby-identity-controls';
+
+        this.identityToggle = document.createElement('button');
+        this.identityToggle.type = 'button';
+        this.identityToggle.className = 'lobby-btn lobby-btn--secondary';
+        this.identityToggle.textContent = 'Register';
+        this.identityToggle.addEventListener('click', () => this.toggleIdentityForm(true));
+
+        this.identitySignOut = document.createElement('button');
+        this.identitySignOut.type = 'button';
+        this.identitySignOut.className = 'lobby-btn lobby-btn--secondary lobby-identity-signout';
+        this.identitySignOut.textContent = 'Sign out';
+        this.identitySignOut.style.display = 'none';
+        this.identitySignOut.addEventListener('click', () => this.handleIdentitySignOut());
+
+        identityControls.appendChild(this.identityToggle);
+        identityControls.appendChild(this.identitySignOut);
+
+        this.googleContainer = document.createElement('div');
+        this.googleContainer.className = 'lobby-google';
+        this.googleButtonTarget = document.createElement('div');
+        this.googleButtonTarget.className = 'lobby-google-button';
+        this.googleFeedback = document.createElement('div');
+        this.googleFeedback.className = 'lobby-google-feedback';
+        this.googleFeedback.dataset.type = 'info';
+        this.googleFeedback.textContent = '';
+        this.googleContainer.appendChild(this.googleButtonTarget);
+        this.googleContainer.appendChild(this.googleFeedback);
+
+        this.identityForm = document.createElement('form');
+        this.identityForm.className = 'lobby-identity-form';
+        this.identityForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            this.handleIdentitySubmit();
+        });
+
+        this.identityInput = document.createElement('input');
+        this.identityInput.type = 'text';
+        this.identityInput.maxLength = 32;
+        this.identityInput.autocomplete = 'off';
+        this.identityInput.placeholder = 'Enter display name';
+        this.identityInput.className = 'lobby-identity-input';
+
+        const identityButtons = document.createElement('div');
+        identityButtons.className = 'lobby-identity-actions';
+
+        this.identitySave = document.createElement('button');
+        this.identitySave.type = 'submit';
+        this.identitySave.className = 'lobby-btn';
+        this.identitySave.textContent = 'Save';
+
+        this.identityCancel = document.createElement('button');
+        this.identityCancel.type = 'button';
+        this.identityCancel.className = 'lobby-btn lobby-btn--secondary';
+        this.identityCancel.textContent = 'Cancel';
+        this.identityCancel.addEventListener('click', () => this.toggleIdentityForm(false));
+
+        identityButtons.appendChild(this.identitySave);
+        identityButtons.appendChild(this.identityCancel);
+
+        this.identityFeedback = document.createElement('div');
+        this.identityFeedback.className = 'lobby-identity-feedback';
+        this.identityFeedback.dataset.type = 'info';
+
+        this.identityForm.appendChild(this.identityInput);
+        this.identityForm.appendChild(identityButtons);
+        this.identityForm.appendChild(this.identityFeedback);
+
+        identityContainer.appendChild(this.identitySummary);
+        identityContainer.appendChild(identityControls);
+        identityContainer.appendChild(this.googleContainer);
+        identityContainer.appendChild(this.identityForm);
+
+        actions.appendChild(identityContainer);
+
         this.statusNode = document.createElement('div');
         this.statusNode.className = 'lobby-status';
         this.statusNode.dataset.type = 'info';
@@ -260,11 +464,357 @@ class LobbyManager {
         socketListener.on('lobby:evicted', this.onLobbyEvicted);
     }
 
+    attachIdentityManager(identityManager) {
+        this.identityManager = identityManager || null;
+        this.configureGoogleIdentity();
+        if (this.identityManager && typeof this.identityManager.getIdentity === 'function') {
+            const identity = this.identityManager.getIdentity();
+            this.updateIdentityDisplay(identity);
+        } else {
+            this.updateIdentityDisplay(null);
+        }
+    }
+
+    updateIdentityDisplay(identity) {
+        const name = identity && typeof identity.name === 'string' ? identity.name.trim() : '';
+        const manager = this.identityManager;
+        const googleEnabled = !!(manager && typeof manager.isGoogleAuthEnabled === 'function' && manager.isGoogleAuthEnabled());
+        const usingGoogle = !!(identity && identity.provider === 'google');
+        if (this.identitySummary) {
+            if (usingGoogle && name.length) {
+                this.identitySummary.textContent = `Signed in as ${name}`;
+            } else if (name.length) {
+                this.identitySummary.textContent = `Playing as ${name}`;
+            } else if (googleEnabled) {
+                this.identitySummary.textContent = 'Sign in with Google to save your progress.';
+            } else {
+                this.identitySummary.textContent = 'Playing as Guest';
+            }
+        }
+        if (this.identityToggle) {
+            let toggleLabel = 'Register';
+            if (usingGoogle && name.length) {
+                toggleLabel = 'Update Name';
+            } else if (name.length) {
+                toggleLabel = 'Update Name';
+            } else if (googleEnabled) {
+                toggleLabel = 'Continue as Guest';
+            }
+            this.identityToggle.textContent = toggleLabel;
+            this.identityToggle.disabled = this.identityFormVisible || this.identityBusy;
+        }
+        const hasIdentity = !!(identity && identity.id);
+        if (this.identitySignOut) {
+            this.identitySignOut.style.display = hasIdentity ? 'inline-flex' : 'none';
+            this.identitySignOut.disabled = this.identityBusy || !hasIdentity;
+        }
+        if (this.identityInput && !this.identityFormVisible) {
+            this.identityInput.value = name;
+        }
+        this.updateGoogleDisplay(identity);
+    }
+
+    configureGoogleIdentity() {
+        if (!this.googleContainer) {
+            return;
+        }
+        const manager = this.identityManager;
+        const enabled = !!(manager && typeof manager.isGoogleAuthEnabled === 'function' && manager.isGoogleAuthEnabled());
+        if (!enabled) {
+            this.googleContainer.classList.remove('visible');
+            this.setGoogleFeedback('', 'info');
+            this.refreshGoogleInteractivity();
+            return;
+        }
+        this.googleContainer.classList.add('visible');
+        this.ensureGoogleClient();
+        this.refreshGoogleInteractivity();
+    }
+
+    ensureGoogleClient() {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const googleApi = window.google && window.google.accounts && window.google.accounts.id
+            ? window.google.accounts.id
+            : null;
+        if (googleApi) {
+            this.initializeGoogleButton();
+            return;
+        }
+        if (this.googleScriptPromise) {
+            this.googleScriptPromise.then(() => this.initializeGoogleButton()).catch((error) => {
+                this.setGoogleFeedback(error?.message || 'Google sign-in unavailable.', 'error');
+            });
+            return;
+        }
+        this.googleScriptPromise = new Promise((resolve, reject) => {
+            const existing = document.querySelector('script[data-google-identity]');
+            if (existing) {
+                const handleLoad = () => resolve(window.google);
+                const handleError = () => reject(new Error('Failed to load Google identity script.'));
+                existing.addEventListener('load', handleLoad, { once: true });
+                existing.addEventListener('error', handleError, { once: true });
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            script.dataset.googleIdentity = 'true';
+            script.onload = () => resolve(window.google);
+            script.onerror = () => reject(new Error('Failed to load Google identity script.'));
+            document.head.appendChild(script);
+        });
+        this.googleScriptPromise.then(() => this.initializeGoogleButton()).catch((error) => {
+            this.setGoogleFeedback(error?.message || 'Google sign-in unavailable.', 'error');
+        });
+    }
+
+    initializeGoogleButton() {
+        if (!this.googleContainer) {
+            return;
+        }
+        const manager = this.identityManager;
+        if (!manager || typeof manager.getGoogleClientId !== 'function') {
+            this.setGoogleFeedback('Google sign-in unavailable.', 'error');
+            return;
+        }
+        const clientId = manager.getGoogleClientId();
+        if (!clientId) {
+            this.setGoogleFeedback('Google sign-in is not configured.', 'error');
+            return;
+        }
+        if (typeof window === 'undefined' || !window.google || !window.google.accounts || !window.google.accounts.id) {
+            this.setGoogleFeedback('Google sign-in unavailable.', 'error');
+            return;
+        }
+        if (!this.googleInitialized) {
+            window.google.accounts.id.initialize({
+                client_id: clientId,
+                callback: (response) => this.handleGoogleCredential(response),
+            });
+            this.googleInitialized = true;
+        }
+        if (this.googleButtonTarget) {
+            this.googleButtonTarget.innerHTML = '';
+            window.google.accounts.id.renderButton(this.googleButtonTarget, {
+                theme: 'outline',
+                size: 'medium',
+                text: 'signin_with',
+                width: 240,
+            });
+        }
+        const identity = manager && typeof manager.getIdentity === 'function'
+            ? manager.getIdentity()
+            : null;
+        if (identity && identity.provider === 'google') {
+            this.setGoogleFeedback('Signed in with Google.', 'success');
+        } else if (!this.googleBusy && !this.identityBusy && !this.identityFormVisible) {
+            this.setGoogleFeedback('Sign in with Google to save your progress.', 'info');
+        }
+    }
+
+    async handleGoogleCredential(response) {
+        if (!response || typeof response.credential !== 'string') {
+            this.setGoogleFeedback('Unable to read Google response.', 'error');
+            return;
+        }
+        if (!this.identityManager || typeof this.identityManager.authenticateWithGoogle !== 'function') {
+            this.setGoogleFeedback('Google sign-in unavailable.', 'error');
+            return;
+        }
+        this.setGoogleBusy(true);
+        this.setGoogleFeedback('Signing in with Google...', 'info');
+        try {
+            const identity = await this.identityManager.authenticateWithGoogle(response.credential);
+            this.updateIdentityDisplay(identity);
+            this.setStatus(`Signed in as ${identity.name} via Google.`, { type: 'success' });
+            this.setGoogleFeedback('Signed in with Google.', 'success');
+        } catch (error) {
+            const message = error && error.message ? error.message : 'Google sign-in failed.';
+            this.setGoogleFeedback(message, 'error');
+        } finally {
+            this.setGoogleBusy(false);
+        }
+    }
+
+    handleIdentitySignOut() {
+        if (!this.identityManager || typeof this.identityManager.clearIdentity !== 'function') {
+            return;
+        }
+        this.identityManager.clearIdentity();
+        this.updateIdentityDisplay(null);
+        this.showIdentityFeedback('You are playing as a guest.', 'info');
+        this.setStatus('Playing as guest.', { type: 'info' });
+    }
+
+    setGoogleFeedback(message, type = 'info') {
+        if (!this.googleFeedback) {
+            return;
+        }
+        this.googleFeedback.textContent = message || '';
+        this.googleFeedback.dataset.type = type || 'info';
+    }
+
+    setGoogleBusy(isBusy) {
+        this.googleBusy = !!isBusy;
+        this.refreshGoogleInteractivity();
+    }
+
+    refreshGoogleInteractivity() {
+        if (!this.googleContainer) {
+            return;
+        }
+        const disabled = this.googleBusy || this.identityBusy || this.identityFormVisible;
+        if (disabled) {
+            this.googleContainer.classList.add('busy');
+        } else {
+            this.googleContainer.classList.remove('busy');
+        }
+    }
+
+    updateGoogleDisplay(identity) {
+        if (!this.googleContainer) {
+            return;
+        }
+        const manager = this.identityManager;
+        const enabled = !!(manager && typeof manager.isGoogleAuthEnabled === 'function' && manager.isGoogleAuthEnabled());
+        if (!enabled) {
+            this.googleContainer.classList.remove('visible');
+            this.setGoogleFeedback('', 'info');
+            this.refreshGoogleInteractivity();
+            return;
+        }
+        this.googleContainer.classList.add('visible');
+        if (!this.googleInitialized) {
+            this.ensureGoogleClient();
+            return;
+        }
+        if (identity && identity.provider === 'google') {
+            this.setGoogleFeedback('Signed in with Google.', 'success');
+        } else if (!this.googleBusy && !this.identityBusy && !this.identityFormVisible) {
+            this.setGoogleFeedback('Sign in with Google to save your progress.', 'info');
+        }
+    }
+
+    toggleIdentityForm(force) {
+        if (!this.identityForm) {
+            return;
+        }
+        const shouldShow = typeof force === 'boolean' ? force : !this.identityFormVisible;
+        this.identityFormVisible = shouldShow;
+        if (shouldShow) {
+            this.identityForm.classList.add('visible');
+            if (this.identityToggle) {
+                this.identityToggle.disabled = true;
+            }
+            if (this.identityInput) {
+                const identity = this.identityManager && typeof this.identityManager.getIdentity === 'function'
+                    ? this.identityManager.getIdentity()
+                    : null;
+                const currentName = identity && identity.name ? identity.name : this.identityInput.value;
+                this.identityInput.value = currentName || '';
+                this.identityInput.disabled = false;
+                setTimeout(() => {
+                    if (this.identityInput) {
+                        this.identityInput.focus();
+                        this.identityInput.select();
+                    }
+                }, 0);
+            }
+            this.showIdentityFeedback('', 'info');
+        } else {
+            this.identityForm.classList.remove('visible');
+            if (this.identityInput) {
+                this.identityInput.disabled = false;
+            }
+            if (this.identityToggle) {
+                this.identityToggle.disabled = this.identityBusy;
+            }
+            if (!this.identityBusy) {
+                this.showIdentityFeedback('', 'info');
+            }
+        }
+        this.refreshGoogleInteractivity();
+    }
+
+    setIdentityBusy(isBusy) {
+        this.identityBusy = !!isBusy;
+        if (this.identityInput) {
+            this.identityInput.disabled = this.identityBusy;
+        }
+        if (this.identitySave) {
+            this.identitySave.disabled = this.identityBusy;
+        }
+        if (this.identityCancel) {
+            this.identityCancel.disabled = this.identityBusy;
+        }
+        if (this.identityToggle) {
+            this.identityToggle.disabled = this.identityBusy || this.identityFormVisible;
+        }
+        if (this.identitySignOut) {
+            const currentIdentity = this.identityManager && typeof this.identityManager.getIdentity === 'function'
+                ? this.identityManager.getIdentity()
+                : null;
+            const hasIdentity = !!(currentIdentity && currentIdentity.id);
+            this.identitySignOut.disabled = this.identityBusy || !hasIdentity;
+        }
+        this.refreshGoogleInteractivity();
+    }
+
+    showIdentityFeedback(message, type = 'info') {
+        if (!this.identityFeedback) {
+            return;
+        }
+        this.identityFeedback.textContent = message || '';
+        this.identityFeedback.dataset.type = type || 'info';
+    }
+
+    async handleIdentitySubmit() {
+        if (this.identityBusy) {
+            return;
+        }
+        const nameValue = this.identityInput ? this.identityInput.value : '';
+        const trimmed = typeof nameValue === 'string' ? nameValue.trim() : '';
+        if (!trimmed.length) {
+            this.showIdentityFeedback('Please enter a name.', 'error');
+            if (this.identityInput) {
+                this.identityInput.focus();
+            }
+            return;
+        }
+        if (!this.identityManager || typeof this.identityManager.saveName !== 'function') {
+            this.showIdentityFeedback('Registration is currently unavailable.', 'error');
+            return;
+        }
+        this.setIdentityBusy(true);
+        this.showIdentityFeedback('Saving...', 'info');
+        try {
+            const identity = await this.identityManager.saveName(trimmed);
+            this.showIdentityFeedback('Name saved.', 'success');
+            this.updateIdentityDisplay(identity);
+            this.toggleIdentityForm(false);
+            this.setStatus(`Registered as ${identity.name}.`, { type: 'success' });
+        } catch (error) {
+            const message = error && error.message ? error.message : 'Unable to save name.';
+            this.showIdentityFeedback(message, 'error');
+        } finally {
+            this.setIdentityBusy(false);
+            if (!this.identityFormVisible) {
+                this.showIdentityFeedback('', 'info');
+            }
+        }
+    }
+
     show() {
         if (this.overlay) {
             this.overlay.classList.add('visible');
         }
         this.visible = true;
+        if (this.identityManager && typeof this.identityManager.getIdentity === 'function') {
+            this.updateIdentityDisplay(this.identityManager.getIdentity());
+        }
     }
 
     hide() {
@@ -272,6 +822,9 @@ class LobbyManager {
             this.overlay.classList.remove('visible');
         }
         this.visible = false;
+        if (this.identityFormVisible) {
+            this.toggleIdentityForm(false);
+        }
     }
 
     isInGame() {
