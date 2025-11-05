@@ -74,7 +74,7 @@ const shortenId = (value) => {
 
 class PlayerFactory {
 
-    constructor(game) {
+    constructor(game, options = {}) {
         this.game = game;
         this.validator = new PlayerStateValidator();
         this.io = null;
@@ -90,6 +90,7 @@ class PlayerFactory {
         this.lobbyVersion = 0;
         this.callsigns = new CallsignRegistry();
         this.chatManager = null;
+        this.userStore = options.userStore || null;
     }
 
     listen(io) {
@@ -114,6 +115,7 @@ class PlayerFactory {
                 }
 
                 const parsedPlayer = this.safeParse(player);
+                const identity = this.resolveIdentityFromPayload(parsedPlayer);
                 const preferences = this.extractAssignmentPreferences(parsedPlayer);
                 const assignment = this.assignCityAndRole(socket.id, preferences);
                 if (assignment.overflow) {
@@ -151,14 +153,20 @@ class PlayerFactory {
                     };
                 }
 
-                var newPlayer = new Player(socket.id, validation.sanitized, validation.timestamp);
+                const initialState = Object.assign({}, validation.sanitized);
+                if (identity) {
+                    initialState.userId = identity.id;
+                    initialState.callsign = identity.name;
+                }
+
+                var newPlayer = new Player(socket.id, initialState, validation.timestamp);
                 newPlayer.city = assignment.city;
                 newPlayer.isMayor = assignment.isMayor;
                 if (spawn) {
                     newPlayer.offset.x = spawn.x;
                     newPlayer.offset.y = spawn.y;
                 }
-                newPlayer.callsign = this.callsigns.assign(newPlayer.id, { category: 'human' });
+                this.applyIdentityToPlayer(newPlayer, identity);
                 this.game.players[socket.id] = newPlayer;
                 this.registerAssignment(newPlayer, assignment);
 
@@ -226,6 +234,32 @@ class PlayerFactory {
 
                 existingPlayer.update(validation.sanitized, validation.timestamp);
                 io.emit('player', JSON.stringify(existingPlayer));
+            });
+
+            socket.on('identity:update', (payload) => {
+                const player = this.game.players[socket.id];
+                if (!player) {
+                    return;
+                }
+                const request = this.safeParse(payload);
+                if (request && Object.prototype.hasOwnProperty.call(request, 'identity') && request.identity === null) {
+                    this.applyIdentityToPlayer(player, null);
+                    if (this.io) {
+                        this.io.emit('player', JSON.stringify(player));
+                    }
+                    socket.emit('identity:ack', JSON.stringify({ status: 'ok', id: null, name: null }));
+                    return;
+                }
+                const identity = this.resolveIdentityFromPayload(request);
+                if (!identity) {
+                    socket.emit('identity:ack', JSON.stringify({ status: 'error', reason: 'not_found' }));
+                    return;
+                }
+                this.applyIdentityToPlayer(player, identity);
+                if (this.io) {
+                    this.io.emit('player', JSON.stringify(player));
+                }
+                socket.emit('identity:ack', JSON.stringify({ status: 'ok', id: identity.id, name: identity.name }));
             });
 
             socket.on('item:use', (payload) => {
@@ -732,6 +766,39 @@ class PlayerFactory {
                 attackerCity,
                 points: null
             }));
+        }
+    }
+
+    resolveIdentityFromPayload(payload) {
+        if (!this.userStore || typeof this.userStore.get !== 'function') {
+            return null;
+        }
+        if (!payload || typeof payload !== 'object') {
+            return null;
+        }
+        const identity = payload.identity && typeof payload.identity === 'object'
+            ? payload.identity
+            : null;
+        const candidate = identity && identity.id
+            ? identity.id
+            : (payload.userId || payload.identityId || null);
+        if (!candidate || (typeof candidate !== 'string' && typeof candidate !== 'number')) {
+            return null;
+        }
+        return this.userStore.get(String(candidate));
+    }
+
+    applyIdentityToPlayer(player, identity) {
+        if (!player) {
+            return;
+        }
+        this.callsigns.release(player.id);
+        if (identity) {
+            player.userId = identity.id;
+            player.callsign = identity.name;
+        } else {
+            player.userId = null;
+            player.callsign = this.callsigns.assign(player.id, { category: 'human' });
         }
     }
 
