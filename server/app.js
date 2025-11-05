@@ -90,6 +90,7 @@ const chatManager = new ChatManager({
     playerFactory,
 });
 chatManager.listen(io);
+playerFactory.setChatManager(chatManager);
 
 const toFiniteNumber = (value, fallback = 0) => {
     if (typeof value === 'number' && Number.isFinite(value)) {

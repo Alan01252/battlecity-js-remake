@@ -84,9 +84,7 @@ class ChatManager {
             global: []
         });
 
-        if (this.history.length) {
-            socket.emit("chat:history", JSON.stringify(this.history));
-        }
+        this.sendHistoryForSocket(socket);
 
         socket.on("chat:message", (payload) => {
             this.handleChatMessage(socket, payload);
@@ -295,6 +293,69 @@ class ChatManager {
             }
             this.emitToSocket(target.id, "chat:message", message);
         }
+    }
+
+    sendHistoryForSocket(socketOrId) {
+        if (!this.history.length) {
+            return;
+        }
+        const socketId = this.resolveSocketId(socketOrId);
+        if (!socketId) {
+            return;
+        }
+        const history = this.collectHistoryForSocket(socketId);
+        if (!history.length) {
+            return;
+        }
+        if (socketOrId && typeof socketOrId.emit === "function") {
+            socketOrId.emit("chat:history", JSON.stringify(history));
+            return;
+        }
+        this.emitToSocket(socketId, "chat:history", history);
+    }
+
+    resolveSocketId(socketOrId) {
+        if (!socketOrId) {
+            return null;
+        }
+        if (typeof socketOrId === "string") {
+            return socketOrId;
+        }
+        if (typeof socketOrId.id === "string") {
+            return socketOrId.id;
+        }
+        return null;
+    }
+
+    collectHistoryForSocket(socketId) {
+        const cityId = this.getPlayerCity(socketId);
+        return this.history.filter((message) => {
+            if (!message) {
+                return false;
+            }
+            if (message.scope === "global") {
+                return true;
+            }
+            if (message.scope !== "team") {
+                return false;
+            }
+            const senderCity = normaliseCityId(message.senderCity);
+            if (cityId === null) {
+                return false;
+            }
+            return senderCity === cityId;
+        });
+    }
+
+    getPlayerCity(socketId) {
+        if (!socketId || !this.game || !this.game.players) {
+            return null;
+        }
+        const player = this.game.players[socketId];
+        if (!player) {
+            return null;
+        }
+        return normaliseCityId(player.city);
     }
 
     emitToSocket(socketId, event, payload) {
