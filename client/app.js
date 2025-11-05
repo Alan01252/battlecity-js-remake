@@ -1,6 +1,8 @@
 import PIXI from './src/pixi';
 import Stats from 'stats.js';
 
+import { initialiseCameraShake, triggerCameraShake, updateCameraShake } from './src/effects/camera-shake';
+
 import * as mapBuilder from "./src/mapBuilder";
 import * as cityBuilder from "./src/cityBuilder";
 
@@ -213,6 +215,13 @@ const game = {
     orbHintElement: null,
     lastOrbHintMessage: '',
     nextOrbHintUpdate: 0,
+    cameraShake: {
+        remaining: 0,
+        duration: 0,
+        intensity: 0,
+        offsetX: 0,
+        offsetY: 0,
+    },
 };
 
 const orbHintElement = document.createElement('div');
@@ -236,6 +245,7 @@ orbHintStyle.pointerEvents = 'none';
 orbHintStyle.display = 'none';
 document.body.appendChild(orbHintElement);
 game.orbHintElement = orbHintElement;
+initialiseCameraShake(game);
 game.lastOrbHintMessage = '';
 
 game.callsignRegistry = new CallsignRegistry();
@@ -1294,6 +1304,7 @@ function setup() {
         if (!data) {
             return;
         }
+        triggerCameraShake(game, { duration: 900, intensity: 7 });
         const attackerName = getCityDisplayName(data.attackerCity);
         const targetName = getCityDisplayName(data.targetCity);
         const points = toFiniteNumber(data.points, 0);
@@ -1513,6 +1524,15 @@ function gameLoop() {
     game.lastTick = game.tick;
     game.tick = new Date().getTime();
     game.timePassed = (game.tick - game.lastTick);
+
+    const shakeOffset = updateCameraShake(game, game.timePassed);
+    if (game.stage) {
+        const x = Number.isFinite(shakeOffset.x) ? shakeOffset.x : 0;
+        const y = Number.isFinite(shakeOffset.y) ? shakeOffset.y : 0;
+        if (game.stage.position.x !== x || game.stage.position.y !== y) {
+            game.stage.position.set(x, y);
+        }
+    }
 
     game.bulletFactory.cycle();
     if (!game.lobby || game.lobby.isInGame()) {
