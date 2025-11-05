@@ -9,7 +9,9 @@ const { ITEM_TYPES, normalizeItemType } = require('./items');
 const {
     isHouse,
     isFactory,
+    isResearch,
     POPULATION_MAX_HOUSE,
+    POPULATION_MAX_NON_HOUSE,
     COST_BUILDING,
 } = require('./constants');
 
@@ -655,6 +657,26 @@ class BuildingFactory {
             inventoryStock = this.cityManager.getInventoryCount(numericCity, targetType);
         }
         return factoryStock + inventoryStock;
+    }
+
+    hasActiveResearch(cityId) {
+        const numericCity = toFiniteNumber(cityId, null);
+        if (numericCity === null) {
+            return false;
+        }
+        for (const building of this.buildings.values()) {
+            if (!isResearch(building.type)) {
+                continue;
+            }
+            const buildingCity = toFiniteNumber(building.cityId ?? building.city, null);
+            if (buildingCity !== numericCity) {
+                continue;
+            }
+            if (building.population >= POPULATION_MAX_NON_HOUSE) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
