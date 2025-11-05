@@ -203,6 +203,7 @@ const game = {
     panelState: {
         heading: DEFAULT_PANEL_MESSAGE.heading,
         lines: [...DEFAULT_PANEL_MESSAGE.lines],
+        isInventoryCollapsed: false,
     },
     defenseItems: new Map(),
     lobby: null,
@@ -590,7 +591,9 @@ const applyPanelMessage = (message) => {
         const text = `${entry}`;
         lines.push(text);
     });
+    const previousState = game.panelState && typeof game.panelState === 'object' ? game.panelState : {};
     game.panelState = {
+        ...previousState,
         heading,
         lines
     };

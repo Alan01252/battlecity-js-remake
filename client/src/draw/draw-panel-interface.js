@@ -28,24 +28,79 @@ const TILE_SIZE = 48;
 const HALF_TILE = TILE_SIZE / 2;
 const CITY_CENTER_OFFSET = TILE_SIZE * 1.5;
 
-const INVENTORY_SLOTS = {
-    [ITEM_TYPE_LASER]: {x: 7, y: 267},
-    [ITEM_TYPE_ROCKET]: {x: 42, y: 267},
-    [ITEM_TYPE_MEDKIT]: {x: 77, y: 267},
-    [ITEM_TYPE_BOMB]: {x: 7, y: 302},
-    [ITEM_TYPE_MINE]: {x: 42, y: 302},
-    [ITEM_TYPE_ORB]: {x: 77, y: 302},
-    [ITEM_TYPE_FLARE]: {x: 7, y: 337},
-    [ITEM_TYPE_DFG]: {x: 42, y: 337},
-    [ITEM_TYPE_WALL]: {x: 77, y: 337},
-    [ITEM_TYPE_TURRET]: {x: 7, y: 372},
-    [ITEM_TYPE_SLEEPER]: {x: 42, y: 372},
-    [ITEM_TYPE_PLASMA]: {x: 77, y: 372},
-    [ITEM_TYPE_CLOAK]: {x: 112, y: 267},
+const INVENTORY_SLOT_SIZE = 32;
+const INVENTORY_SLOT_GAP = 8;
+const INVENTORY_PANEL_LAYOUT = {
+    offsetX: 8,
+    offsetY: 208,
+    width: 188,
+    headerHeight: 58,
+    paddingX: 14,
+    paddingTop: 10,
+    paddingBottom: 14,
+    collapsedExtra: 18,
+    columns: 4,
 };
 
-const resolveSlotPosition = (type, defaultX, defaultY) => {
-    return INVENTORY_SLOTS[type] ?? {x: defaultX, y: defaultY};
+const INVENTORY_SLOTS = {
+    [ITEM_TYPE_LASER]: {column: 0, row: 0},
+    [ITEM_TYPE_ROCKET]: {column: 1, row: 0},
+    [ITEM_TYPE_MEDKIT]: {column: 2, row: 0},
+    [ITEM_TYPE_CLOAK]: {column: 3, row: 0},
+    [ITEM_TYPE_BOMB]: {column: 0, row: 1},
+    [ITEM_TYPE_MINE]: {column: 1, row: 1},
+    [ITEM_TYPE_ORB]: {column: 2, row: 1},
+    [ITEM_TYPE_FLARE]: {column: 3, row: 1},
+    [ITEM_TYPE_DFG]: {column: 0, row: 2},
+    [ITEM_TYPE_WALL]: {column: 1, row: 2},
+    [ITEM_TYPE_TURRET]: {column: 2, row: 2},
+    [ITEM_TYPE_SLEEPER]: {column: 3, row: 2},
+    [ITEM_TYPE_PLASMA]: {column: 0, row: 3},
+};
+
+const getInventoryLayout = (game) => {
+    const baseX = (game?.maxMapX || 0) + INVENTORY_PANEL_LAYOUT.offsetX;
+    const baseY = INVENTORY_PANEL_LAYOUT.offsetY;
+    const columnSpacing = INVENTORY_SLOT_SIZE + INVENTORY_SLOT_GAP;
+    const rowSpacing = columnSpacing;
+    const maxRow = Object.values(INVENTORY_SLOTS).reduce((max, slot) => Math.max(max, slot.row), 0);
+    const rows = Math.max(1, maxRow + 1);
+    const startX = baseX + INVENTORY_PANEL_LAYOUT.paddingX;
+    const startY = baseY + INVENTORY_PANEL_LAYOUT.headerHeight + INVENTORY_PANEL_LAYOUT.paddingTop;
+    const contentHeight = (rows * INVENTORY_SLOT_SIZE) + ((rows - 1) * INVENTORY_SLOT_GAP);
+    const expandedHeight = INVENTORY_PANEL_LAYOUT.headerHeight + INVENTORY_PANEL_LAYOUT.paddingTop + contentHeight + INVENTORY_PANEL_LAYOUT.paddingBottom;
+    const collapsedHeight = INVENTORY_PANEL_LAYOUT.headerHeight + INVENTORY_PANEL_LAYOUT.collapsedExtra;
+    return {
+        panelX: baseX,
+        panelY: baseY,
+        panelWidth: INVENTORY_PANEL_LAYOUT.width,
+        headerHeight: INVENTORY_PANEL_LAYOUT.headerHeight,
+        startX,
+        startY,
+        columnSpacing,
+        rowSpacing,
+        slotSize: INVENTORY_SLOT_SIZE,
+        columns: INVENTORY_PANEL_LAYOUT.columns,
+        rows,
+        expandedHeight,
+        collapsedHeight,
+    };
+};
+
+const resolveSlotPosition = (layout, type, fallbackIndex = 0) => {
+    const slot = INVENTORY_SLOTS[type];
+    if (slot) {
+        return {
+            x: layout.startX + (slot.column * layout.columnSpacing),
+            y: layout.startY + (slot.row * layout.rowSpacing),
+        };
+    }
+    const column = fallbackIndex % layout.columns;
+    const row = Math.floor(fallbackIndex / layout.columns);
+    return {
+        x: layout.startX + (column * layout.columnSpacing),
+        y: layout.startY + (row * layout.rowSpacing),
+    };
 };
 
 const PANEL_BUTTON_DEFINITIONS = [
@@ -114,6 +169,29 @@ const PANEL_BUTTON_DEFINITIONS = [
         handler: (game) => game?.requestExitToLobby && game.requestExitToLobby()
     }
 ];
+
+const ensurePanelState = (game) => {
+    if (!game.panelState || typeof game.panelState !== 'object') {
+        game.panelState = {};
+    }
+    if (typeof game.panelState.isInventoryCollapsed !== 'boolean') {
+        game.panelState.isInventoryCollapsed = false;
+    }
+    return game.panelState;
+};
+
+const isInventoryCollapsed = (game) => {
+    const state = ensurePanelState(game);
+    return !!state.isInventoryCollapsed;
+};
+
+const toggleInventoryCollapsed = (game) => {
+    const state = ensurePanelState(game);
+    state.isInventoryCollapsed = !state.isInventoryCollapsed;
+    if (game) {
+        game.forceDraw = true;
+    }
+};
 
 const attachPanelButtons = (game, stage) => {
     if (!game || !stage) {
@@ -551,82 +629,190 @@ var drawPanel = (game, stage) => {
     stage.addChild(interfaceBottom);
 };
 
-var drawFinance = (game, stage) => {
-    if (!game.player.isMayor) {
-        return;
-    }
-    const cityIndex = game.player.city ?? 0;
-    const city = game.cities?.[cityIndex];
-    if (!city) {
-        return;
-    }
+const drawInventoryBackground = (stage, layout, collapsed) => {
+    const height = collapsed ? layout.collapsedHeight : layout.expandedHeight;
+    const panelBackground = new PIXI.Graphics();
+    panelBackground.lineStyle(1, 0x274b87, 0.65);
+    panelBackground.beginFill(0x020b1e, 0.92);
+    panelBackground.drawRoundedRect(layout.panelX, layout.panelY, layout.panelWidth, height, 12);
+    panelBackground.endFill();
+    stage.addChild(panelBackground);
 
-    const boxTexture = game.textures['imgMoneyBox'];
-    if (boxTexture) {
-        const moneyBox = new PIXI.Sprite(boxTexture);
-        moneyBox.x = game.maxMapX + 2;
-        moneyBox.y = 224;
-        stage.addChild(moneyBox);
-    }
+    const headerOverlay = new PIXI.Graphics();
+    headerOverlay.beginFill(0xffffff, 0.05);
+    headerOverlay.drawRoundedRect(layout.panelX + 1, layout.panelY + 1, layout.panelWidth - 2, layout.headerHeight + 6, 11);
+    headerOverlay.endFill();
+    stage.addChild(headerOverlay);
 
-    const gross = getGrossIncome(city);
-    const iconKey = gross < 0 ? 'imgMoneyDown' : 'imgMoneyUp';
-    const iconTexture = game.textures[iconKey];
-    if (iconTexture) {
-        const indicator = new PIXI.Sprite(iconTexture);
-        indicator.x = game.maxMapX + 8;
-        indicator.y = 225;
-        stage.addChild(indicator);
-    }
-
-    const cashText = new PIXI.Text(formatCash(city.cash ?? 0), {
-        fontFamily: 'Arial',
-        fontSize: 13,
-        fontWeight: 'bold',
-        fill: gross < 0 ? 0xE74C3C : 0x2ECC71,
-        stroke: 0x000000,
-        strokeThickness: 2,
-    });
-    cashText.x = game.maxMapX + 21;
-    cashText.y = 226;
-    stage.addChild(cashText);
-
-    const scoreValue = Number.isFinite(city.score) ? city.score : parseInt(city.score, 10) || 0;
-    const scoreText = new PIXI.Text(`Score: ${scoreValue}`, {
-        fontFamily: 'Arial',
-        fontSize: 12,
-        fill: 0xFDFEFE,
-        stroke: 0x000000,
-        strokeThickness: 2,
-    });
-    scoreText.x = game.maxMapX + 21;
-    scoreText.y = 244;
-    stage.addChild(scoreText);
-
-    const orbCount = Number.isFinite(city.orbs) ? city.orbs : parseInt(city.orbs, 10) || 0;
-    const orbText = new PIXI.Text(`Orbs: ${orbCount}`, {
-        fontFamily: 'Arial',
-        fontSize: 12,
-        fill: 0xFDFEFE,
-        stroke: 0x000000,
-        strokeThickness: 2,
-    });
-    orbText.x = game.maxMapX + 21;
-    orbText.y = 258;
-    stage.addChild(orbText);
+    const divider = new PIXI.Graphics();
+    divider.beginFill(0xffffff, 0.12);
+    divider.drawRect(layout.panelX + 12, layout.panelY + layout.headerHeight, layout.panelWidth - 24, 1);
+    divider.endFill();
+    stage.addChild(divider);
 };
 
-var drawItems = (game, stage) => {
-    var icon = game.iconFactory.getHead();
+const drawInventoryGrid = (stage, layout) => {
+    const grid = new PIXI.Graphics();
+    for (let row = 0; row < layout.rows; row += 1) {
+        for (let column = 0; column < layout.columns; column += 1) {
+            const slotX = layout.startX + (column * layout.columnSpacing);
+            const slotY = layout.startY + (row * layout.rowSpacing);
+            grid.lineStyle(1, 0x1c3154, 0.55);
+            grid.beginFill(0x071325, 0.82);
+            grid.drawRoundedRect(slotX - 4, slotY - 4, layout.slotSize + 8, layout.slotSize + 8, 6);
+            grid.endFill();
+        }
+    }
+    stage.addChild(grid);
+};
 
+const drawInventoryHeader = (game, stage, layout, collapsed) => {
+    const title = new PIXI.Text('Inventory', {
+        fontFamily: 'Arial',
+        fontSize: 16,
+        fontWeight: 'bold',
+        fill: 0xAED6F1,
+        stroke: 0x000000,
+        strokeThickness: 3,
+        letterSpacing: 0.6,
+    });
+    title.x = layout.panelX + 16;
+    title.y = layout.panelY + 10;
+    stage.addChild(title);
 
-    var x = 0;
-    var y = 0;
+    const cityIndex = game?.player?.city ?? 0;
+    const city = game?.cities?.[cityIndex] ?? null;
+    const isMayor = !!(game?.player && game.player.isMayor);
+
+    if (city && isMayor) {
+        const gross = getGrossIncome(city);
+        const netValue = gross >= 0 ? `+${formatCash(gross)}` : formatCash(gross);
+        const indicatorKey = gross < 0 ? 'imgMoneyDown' : 'imgMoneyUp';
+        let netTextX = layout.panelX + 16;
+        const indicatorTexture = game.textures[indicatorKey];
+        if (indicatorTexture) {
+            const indicator = new PIXI.Sprite(indicatorTexture);
+            indicator.x = netTextX;
+            indicator.y = layout.panelY + 29;
+            indicator.alpha = 0.9;
+            stage.addChild(indicator);
+            netTextX = indicator.x + indicator.width + 6;
+        }
+
+        const netText = new PIXI.Text(`Net ${netValue}`, {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fill: gross < 0 ? 0xE74C3C : 0x2ECC71,
+            stroke: 0x000000,
+            strokeThickness: 2,
+        });
+        netText.x = netTextX;
+        netText.y = layout.panelY + 30;
+        stage.addChild(netText);
+
+        const cashValue = formatCash(city.cash ?? 0);
+        const cashText = new PIXI.Text(`$${cashValue}`, {
+            fontFamily: 'Arial',
+            fontSize: 15,
+            fontWeight: 'bold',
+            fill: 0xF8F9FF,
+            stroke: 0x000000,
+            strokeThickness: 3,
+        });
+        cashText.anchor.set(1, 0);
+        cashText.x = layout.panelX + layout.panelWidth - 18;
+        cashText.y = layout.panelY + 10;
+        stage.addChild(cashText);
+
+        const cashLabel = new PIXI.Text('City Cash', {
+            fontFamily: 'Arial',
+            fontSize: 11,
+            fill: 0xBBD1FF,
+            stroke: 0x000000,
+            strokeThickness: 2,
+        });
+        cashLabel.anchor.set(1, 0);
+        cashLabel.x = cashText.x;
+        cashLabel.y = cashText.y + 18;
+        stage.addChild(cashLabel);
+    }
+
+    if (city) {
+        const scoreValue = Number.isFinite(city.score) ? city.score : parseInt(city.score, 10) || 0;
+        const orbCount = Number.isFinite(city.orbs) ? city.orbs : parseInt(city.orbs, 10) || 0;
+        const metaStyle = {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fill: 0xD6EAF8,
+            stroke: 0x000000,
+            strokeThickness: 2,
+        };
+        const scoreText = new PIXI.Text(`Score ${scoreValue}`, metaStyle);
+        scoreText.x = layout.panelX + 16;
+        scoreText.y = layout.panelY + layout.headerHeight - 22;
+        stage.addChild(scoreText);
+
+        const orbText = new PIXI.Text(`Orbs ${orbCount}`, metaStyle);
+        orbText.anchor.set(1, 0);
+        orbText.x = layout.panelX + layout.panelWidth - 18;
+        orbText.y = scoreText.y;
+        stage.addChild(orbText);
+    } else {
+        const subtitle = new PIXI.Text('Manage your battlefield tools', {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fill: 0xD6EAF8,
+            stroke: 0x000000,
+            strokeThickness: 2,
+        });
+        subtitle.x = layout.panelX + 16;
+        subtitle.y = layout.panelY + 30;
+        stage.addChild(subtitle);
+    }
+
+    const toggleButton = new PIXI.Container();
+    toggleButton.x = layout.panelX + layout.panelWidth - 32;
+    toggleButton.y = layout.panelY + 22;
+
+    const toggleHitArea = new PIXI.Graphics();
+    toggleHitArea.beginFill(0xffffff, 0.001);
+    toggleHitArea.drawCircle(0, 0, 14);
+    toggleHitArea.endFill();
+    toggleButton.addChild(toggleHitArea);
+
+    const toggleIcon = new PIXI.Graphics();
+    toggleIcon.beginFill(0x9CC3FF);
+    if (collapsed) {
+        toggleIcon.moveTo(-6, -2);
+        toggleIcon.lineTo(0, 6);
+        toggleIcon.lineTo(6, -2);
+    } else {
+        toggleIcon.moveTo(-6, 2);
+        toggleIcon.lineTo(0, -6);
+        toggleIcon.lineTo(6, 2);
+    }
+    toggleIcon.endFill();
+    toggleButton.addChild(toggleIcon);
+
+    toggleButton.interactive = true;
+    toggleButton.buttonMode = true;
+    toggleButton.cursor = 'pointer';
+    toggleButton.on('pointertap', (event) => {
+        event.stopPropagation();
+        toggleInventoryCollapsed(game);
+    });
+
+    stage.addChild(toggleButton);
+};
+
+const drawItems = (game, stage, layout, collapsed) => {
+    if (!game || !stage || !layout || collapsed) {
+        return;
+    }
+    let icon = game.iconFactory.getHead();
+    let fallbackIndex = 0;
     while (icon) {
-
-        if (icon.owner == game.player.id) {
-
-
+        if (icon.owner === game.player.id) {
             let frameX = icon.type * 32;
             let frameY = 0;
             if (icon.type === ITEM_TYPE_BOMB && icon.armed) {
@@ -634,37 +820,37 @@ var drawItems = (game, stage) => {
                 frameY = 89;
             }
 
-            var tmpText = new PIXI.Texture(
+            const tmpText = new PIXI.Texture(
                 game.textures['imageItems'].baseTexture,
                 new PIXI.Rectangle(frameX, frameY, 32, 32)
             );
 
-            var iconSprite = new PIXI.Sprite(tmpText);
-
-
-            const slot = resolveSlotPosition(icon.type, 7, 267);
-            x = game.maxMapX + slot.x;
-            y = slot.y;
+            const iconSprite = new PIXI.Sprite(tmpText);
+            const slotPosition = resolveSlotPosition(layout, icon.type, fallbackIndex);
+            const x = slotPosition.x;
+            const y = slotPosition.y;
 
             if (icon.selected) {
-                var selected = new PIXI.Sprite(game.textures['imageInventorySelection']);
-                selected.x = x;
-                selected.y = y;
-                stage.addChild(selected);
+                const highlight = new PIXI.Graphics();
+                highlight.lineStyle(2, 0x5dade2, 0.95);
+                highlight.beginFill(0x5dade2, 0.18);
+                highlight.drawRoundedRect(x - 4, y - 4, layout.slotSize + 8, layout.slotSize + 8, 6);
+                highlight.endFill();
+                stage.addChild(highlight);
             }
 
             iconSprite.x = x;
             iconSprite.y = y;
-
             iconSprite.interactive = true;
             iconSprite.buttonMode = true;
+            iconSprite.cursor = 'pointer';
 
             const iconClosure = icon;
-            iconSprite.on('mousedown', (event) => {
-                console.log("selecting item")
+            iconSprite.on('pointertap', (event) => {
                 event.stopPropagation();
-                console.log("selecting item")
-                game.iconFactory.toggleSelected(iconClosure);
+                if (typeof game.iconFactory.toggleSelected === 'function') {
+                    game.iconFactory.toggleSelected(iconClosure);
+                }
                 game.forceDraw = true;
             });
             stage.addChild(iconSprite);
@@ -679,11 +865,13 @@ var drawItems = (game, stage) => {
                     stroke: 0x000000,
                     strokeThickness: 3,
                 });
-                qtyText.x = x + 22;
-                qtyText.y = y + 12;
+                qtyText.anchor.set(1, 1);
+                qtyText.x = x + layout.slotSize - 3;
+                qtyText.y = y + layout.slotSize - 2;
                 stage.addChild(qtyText);
             }
 
+            fallbackIndex += 1;
         }
         icon = icon.next;
     }
@@ -693,7 +881,7 @@ const drawPanelMessages = (game, stage) => {
     if (!game || !stage) {
         return;
     }
-    const panelState = game.panelState || {};
+    const panelState = ensurePanelState(game);
     const heading = panelState.heading || '';
     const lines = Array.isArray(panelState.lines) ? panelState.lines : [];
 
@@ -764,9 +952,15 @@ export const drawPanelInterface = (game, panelContainer) => {
     if (game.forceDraw) {
         panelContainer.removeChildren();
         drawPanel(game, panelContainer);
-        drawFinance(game, panelContainer);
+        const layout = getInventoryLayout(game);
+        const collapsed = isInventoryCollapsed(game);
+        drawInventoryBackground(panelContainer, layout, collapsed);
+        drawInventoryHeader(game, panelContainer, layout, collapsed);
+        if (!collapsed) {
+            drawInventoryGrid(panelContainer, layout);
+        }
         drawHealth(game, panelContainer);
-        drawItems(game, panelContainer);
+        drawItems(game, panelContainer, layout, collapsed);
         drawPanelMessages(game, panelContainer);
         attachPanelButtons(game, panelContainer);
     }
