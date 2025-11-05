@@ -30,6 +30,7 @@ import {getCitySpawn, getCityDisplayName} from "./src/utils/citySpawns";
 import LobbyManager from "./src/lobby/LobbyManager";
 import NotificationManager from "./src/ui/NotificationManager";
 import CallsignRegistry from "./src/utils/callsigns";
+import ChatManager from "./src/ui/ChatManager";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -246,6 +247,7 @@ game.notify = (payload) => {
     }
     return game.notificationManager.notify(payload);
 };
+game.chatManager = new ChatManager({ game });
 game.resolveCallsign = (id) => {
     if (id === undefined || id === null) {
         return null;
@@ -958,6 +960,9 @@ game.clearPanelMessage();
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
+if (game.chatManager) {
+    game.chatManager.bindSocket(game.socketListener);
+}
 game.lobby = new LobbyManager(game);
 game.lobby.attachSocket(game.socketListener);
 game.iconFactory = new IconFactory(game);
