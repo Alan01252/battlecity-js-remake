@@ -355,7 +355,7 @@ class LobbyManager {
         this.identityToggle = document.createElement('button');
         this.identityToggle.type = 'button';
         this.identityToggle.className = 'lobby-btn lobby-btn--secondary';
-        this.identityToggle.textContent = 'Register';
+        this.identityToggle.textContent = 'Set display name';
         this.identityToggle.addEventListener('click', () => this.toggleIdentityForm(true));
 
         this.identitySignOut = document.createElement('button');
@@ -486,19 +486,15 @@ class LobbyManager {
             } else if (name.length) {
                 this.identitySummary.textContent = `Playing as ${name}`;
             } else if (googleEnabled) {
-                this.identitySummary.textContent = 'Sign in with Google to save your progress.';
+                this.identitySummary.textContent = 'Register with Google or set a display name to continue.';
             } else {
-                this.identitySummary.textContent = 'Playing as Guest';
+                this.identitySummary.textContent = 'Set a display name to appear to other players.';
             }
         }
         if (this.identityToggle) {
-            let toggleLabel = 'Register';
-            if (usingGoogle && name.length) {
-                toggleLabel = 'Update Name';
-            } else if (name.length) {
-                toggleLabel = 'Update Name';
-            } else if (googleEnabled) {
-                toggleLabel = 'Continue as Guest';
+            let toggleLabel = 'Set display name';
+            if (name.length) {
+                toggleLabel = 'Update name';
             }
             this.identityToggle.textContent = toggleLabel;
             this.identityToggle.disabled = this.identityFormVisible || this.identityBusy;
@@ -601,7 +597,7 @@ class LobbyManager {
             window.google.accounts.id.renderButton(this.googleButtonTarget, {
                 theme: 'outline',
                 size: 'medium',
-                text: 'signin_with',
+                text: 'signup_with',
                 width: 240,
             });
         }
@@ -609,9 +605,9 @@ class LobbyManager {
             ? manager.getIdentity()
             : null;
         if (identity && identity.provider === 'google') {
-            this.setGoogleFeedback('Signed in with Google.', 'success');
+            this.setGoogleFeedback('Registered with Google.', 'success');
         } else if (!this.googleBusy && !this.identityBusy && !this.identityFormVisible) {
-            this.setGoogleFeedback('Sign in with Google to save your progress.', 'info');
+            this.setGoogleFeedback('Register with Google to save your progress.', 'info');
         }
     }
 
@@ -625,12 +621,12 @@ class LobbyManager {
             return;
         }
         this.setGoogleBusy(true);
-        this.setGoogleFeedback('Signing in with Google...', 'info');
+        this.setGoogleFeedback('Registering with Google...', 'info');
         try {
             const identity = await this.identityManager.authenticateWithGoogle(response.credential);
             this.updateIdentityDisplay(identity);
             this.setStatus(`Signed in as ${identity.name} via Google.`, { type: 'success' });
-            this.setGoogleFeedback('Signed in with Google.', 'success');
+            this.setGoogleFeedback('Registered with Google.', 'success');
         } catch (error) {
             const message = error && error.message ? error.message : 'Google sign-in failed.';
             this.setGoogleFeedback(message, 'error');
@@ -692,9 +688,9 @@ class LobbyManager {
             return;
         }
         if (identity && identity.provider === 'google') {
-            this.setGoogleFeedback('Signed in with Google.', 'success');
+            this.setGoogleFeedback('Registered with Google.', 'success');
         } else if (!this.googleBusy && !this.identityBusy && !this.identityFormVisible) {
-            this.setGoogleFeedback('Sign in with Google to save your progress.', 'info');
+            this.setGoogleFeedback('Register with Google to save your progress.', 'info');
         }
     }
 

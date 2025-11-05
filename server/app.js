@@ -9,16 +9,91 @@ var server = http.createServer(app);
 var { Server } = require('socket.io');
 var citySpawns = require('../shared/citySpawns.json');
 var UserStore = require('./src/users/UserStore');
+
+const parseClientIds = (value) => {
+    if (!value || typeof value !== 'string') {
+        return [];
+    }
+    return value
+        .split(/[;,]/)
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+};
+
+const GOOGLE_AUDIENCES = parseClientIds(process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '');
+
+const parseOrigins = (value) => {
+    if (!value || typeof value !== 'string') {
+        return [];
+    }
+    return value
+        .split(/[;,\s]/)
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+};
+
+const DEFAULT_CLIENT_ORIGINS = [
+    'http://localhost:8020',
+    'http://127.0.0.1:8020',
+    'http://0.0.0.0:8020'
+];
+
+const CLIENT_ORIGINS = (() => {
+    const configured = parseOrigins(process.env.CLIENT_ORIGINS || process.env.CLIENT_ORIGIN || '');
+    if (configured.length > 0) {
+        return configured;
+    }
+    return DEFAULT_CLIENT_ORIGINS;
+})();
+
+const normaliseOrigin = (value) => {
+    if (!value || typeof value !== 'string') {
+        return '';
+    }
+    try {
+        const url = new URL(value);
+        return `${url.protocol}//${url.host}`;
+    } catch (error) {
+        return value.replace(/\/$/, '');
+    }
+};
+
+const isWildcardOriginAllowed = () => CLIENT_ORIGINS.includes('*');
+
+const isOriginAllowed = (origin) => {
+    if (isWildcardOriginAllowed()) {
+        return true;
+    }
+    const candidate = normaliseOrigin(origin);
+    return CLIENT_ORIGINS.some((allowed) => normaliseOrigin(allowed) === candidate);
+};
+
+const resolveResponseOrigin = (originHeader) => {
+    if (originHeader && isOriginAllowed(originHeader)) {
+        return originHeader;
+    }
+    return CLIENT_ORIGINS[0] || 'http://localhost:8020';
+};
+
 var io = new Server(server, {
     cors: {
-        origin: "http://localhost:8020",
+        origin(origin, callback) {
+            if (!origin || isOriginAllowed(origin)) {
+                callback(null, true);
+                return;
+            }
+            callback(new Error('Not allowed by CORS'));
+        },
         methods: ["GET", "POST"]
     }
 });
 
 app.use(express.json());
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:8020');
+    const requestOrigin = req.headers.origin;
+    const responseOrigin = resolveResponseOrigin(requestOrigin);
+    res.header('Access-Control-Allow-Origin', responseOrigin);
+    res.header('Vary', 'Origin');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
     if (req.method === 'OPTIONS') {
@@ -69,18 +144,6 @@ try {
 
 
 const userStore = new UserStore();
-
-const parseClientIds = (value) => {
-    if (!value || typeof value !== 'string') {
-        return [];
-    }
-    return value
-        .split(/[;,]/)
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0);
-};
-
-const GOOGLE_AUDIENCES = parseClientIds(process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '');
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/tokeninfo';
 const GOOGLE_TOKEN_TIMEOUT_MS = 5000;
 
