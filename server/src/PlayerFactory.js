@@ -6,6 +6,8 @@ var PlayerStateValidator = require("./validation/PlayerStateValidator");
 
 var debug = require('debug')('BattleCity:PlayerFactory');
 var { TILE_SIZE, MAX_HEALTH, TIMER_CLOAK, TIMER_DFG } = require('./gameplay/constants');
+var { rectangleCollision, getPlayerRect } = require('./gameplay/geometry');
+var { isHospitalBuilding, getHospitalDriveableRect } = require('./utils/buildings');
 var citySpawns = require('../../shared/citySpawns.json');
 var CallsignRegistry = require('./utils/callsigns');
 
@@ -17,6 +19,8 @@ const PLAYER_SPRITE_SIZE = 48;
 const PLAYER_SPRITE_HALF = PLAYER_SPRITE_SIZE / 2;
 const PLAYER_SPAWN_ADJUST_X = 6.5;
 const PLAYER_SPAWN_ADJUST_Y = 5.5;
+const HOSPITAL_HEAL_INTERVAL = 150;
+const HOSPITAL_HEAL_AMOUNT = 2;
 
 const toFiniteNumber = (value, fallback = null) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -789,7 +793,71 @@ class PlayerFactory {
             if (statusChanged) {
                 this.emitStatusUpdate(player);
             }
+
+            this.applyHospitalHealingForPlayer(player, now);
         }
+    }
+
+    applyHospitalHealingForPlayer(player, now = Date.now()) {
+        if (!player || player.health <= 0) {
+            return false;
+        }
+        if (!this.game || !this.game.buildingFactory) {
+            return false;
+        }
+        if (!Number.isFinite(player.health) || player.health >= MAX_HEALTH) {
+            return false;
+        }
+        const factory = this.game.buildingFactory;
+        const buildings = factory && factory.buildings;
+        if (!buildings || typeof buildings.values !== 'function') {
+            return false;
+        }
+
+        const playerRect = getPlayerRect(player);
+        const referenceTime = Number.isFinite(now) ? now : Date.now();
+
+        for (const building of buildings.values()) {
+            if (!building || !isHospitalBuilding(building)) {
+                continue;
+            }
+            const healZone = getHospitalDriveableRect(building);
+            if (!healZone) {
+                continue;
+            }
+            if (!rectangleCollision(playerRect, healZone)) {
+                continue;
+            }
+            const lastHeal = Number.isFinite(player.lastHospitalHealAt) ? player.lastHospitalHealAt : 0;
+            if (referenceTime < (lastHeal + HOSPITAL_HEAL_INTERVAL)) {
+                return false;
+            }
+
+            const previousHealth = player.health;
+            const nextHealth = Math.min(MAX_HEALTH, previousHealth + HOSPITAL_HEAL_AMOUNT);
+            if (nextHealth <= previousHealth) {
+                return false;
+            }
+
+            player.health = nextHealth;
+            player.lastHospitalHealAt = referenceTime;
+
+            if (this.io) {
+                this.io.emit('player:health', JSON.stringify({
+                    id: player.id,
+                    health: player.health,
+                    previousHealth,
+                    source: {
+                        type: 'hospital',
+                        buildingId: building.id || null,
+                    }
+                }));
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     getSpawnForCity(cityId) {
