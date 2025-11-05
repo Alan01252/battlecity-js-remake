@@ -28,6 +28,7 @@ class Player {
         this.isFake = false;
         this.isFakeRecruit = false;
         this.type = null;
+        this.userId = this._sanitizeId(player && (player.userId || (player.identity && player.identity.id)));
         this.callsign = this._sanitizeCallsign(player && player.callsign);
         this.lastUpdateAt = now || Date.now();
         this.update(player, this.lastUpdateAt);
@@ -73,6 +74,13 @@ class Player {
             const nextCallsign = this._sanitizeCallsign(player.callsign, this.callsign);
             if (nextCallsign) {
                 this.callsign = nextCallsign;
+            }
+        }
+
+        if (player.userId || (player.identity && player.identity.id)) {
+            const nextId = this._sanitizeId(player.userId || (player.identity && player.identity.id));
+            if (nextId) {
+                this.userId = nextId;
             }
         }
 
@@ -143,6 +151,9 @@ class Player {
         if (this.callsign) {
             payload.callsign = this.callsign;
         }
+        if (this.userId) {
+            payload.userId = this.userId;
+        }
         return payload;
     }
 
@@ -171,6 +182,17 @@ class Player {
             return fallback;
         }
         return trimmed.slice(0, 48);
+    }
+
+    _sanitizeId(value) {
+        if (!value) {
+            return null;
+        }
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            return trimmed.length ? trimmed : null;
+        }
+        return String(value);
     }
 }
 
