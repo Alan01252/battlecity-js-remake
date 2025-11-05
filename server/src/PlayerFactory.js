@@ -10,6 +10,7 @@ var { rectangleCollision, getPlayerRect } = require('./gameplay/geometry');
 var { isHospitalBuilding, getHospitalDriveableRect } = require('./utils/buildings');
 var citySpawns = require('../../shared/citySpawns.json');
 var CallsignRegistry = require('./utils/callsigns');
+const { ITEM_TYPES } = require('./items');
 
 const HALF_TILE = TILE_SIZE / 2;
 const COMMAND_CENTER_WIDTH_TILES = 3;
@@ -114,6 +115,9 @@ class PlayerFactory {
                 debug("Player entered game " + socket.id);
                 const existing = this.game.players[socket.id];
                 if (existing) {
+                    if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
+                        this.game.buildingFactory.cityManager.releasePlayerInventory(socket.id);
+                    }
                     this.releaseSlot(existing);
                     delete this.game.players[socket.id];
                 }
@@ -274,6 +278,9 @@ class PlayerFactory {
                 var removedPlayer = this.game.players[socket.id];
                 if (!removedPlayer) {
                     return;
+                }
+                if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
+                    this.game.buildingFactory.cityManager.releasePlayerInventory(socket.id);
                 }
                 if (this.game.buildingFactory &&
                     this.game.buildingFactory.cityManager &&
@@ -447,6 +454,28 @@ class PlayerFactory {
         return this.game.players[socketId] || null;
     }
 
+    adjustCityInventory(socketId, itemType, delta) {
+        if (!this.game || !this.game.buildingFactory || !this.game.buildingFactory.cityManager) {
+            return 0;
+        }
+        if (!Number.isFinite(delta) || delta === 0) {
+            return 0;
+        }
+        const player = this.game.players[socketId];
+        if (!player || player.city === undefined || player.city === null) {
+            return 0;
+        }
+        const cityId = Number(player.city);
+        if (!Number.isFinite(cityId)) {
+            return 0;
+        }
+        const cityManager = this.game.buildingFactory.cityManager;
+        if (delta > 0) {
+            return cityManager.recordInventoryPickup(socketId, cityId, itemType, delta);
+        }
+        return cityManager.recordInventoryConsumption(socketId, cityId, itemType, Math.abs(delta));
+    }
+
     getSocket(socketId) {
         const sockets = this.io && this.io.sockets && this.io.sockets.sockets;
         if (!sockets) {
@@ -575,6 +604,9 @@ class PlayerFactory {
                 }));
             }
 
+            if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
+                this.game.buildingFactory.cityManager.releasePlayerInventory(socketId);
+            }
             this.releaseSlot(player);
             delete this.game.players[socketId];
             if (this.io) {
@@ -637,10 +669,14 @@ class PlayerFactory {
 
         switch (type) {
             case 'medkit':
-                this.applyHealing(socketId, MAX_HEALTH, { type: 'medkit', iconId: data.iconId ?? null });
+                if (this.applyHealing(socketId, MAX_HEALTH, { type: 'medkit', iconId: data.iconId ?? null })) {
+                    this.adjustCityInventory(socketId, ITEM_TYPES.MEDKIT, -1);
+                }
                 break;
             case 'cloak':
-                this.applyCloak(socketId, Number.isFinite(data.duration) ? data.duration : TIMER_CLOAK);
+                if (this.applyCloak(socketId, Number.isFinite(data.duration) ? data.duration : TIMER_CLOAK)) {
+                    this.adjustCityInventory(socketId, ITEM_TYPES.CLOAK, -1);
+                }
                 break;
             default:
                 break;
@@ -650,13 +686,13 @@ class PlayerFactory {
     applyHealing(socketId, targetHealth, meta) {
         const player = this.game.players[socketId];
         if (!player) {
-            return;
+            return false;
         }
         const previousHealth = player.health;
         const resolvedHealth = Number.isFinite(targetHealth) ? targetHealth : MAX_HEALTH;
         const clamped = Math.min(MAX_HEALTH, Math.max(previousHealth, Math.floor(resolvedHealth)));
         if (clamped <= previousHealth) {
-            return;
+            return false;
         }
         player.health = clamped;
         if (this.io) {
@@ -667,17 +703,19 @@ class PlayerFactory {
                 source: meta || null
             }));
         }
+        return true;
     }
 
     applyCloak(socketId, durationMs = TIMER_CLOAK) {
         const player = this.game.players[socketId];
         if (!player) {
-            return;
+            return false;
         }
         const duration = Number.isFinite(durationMs) ? Math.max(0, durationMs) : TIMER_CLOAK;
         player.isCloaked = true;
         player.cloakExpiresAt = Date.now() + duration;
         this.emitStatusUpdate(player);
+        return true;
     }
 
     clearCloak(socketId) {
@@ -756,6 +794,9 @@ class PlayerFactory {
 
         if (!player.isSystemControlled) {
             this.releaseSlot(player);
+        }
+        if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
+            this.game.buildingFactory.cityManager.releasePlayerInventory(socketId);
         }
         delete this.game.players[socketId];
 
