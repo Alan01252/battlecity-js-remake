@@ -1,6 +1,7 @@
 "use strict";
 
 const { TILE_SIZE, DAMAGE_MINE, DAMAGE_BOMB, BOMB_TIMER_MS, BOMB_EXPLOSION_TILE_RADIUS, TIMER_DFG } = require("../gameplay/constants");
+const { ITEM_TYPES } = require("../items");
 const { rectangleCollision } = require("../gameplay/geometry");
 
 const HAZARD_TYPES = {
@@ -16,6 +17,12 @@ const ITEM_TYPE_MAP = {
     4: HAZARD_TYPES.MINE,
     7: HAZARD_TYPES.DFG
 };
+
+const HAZARD_TYPE_TO_ITEM = new Map([
+    [HAZARD_TYPES.BOMB, ITEM_TYPES.BOMB],
+    [HAZARD_TYPES.MINE, ITEM_TYPES.MINE],
+    [HAZARD_TYPES.DFG, ITEM_TYPES.DFG],
+]);
 
 class HazardManager {
 
@@ -139,6 +146,7 @@ class HazardManager {
         this.pendingIdsBySocket.get(socket.id).add(hazard.id);
 
         this.broadcastHazard("hazard:spawn", hazard);
+        this.recordInventoryConsumption(socket.id, hazard);
         return hazard;
     }
 
@@ -253,6 +261,22 @@ class HazardManager {
         this.hazards.delete(id);
         const payload = Object.assign({ reason }, hazard);
         this.broadcastHazard("hazard:remove", payload);
+    }
+
+    recordInventoryConsumption(socketId, hazard) {
+        if (!hazard || !this.game || !this.game.buildingFactory || !this.game.buildingFactory.cityManager) {
+            return;
+        }
+        const itemType = HAZARD_TYPE_TO_ITEM.get(hazard.type);
+        if (itemType === undefined) {
+            return;
+        }
+        const cityId = Number.isFinite(hazard.teamId) ? Math.floor(hazard.teamId) : null;
+        if (cityId === null) {
+            return;
+        }
+        const ownerId = socketId || (typeof hazard.ownerId === "string" ? hazard.ownerId : null);
+        this.game.buildingFactory.cityManager.recordInventoryConsumption(ownerId, cityId, itemType, 1);
     }
 
     removeHazardsByCityAndItem(cityId, itemType, reason = "factory_destroyed") {

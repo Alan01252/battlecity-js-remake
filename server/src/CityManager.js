@@ -7,6 +7,7 @@ const {
     COST_BUILDING,
     COST_UPKEEP_HOSPITAL,
 } = require('./constants');
+const { ITEM_TYPES, normalizeItemType } = require('./items');
 const { ORBABLE_SIZE } = require('./gameplay/constants');
 
 const REFUND_CHANCE = 0.25;
@@ -27,6 +28,8 @@ class CityManager {
         this.io = null;
         this.cities = new Map();
         this.orbHolders = new Map();
+        this.inventoryByCity = new Map();
+        this.inventoryByPlayer = new Map();
     }
 
     setIo(io) {
@@ -111,7 +114,187 @@ class CityManager {
         }
         const city = this.cities.get(id);
         this.ensureDerivedFields(city);
+        this.ensureCityInventory(id);
         return city;
+    }
+
+    ensureCityInventory(cityId) {
+        if (!Number.isFinite(cityId)) {
+            return new Map();
+        }
+        if (!this.inventoryByCity.has(cityId)) {
+            this.inventoryByCity.set(cityId, new Map());
+        }
+        return this.inventoryByCity.get(cityId);
+    }
+
+    ensurePlayerInventory(socketId, cityId) {
+        if (!socketId) {
+            return null;
+        }
+        const cityNumeric = Number.isFinite(cityId) ? Math.max(0, Math.floor(cityId)) : null;
+        if (cityNumeric === null) {
+            return null;
+        }
+        if (!this.inventoryByPlayer.has(socketId)) {
+            this.inventoryByPlayer.set(socketId, {
+                cityId: cityNumeric,
+                items: new Map(),
+            });
+        }
+        const record = this.inventoryByPlayer.get(socketId);
+        if (record.cityId !== cityNumeric) {
+            record.cityId = cityNumeric;
+            record.items.clear();
+        }
+        return record;
+    }
+
+    recordInventoryPickup(socketId, cityId, itemType, quantity = 1) {
+        const numericCity = toCityId(cityId);
+        const type = normalizeItemType(itemType, null);
+        const amount = Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1;
+        if (!Number.isFinite(numericCity) || type === null || amount <= 0) {
+            return 0;
+        }
+        const city = this.ensureCity(numericCity);
+        const cityInventory = this.ensureCityInventory(numericCity);
+        const current = cityInventory.get(type) || 0;
+        cityInventory.set(type, current + amount);
+
+        if (socketId) {
+            const playerInventory = this.ensurePlayerInventory(socketId, numericCity);
+            if (playerInventory) {
+                const existing = playerInventory.items.get(type) || 0;
+                playerInventory.items.set(type, existing + amount);
+            }
+        }
+
+        city.updatedAt = Date.now();
+        return amount;
+    }
+
+    recordInventoryConsumption(socketId, cityId, itemType, quantity = 1) {
+        const numericCity = toCityId(cityId);
+        const type = normalizeItemType(itemType, null);
+        const amount = Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1;
+        if (!Number.isFinite(numericCity) || type === null || amount <= 0) {
+            return 0;
+        }
+        const city = this.ensureCity(numericCity);
+        const cityInventory = this.ensureCityInventory(numericCity);
+        const current = cityInventory.get(type) || 0;
+        if (current <= 0) {
+            return 0;
+        }
+        const applied = Math.min(current, amount);
+        const nextValue = current - applied;
+        if (nextValue > 0) {
+            cityInventory.set(type, nextValue);
+        } else {
+            cityInventory.delete(type);
+        }
+
+        if (socketId && this.inventoryByPlayer.has(socketId)) {
+            const record = this.inventoryByPlayer.get(socketId);
+            if (record && record.cityId === numericCity) {
+                const owned = record.items.get(type) || 0;
+                const remaining = Math.max(0, owned - applied);
+                if (remaining > 0) {
+                    record.items.set(type, remaining);
+                } else {
+                    record.items.delete(type);
+                }
+                if (record.items.size === 0) {
+                    this.inventoryByPlayer.delete(socketId);
+                }
+            }
+        }
+
+        city.updatedAt = Date.now();
+        return applied;
+    }
+
+    getInventoryCount(cityId, itemType) {
+        const numericCity = toCityId(cityId);
+        const type = normalizeItemType(itemType, null);
+        if (!Number.isFinite(numericCity) || type === null) {
+            return 0;
+        }
+        const cityInventory = this.inventoryByCity.get(numericCity);
+        if (!cityInventory) {
+            return 0;
+        }
+        return cityInventory.get(type) || 0;
+    }
+
+    releasePlayerInventory(socketId) {
+        if (!socketId || !this.inventoryByPlayer.has(socketId)) {
+            return;
+        }
+        const record = this.inventoryByPlayer.get(socketId);
+        this.inventoryByPlayer.delete(socketId);
+        if (!record || record.cityId === null || record.cityId === undefined) {
+            return;
+        }
+        const cityInventory = this.ensureCityInventory(record.cityId);
+        for (const [type, count] of record.items.entries()) {
+            const current = cityInventory.get(type) || 0;
+            const nextValue = Math.max(0, current - count);
+            if (nextValue > 0) {
+                cityInventory.set(type, nextValue);
+            } else {
+                cityInventory.delete(type);
+            }
+        }
+        const city = this.getCity(record.cityId);
+        if (city) {
+            city.updatedAt = Date.now();
+        }
+    }
+
+    clearCityInventory(cityId) {
+        const numericCity = toCityId(cityId);
+        if (!Number.isFinite(numericCity)) {
+            return;
+        }
+        this.inventoryByCity.delete(numericCity);
+        for (const [socketId, record] of Array.from(this.inventoryByPlayer.entries())) {
+            if (record && record.cityId === numericCity) {
+                this.inventoryByPlayer.delete(socketId);
+            }
+        }
+        const city = this.getCity(numericCity);
+        if (city) {
+            city.updatedAt = Date.now();
+        }
+    }
+
+    clearInventoryForType(cityId, itemType) {
+        const numericCity = toCityId(cityId);
+        const type = normalizeItemType(itemType, null);
+        if (!Number.isFinite(numericCity) || type === null) {
+            return;
+        }
+        const cityInventory = this.inventoryByCity.get(numericCity);
+        if (cityInventory) {
+            cityInventory.delete(type);
+        }
+        for (const [socketId, record] of Array.from(this.inventoryByPlayer.entries())) {
+            if (!record || record.cityId !== numericCity) {
+                continue;
+            }
+            if (record.items.has(type)) {
+                record.items.delete(type);
+                if (record.items.size === 0) {
+                    this.inventoryByPlayer.delete(socketId);
+                }
+            }
+        }
+        const city = this.getCity(numericCity);
+        if (city) {
+            city.updatedAt = Date.now();
+        }
     }
 
     addIncome(cityId, amount) {
@@ -182,6 +365,7 @@ class CityManager {
         }
         const city = this.ensureCity(cityId);
         this.orbHolders.set(socketId, city.id);
+        this.recordInventoryPickup(socketId, city.id, ITEM_TYPES.ORB, 1);
         return city.id;
     }
 
@@ -192,7 +376,7 @@ class CityManager {
         const cityId = this.orbHolders.get(socketId);
         this.orbHolders.delete(socketId);
         if (options.consume !== false) {
-            this.consumeOrb(cityId);
+            this.consumeOrb(cityId, socketId);
         }
         return cityId;
     }
@@ -201,6 +385,7 @@ class CityManager {
         const city = this.ensureCity(cityId);
         city.activeOrbCount = Math.max(0, this.getActiveOrbCount(cityId) - 1);
         city.updatedAt = Date.now();
+        this.recordInventoryConsumption(socketId, city.id, ITEM_TYPES.ORB, 1);
         if (socketId && this.orbHolders.get(socketId) === city.id) {
             this.orbHolders.delete(socketId);
         }
@@ -217,7 +402,7 @@ class CityManager {
         identifiers.forEach((socketId) => {
             this.orbHolders.delete(socketId);
             if (options.consume !== false) {
-                this.consumeOrb(cityId);
+                this.consumeOrb(cityId, socketId);
             }
         });
     }
@@ -373,6 +558,7 @@ class CityManager {
         city.lastOrbReward = 0;
         city.activeOrbCount = 0;
         this.clearOrbHoldersForCity(city.id, { consume: false });
+        this.clearCityInventory(city.id);
         city.destroyedAt = now;
         city.startedAt = now;
         city.updatedAt = now;
