@@ -7,36 +7,26 @@ import {MAP_SQUARE_BUILDING} from "../constants.js";
 import {BUILDING_COMMAND_CENTER} from "../constants.js";
 import {BUILDING_REPAIR} from "../constants.js";
 
+const resolveBuildingFamily = (type) => {
+    if (type === null || type === undefined) {
+        return null;
+    }
+    const numeric = Number(type);
+    if (!Number.isFinite(numeric)) {
+        return null;
+    }
+    if (numeric < 100) {
+        return numeric;
+    }
+    return Math.floor(numeric / 100);
+};
+
 const TILE_SIZE = 48;
 const BULLET_SIZE = 4;
 const BLOCKING_TILE_VALUES = new Set([
     MAP_SQUARE_ROCK,
     MAP_SQUARE_BUILDING
 ]);
-
-const parseBuildingType = (type) => {
-    if (Number.isFinite(type)) {
-        return type;
-    }
-    if (typeof type === 'string' && type.trim() !== '') {
-        const parsed = Number.parseInt(type, 10);
-        if (!Number.isNaN(parsed)) {
-            return parsed;
-        }
-    }
-    return null;
-};
-
-const getBuildingFamily = (type) => {
-    const numericType = parseBuildingType(type);
-    if (numericType === null) {
-        return null;
-    }
-    if (numericType < 100) {
-        return numericType;
-    }
-    return Math.floor(numericType / 100);
-};
 
 
 var collided = (testRect, bullet)=> {
@@ -226,7 +216,7 @@ export const collidedWithBuilding = (game, bullet) => {
             h: 96,
         };
 
-        const buildingFamily = getBuildingFamily(building.type);
+        const buildingFamily = resolveBuildingFamily(building.type);
         if (buildingFamily === BUILDING_COMMAND_CENTER || buildingFamily === BUILDING_REPAIR) {
             buildingRect.h = buildingRect.h - 48;
         }

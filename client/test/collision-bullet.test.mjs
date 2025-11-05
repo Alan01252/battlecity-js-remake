@@ -88,11 +88,17 @@ describe('collidedWithBuilding', () => {
         assert.equal(collidedWithBuilding(game, upperBullet), true);
     });
 
-    it('treats build-tree hospital codes the same as hospital structures', () => {
-        const building = createBuildingNode(5, 7, CAN_BUILD_HOSPITAL);
-        const game = createGame({buildingFactory: createFactory(building)});
+    it('recognises hospital build-tree codes as bay-bearing structures', () => {
+        const hospital = createBuildingNode(5, 7, CAN_BUILD_HOSPITAL);
+        const hospitalGame = createGame({buildingFactory: createFactory(hospital)});
 
-        assert.equal(collidedWithBuilding(game, walkwayBullet), false);
-        assert.equal(collidedWithBuilding(game, upperBullet), true);
+        assert.equal(collidedWithBuilding(hospitalGame, walkwayBullet), false);
+        assert.equal(collidedWithBuilding(hospitalGame, upperBullet), true);
+
+        const hospitalString = createBuildingNode(5, 7, String(CAN_BUILD_HOSPITAL));
+        const hospitalStringGame = createGame({buildingFactory: createFactory(hospitalString)});
+
+        assert.equal(collidedWithBuilding(hospitalStringGame, walkwayBullet), false);
+        assert.equal(collidedWithBuilding(hospitalStringGame, upperBullet), true);
     });
 });

@@ -53,21 +53,26 @@ describe("BulletFactory structure collisions", () => {
     });
 
     it("respects hospital bays in the same way as the client", () => {
-        const bulletFactory = createBulletFactory([
-            { x: baseTileX, y: baseTileY, type: 301 },
+        const hospitalFactory = createBulletFactory([
+            { x: baseTileX, y: baseTileY, type: 200 },
         ]);
 
-        assert.equal(bulletFactory.checkStructureCollision({ ...walkwayBullet }), false);
-        assert.equal(bulletFactory.checkStructureCollision({ ...upperBullet }), true);
-    });
+        assert.equal(hospitalFactory.checkStructureCollision({ ...walkwayBullet }), false);
+        assert.equal(hospitalFactory.checkStructureCollision({ ...upperBullet }), true);
 
-    it("recognises hospital bays when the build tree type is provided", () => {
-        const bulletFactory = createBulletFactory([
+        const hospitalFamilyFactory = createBulletFactory([
+            { x: baseTileX, y: baseTileY, type: 2 },
+        ]);
+
+        assert.equal(hospitalFamilyFactory.checkStructureCollision({ ...walkwayBullet }), false);
+        assert.equal(hospitalFamilyFactory.checkStructureCollision({ ...upperBullet }), true);
+
+        const hospitalStringFactory = createBulletFactory([
             { x: baseTileX, y: baseTileY, type: '200' },
         ]);
 
-        assert.equal(bulletFactory.checkStructureCollision({ ...walkwayBullet }), false);
-        assert.equal(bulletFactory.checkStructureCollision({ ...upperBullet }), true);
+        assert.equal(hospitalStringFactory.checkStructureCollision({ ...walkwayBullet }), false);
+        assert.equal(hospitalStringFactory.checkStructureCollision({ ...upperBullet }), true);
     });
 
     it("applies bay rules to structure-fired bullets such as turrets", () => {
