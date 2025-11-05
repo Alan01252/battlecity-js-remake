@@ -659,7 +659,14 @@ class BuildingFactory {
         if (this.cityManager && typeof this.cityManager.getInventoryCount === 'function') {
             inventoryStock = this.cityManager.getInventoryCount(numericCity, targetType);
         }
-        return factoryStock + inventoryStock;
+        let deployedStock = 0;
+        if (this.hazardManager && typeof this.hazardManager.getOutstandingCount === 'function') {
+            deployedStock += this.hazardManager.getOutstandingCount(numericCity, targetType);
+        }
+        if (this.defenseManager && typeof this.defenseManager.getOutstandingCount === 'function') {
+            deployedStock += this.defenseManager.getOutstandingCount(numericCity, targetType);
+        }
+        return factoryStock + inventoryStock + deployedStock;
     }
 
     hasActiveResearch(cityId) {
