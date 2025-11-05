@@ -73,6 +73,7 @@ class IdentityManager {
             this.googleClientIds = this._normaliseClientIds(envGoogleIds);
         }
         this.googleClientId = this.googleClientIds.length ? this.googleClientIds[0] : null;
+        this._initialisePromise = null;
         this.handleSocketConnected = this.handleSocketConnected.bind(this);
         this.handleIdentityAck = this.handleIdentityAck.bind(this);
     }
@@ -134,6 +135,17 @@ class IdentityManager {
         return this.googleClientId;
     }
 
+    initialise() {
+        if (this._initialisePromise) {
+            return this._initialisePromise;
+        }
+        this._initialisePromise = this._loadRemoteConfig().catch((error) => {
+            this._initialisePromise = null;
+            throw error;
+        });
+        return this._initialisePromise;
+    }
+
     async saveName(rawName) {
         const name = sanitizeName(rawName);
         if (!name) {
@@ -141,9 +153,19 @@ class IdentityManager {
         }
         let response;
         if (this.identity && this.identity.id) {
-            response = await this._request('PUT', `/api/users/${encodeURIComponent(this.identity.id)}`, { name });
+            response = await this._request(
+                'PUT',
+                `/api/users/${encodeURIComponent(this.identity.id)}`,
+                { name },
+                { fallbackMessage: 'Unable to save name.' }
+            );
         } else {
-            response = await this._request('POST', '/api/users/register', { name });
+            response = await this._request(
+                'POST',
+                '/api/users/register',
+                { name },
+                { fallbackMessage: 'Unable to save name.' }
+            );
         }
         this.identity = {
             id: response.id,
@@ -163,7 +185,12 @@ class IdentityManager {
         if (!credential || typeof credential !== 'string') {
             throw new Error('Missing Google credential.');
         }
-        const response = await this._request('POST', '/api/auth/google', { credential });
+        const response = await this._request(
+            'POST',
+            '/api/auth/google',
+            { credential },
+            { fallbackMessage: 'Google sign-in failed.' }
+        );
         this.identity = {
             id: response.id,
             name: response.name,
@@ -183,7 +210,12 @@ class IdentityManager {
             return null;
         }
         try {
-            const response = await this._request('GET', `/api/users/${encodeURIComponent(this.identity.id)}`);
+            const response = await this._request(
+                'GET',
+                `/api/users/${encodeURIComponent(this.identity.id)}`,
+                undefined,
+                { fallbackMessage: 'Unable to refresh identity.' }
+            );
             this.identity = {
                 id: response.id,
                 name: response.name,
@@ -275,19 +307,27 @@ class IdentityManager {
         this.notifySocket(true);
     }
 
-    async _request(method, path, body) {
+    async _request(method, path, body, options = {}) {
         const url = `${this.apiBase}${path}`;
         const headers = { 'Content-Type': 'application/json' };
-        const options = {
+        const requestOptions = {
             method,
             headers,
         };
         if (method !== 'GET' && method !== 'HEAD' && body !== undefined) {
-            options.body = JSON.stringify(body);
+            requestOptions.body = JSON.stringify(body);
         }
-        const response = await fetch(url, options);
+        const fallbackMessage = options && typeof options.fallbackMessage === 'string'
+            ? options.fallbackMessage
+            : 'Request failed.';
+        let response;
+        try {
+            response = await fetch(url, requestOptions);
+        } catch (networkError) {
+            throw new Error(fallbackMessage);
+        }
         if (!response.ok) {
-            let message = 'Unable to save name.';
+            let message = fallbackMessage;
             try {
                 const data = await response.json();
                 if (data && typeof data === 'object' && data.error) {
@@ -319,6 +359,50 @@ class IdentityManager {
         }
         const data = await response.json();
         return data;
+    }
+
+    async _loadRemoteConfig() {
+        let response;
+        try {
+            response = await this._request(
+                'GET',
+                '/api/identity/config',
+                undefined,
+                { fallbackMessage: 'Unable to load identity configuration.' }
+            );
+        } catch (error) {
+            throw error;
+        }
+        if (!response || typeof response !== 'object') {
+            return null;
+        }
+        const googleConfig = response.google || {};
+        const remoteIds = this._normaliseClientIds(
+            Array.isArray(googleConfig.clientIds) && googleConfig.clientIds.length
+                ? googleConfig.clientIds
+                : googleConfig.clientId || []
+        );
+        if (!this._areClientIdListsEqual(remoteIds, this.googleClientIds)) {
+            this.googleClientIds = remoteIds;
+            this.googleClientId = this.googleClientIds.length > 0 ? this.googleClientIds[0] : null;
+            this._notifyGoogleConfigChanged();
+        }
+        return response;
+    }
+
+    _notifyGoogleConfigChanged() {
+        if (!this.game || !this.game.lobby) {
+            return;
+        }
+        const lobby = this.game.lobby;
+        if (typeof lobby.configureGoogleIdentity === 'function') {
+            lobby.configureGoogleIdentity();
+        }
+        if (typeof lobby.updateIdentityDisplay === 'function') {
+            lobby.updateIdentityDisplay(this.getIdentity());
+        } else if (typeof lobby.updateGoogleDisplay === 'function') {
+            lobby.updateGoogleDisplay(this.getIdentity());
+        }
     }
 
     _persistIdentity() {
@@ -356,6 +440,24 @@ class IdentityManager {
                 .filter((value) => value.length > 0);
         }
         return [];
+    }
+
+    _areClientIdListsEqual(a, b) {
+        if (a === b) {
+            return true;
+        }
+        if (!Array.isArray(a) || !Array.isArray(b)) {
+            return false;
+        }
+        if (a.length !== b.length) {
+            return false;
+        }
+        for (let index = 0; index < a.length; index += 1) {
+            if (a[index] !== b[index]) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
