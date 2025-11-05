@@ -7,11 +7,18 @@ import {
     ITEM_TYPE_ROCKET,
     ITEM_TYPE_FLARE,
     ITEM_TYPE_MEDKIT,
-    ITEM_TYPE_CLOAK
+    ITEM_TYPE_CLOAK,
+    ITEM_TYPE_TURRET,
+    ITEM_TYPE_PLASMA,
+    ITEM_TYPE_SLEEPER
 } from "../constants";
-/**
- * Created by alan on 27/03/17.
- */
+
+const DIRECT_DROP_TYPES = new Set([
+    ITEM_TYPE_TURRET,
+    ITEM_TYPE_PLASMA,
+    ITEM_TYPE_SLEEPER,
+]);
+
 
 
 var lastShot = 0;
@@ -135,13 +142,23 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
 
         var dropInfo = game.iconFactory.dropSelectedIcon();
 
+        var x2;
+        var y2;
 
         var angle = -game.player.direction;
         var x = (Math.sin((angle / 16) * 3.14) * -1);
         var y = (Math.cos((angle / 16) * 3.14) * -1);
+        if (dropInfo && DIRECT_DROP_TYPES.has(dropInfo.type)) {
+            x2 = game.player.offset.x + 12;
+            y2 = game.player.offset.y + 24;
+        } else {
+            var angle = -game.player.direction;
+            var x = (Math.sin((angle / 16) * 3.14) * -1);
+            var y = (Math.cos((angle / 16) * 3.14) * -1);
 
-        var x2 = ((game.player.offset.x)) + (x * 20);
-        var y2 = ((game.player.offset.y) + 20) + (y * 20);
+            x2 = (game.player.offset.x) + (x * 20);
+            y2 = (game.player.offset.y + 20) + (y * 20);
+        }
 
         if (dropInfo) {
             var item = game.itemFactory.newItem(dropInfo, x2, y2, dropInfo.type);
