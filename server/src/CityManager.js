@@ -228,7 +228,7 @@ class CityManager {
         return cityInventory.get(type) || 0;
     }
 
-    releasePlayerInventory(socketId) {
+    releasePlayerInventory(socketId, options = {}) {
         if (!socketId || !this.inventoryByPlayer.has(socketId)) {
             return;
         }
@@ -237,10 +237,12 @@ class CityManager {
         if (!record || record.cityId === null || record.cityId === undefined) {
             return;
         }
+        const { returnToCity = false } = options || {};
         const cityInventory = this.ensureCityInventory(record.cityId);
         for (const [type, count] of record.items.entries()) {
             const current = cityInventory.get(type) || 0;
-            const nextValue = Math.max(0, current - count);
+            const baseValue = Math.max(0, current - count);
+            const nextValue = returnToCity ? baseValue + count : baseValue;
             if (nextValue > 0) {
                 cityInventory.set(type, nextValue);
             } else {
