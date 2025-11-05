@@ -986,6 +986,11 @@ game.lobby.attachSocket(game.socketListener);
 if (game.identityManager) {
     game.lobby.attachIdentityManager(game.identityManager);
     game.lobby.updateIdentityDisplay(game.identityManager.getIdentity());
+    if (typeof game.identityManager.initialise === 'function') {
+        game.identityManager.initialise().catch((error) => {
+            console.warn('[identity] Failed to initialise identity manager:', error?.message || error);
+        });
+    }
 }
 game.iconFactory = new IconFactory(game);
 game.itemFactory = new ItemFactory(game);

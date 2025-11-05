@@ -477,11 +477,30 @@ class LobbyManager {
 
     updateIdentityDisplay(identity) {
         const name = identity && typeof identity.name === 'string' ? identity.name.trim() : '';
+        const manager = this.identityManager;
+        const googleEnabled = !!(manager && typeof manager.isGoogleAuthEnabled === 'function' && manager.isGoogleAuthEnabled());
+        const usingGoogle = !!(identity && identity.provider === 'google');
         if (this.identitySummary) {
-            this.identitySummary.textContent = name.length ? `Playing as ${name}` : 'Playing as Guest';
+            if (usingGoogle && name.length) {
+                this.identitySummary.textContent = `Signed in as ${name}`;
+            } else if (name.length) {
+                this.identitySummary.textContent = `Playing as ${name}`;
+            } else if (googleEnabled) {
+                this.identitySummary.textContent = 'Sign in with Google to save your progress.';
+            } else {
+                this.identitySummary.textContent = 'Playing as Guest';
+            }
         }
         if (this.identityToggle) {
-            this.identityToggle.textContent = name.length ? 'Update Name' : 'Register';
+            let toggleLabel = 'Register';
+            if (usingGoogle && name.length) {
+                toggleLabel = 'Update Name';
+            } else if (name.length) {
+                toggleLabel = 'Update Name';
+            } else if (googleEnabled) {
+                toggleLabel = 'Continue as Guest';
+            }
+            this.identityToggle.textContent = toggleLabel;
             this.identityToggle.disabled = this.identityFormVisible || this.identityBusy;
         }
         const hasIdentity = !!(identity && identity.id);
@@ -592,7 +611,7 @@ class LobbyManager {
         if (identity && identity.provider === 'google') {
             this.setGoogleFeedback('Signed in with Google.', 'success');
         } else if (!this.googleBusy && !this.identityBusy && !this.identityFormVisible) {
-            this.setGoogleFeedback('Sign in with Google to link your name.', 'info');
+            this.setGoogleFeedback('Sign in with Google to save your progress.', 'info');
         }
     }
 
@@ -675,7 +694,7 @@ class LobbyManager {
         if (identity && identity.provider === 'google') {
             this.setGoogleFeedback('Signed in with Google.', 'success');
         } else if (!this.googleBusy && !this.identityBusy && !this.identityFormVisible) {
-            this.setGoogleFeedback('Sign in with Google to link your name.', 'info');
+            this.setGoogleFeedback('Sign in with Google to save your progress.', 'info');
         }
     }
 

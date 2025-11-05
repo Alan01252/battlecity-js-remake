@@ -225,6 +225,17 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
+app.get('/api/identity/config', (_req, res) => {
+    const clientIds = Array.isArray(GOOGLE_AUDIENCES) ? GOOGLE_AUDIENCES.filter((value) => value && value.length) : [];
+    res.json({
+        google: {
+            enabled: clientIds.length > 0,
+            clientIds,
+            clientId: clientIds.length > 0 ? clientIds[0] : null,
+        },
+    });
+});
+
 app.put('/api/users/:id', (req, res) => {
     const id = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
     if (!id) {
