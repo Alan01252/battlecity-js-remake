@@ -156,19 +156,22 @@ class BuildingFactory {
 
         const itemType = toFiniteNumber(data.type, null);
         const quantity = Math.max(1, toFiniteNumber(data.quantity, 1) || 1);
-        const previous = toFiniteNumber(building.itemsLeft, 0) || 0;
-        building.itemsLeft = Math.max(0, previous - quantity);
+        const previous = Math.max(0, toFiniteNumber(building.itemsLeft, 0) || 0);
+        const dispensed = Math.min(previous, quantity);
+        building.itemsLeft = previous - dispensed;
         this.emitPopulationUpdate(building);
 
         const owningCity = playerCity !== null ? playerCity : buildingCity;
-        if (itemType !== ITEM_TYPE_ORB &&
+        if (dispensed > 0 &&
+            itemType !== ITEM_TYPE_ORB &&
             this.cityManager &&
             Number.isFinite(owningCity) &&
             itemType !== null) {
-            this.cityManager.recordInventoryPickup(socket.id, owningCity, itemType, quantity);
+            this.cityManager.recordInventoryPickup(socket.id, owningCity, itemType, dispensed);
         }
 
-        if (itemType === ITEM_TYPE_ORB &&
+        if (dispensed > 0 &&
+            itemType === ITEM_TYPE_ORB &&
             this.cityManager &&
             typeof this.cityManager.registerOrbHolder === 'function') {
             const owningCity = playerCity !== null ? playerCity : buildingCity;
