@@ -12,7 +12,7 @@ const vectorToDirection = (dx, dy, fallback = 0) => {
   if (!Number.isFinite(dx) || !Number.isFinite(dy)) return fallback;
   const len2 = dx * dx + dy * dy;
   if (len2 < 1e-6) return fallback;
-  const theta = Math.atan2(dx, dy);
+  const theta = Math.atan2(-dx, -dy);
   let dir = Math.round((-theta / Math.PI) * 16);
   dir %= 32;
   if (dir < 0) dir += 32;
