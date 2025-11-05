@@ -1,12 +1,12 @@
-import {COLLISION_BLOCKING} from "../constants";
-import {COLLISION_MAP_EDGE_LEFT} from "../constants";
-import {COLLISION_MAP_EDGE_RIGHT} from "../constants";
-import {COLLISION_MAP_EDGE_TOP} from "../constants";
-import {COLLISION_MAP_EDGE_BOTTOM} from "../constants";
-import {COLLISION_MINE} from "../constants";
-import {COLLISION_DFG} from "../constants";
-import {ITEM_TYPE_MINE} from "../constants";
-import {ITEM_TYPE_DFG} from "../constants";
+import {COLLISION_BLOCKING} from "../constants.js";
+import {COLLISION_MAP_EDGE_LEFT} from "../constants.js";
+import {COLLISION_MAP_EDGE_RIGHT} from "../constants.js";
+import {COLLISION_MAP_EDGE_TOP} from "../constants.js";
+import {COLLISION_MAP_EDGE_BOTTOM} from "../constants.js";
+import {COLLISION_MINE} from "../constants.js";
+import {COLLISION_DFG} from "../constants.js";
+import {ITEM_TYPE_MINE} from "../constants.js";
+import {ITEM_TYPE_DFG} from "../constants.js";
 
 export const rectangleCollision = (rect1, rect2) => {
     if (!rect1 || !rect2) {

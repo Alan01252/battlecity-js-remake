@@ -1,10 +1,11 @@
-import {rectangleCollision} from "./collision-helpers";
-import {getPlayerRect} from "./collision-helpers";
+import {rectangleCollision} from "./collision-helpers.js";
+import {getPlayerRect} from "./collision-helpers.js";
 
 
-import {MAP_SQUARE_ROCK} from "../constants";
-import {MAP_SQUARE_BUILDING} from "../constants";
-import {BUILDING_HAS_BAY} from "../constants";
+import {MAP_SQUARE_ROCK} from "../constants.js";
+import {MAP_SQUARE_BUILDING} from "../constants.js";
+import {BUILDING_COMMAND_CENTER} from "../constants.js";
+import {BUILDING_REPAIR} from "../constants.js";
 
 const TILE_SIZE = 48;
 const BULLET_SIZE = 4;
@@ -201,7 +202,7 @@ export const collidedWithBuilding = (game, bullet) => {
             h: 96,
         };
 
-        if (building.type < BUILDING_HAS_BAY) {
+        if (building.type === BUILDING_COMMAND_CENTER || building.type === BUILDING_REPAIR) {
             buildingRect.h = buildingRect.h - 48;
         }
         if (collided(buildingRect, bullet)) {

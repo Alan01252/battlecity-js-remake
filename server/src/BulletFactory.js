@@ -14,7 +14,7 @@ const {
     COMMAND_CENTER_HEIGHT_TILES
 } = require("./gameplay/constants");
 const { createBulletRect, getPlayerRect, rectangleCollision } = require("./gameplay/geometry");
-const { isCommandCenter } = require('./constants');
+const { isCommandCenter, isHospital, isHouse } = require('./constants');
 
 let bulletCounter = 0;
 
@@ -47,7 +47,10 @@ const resolveBulletSpeed = (type) => {
 const BLOCKING_TILE_VALUES = new Set([2, 3]);
 const MAP_SIZE_TILES = 512;
 const MAP_PIXEL_SIZE = MAP_SIZE_TILES * TILE_SIZE;
-const BULLET_BUILDING_PADDING = TILE_SIZE * 0.2;
+const DEFAULT_BUILDING_WIDTH_TILES = COMMAND_CENTER_WIDTH_TILES;
+const DEFAULT_BUILDING_HEIGHT_TILES = COMMAND_CENTER_HEIGHT_TILES;
+const OPEN_BAY_HEIGHT_TILES = 1;
+const BULLET_BUILDING_PADDING = 0;
 
 class BulletFactory {
 
@@ -461,16 +464,75 @@ class BulletFactory {
 
     getBuildingFootprint(building) {
         if (!building) {
-            return { width: 1, height: 1 };
-        }
-        const type = Number.isFinite(building.type) ? building.type : null;
-        if (type !== null && isCommandCenter(type)) {
             return {
-                width: COMMAND_CENTER_WIDTH_TILES,
-                height: COMMAND_CENTER_HEIGHT_TILES
+                width: DEFAULT_BUILDING_WIDTH_TILES,
+                height: DEFAULT_BUILDING_HEIGHT_TILES
             };
         }
-        return { width: 1, height: 1 };
+        const explicitWidth = Number.isFinite(building.width) ? building.width : null;
+        const explicitHeight = Number.isFinite(building.height) ? building.height : null;
+        if (explicitWidth !== null && explicitHeight !== null) {
+            return { width: explicitWidth, height: explicitHeight };
+        }
+        const type = Number.isFinite(building.type) ? building.type : null;
+        if (type !== null) {
+            if (isCommandCenter(type) || isHospital(type)) {
+                return {
+                    width: COMMAND_CENTER_WIDTH_TILES,
+                    height: COMMAND_CENTER_HEIGHT_TILES
+                };
+            }
+            if (isHouse(type)) {
+                return { width: 1, height: 1 };
+            }
+        }
+        return {
+            width: DEFAULT_BUILDING_WIDTH_TILES,
+            height: DEFAULT_BUILDING_HEIGHT_TILES
+        };
+    }
+
+    hasOpenBay(building) {
+        const type = Number.isFinite(building?.type) ? building.type : null;
+        if (type === null) {
+            return false;
+        }
+        return isCommandCenter(type) || isHospital(type);
+    }
+
+    createBuildingHitboxes(building) {
+        const tileX = Number.isFinite(building.x) ? Math.floor(building.x) : null;
+        const tileY = Number.isFinite(building.y) ? Math.floor(building.y) : null;
+        if (tileX === null || tileY === null) {
+            return [];
+        }
+
+        const footprint = this.getBuildingFootprint(building);
+        const widthTiles = Math.max(1, Number.isFinite(footprint.width) ? footprint.width : DEFAULT_BUILDING_WIDTH_TILES);
+        const heightTiles = Math.max(1, Number.isFinite(footprint.height) ? footprint.height : DEFAULT_BUILDING_HEIGHT_TILES);
+
+        const baseRect = {
+            x: (tileX * TILE_SIZE) + BULLET_BUILDING_PADDING,
+            y: (tileY * TILE_SIZE) + BULLET_BUILDING_PADDING,
+            w: Math.max(TILE_SIZE * widthTiles - (BULLET_BUILDING_PADDING * 2), 8),
+            h: Math.max(TILE_SIZE * heightTiles - (BULLET_BUILDING_PADDING * 2), 8)
+        };
+
+        if (!this.hasOpenBay(building) || heightTiles <= OPEN_BAY_HEIGHT_TILES) {
+            return [baseRect];
+        }
+
+        const blockedTiles = Math.max(0, heightTiles - OPEN_BAY_HEIGHT_TILES);
+        if (blockedTiles <= 0) {
+            return [];
+        }
+
+        const blockedHeight = Math.max((blockedTiles * TILE_SIZE) - BULLET_BUILDING_PADDING, 8);
+        const topRect = Object.assign({}, baseRect, {
+            h: Math.min(baseRect.h, blockedHeight)
+        });
+
+        return [topRect];
     }
 
     hitsBuilding(rect) {
@@ -485,22 +547,11 @@ class BulletFactory {
             if (!building) {
                 continue;
             }
-            const tileX = Number.isFinite(building.x) ? Math.floor(building.x) : null;
-            const tileY = Number.isFinite(building.y) ? Math.floor(building.y) : null;
-            if (tileX === null || tileY === null) {
-                continue;
-            }
-            const footprint = this.getBuildingFootprint(building);
-            const width = Math.max(1, Number.isFinite(footprint.width) ? footprint.width : 1);
-            const height = Math.max(1, Number.isFinite(footprint.height) ? footprint.height : 1);
-            const buildingRect = {
-                x: (tileX * TILE_SIZE) + BULLET_BUILDING_PADDING,
-                y: (tileY * TILE_SIZE) + BULLET_BUILDING_PADDING,
-                w: Math.max(TILE_SIZE * width - (BULLET_BUILDING_PADDING * 2), 8),
-                h: Math.max(TILE_SIZE * height - (BULLET_BUILDING_PADDING * 2), 8)
-            };
-            if (rectangleCollision(rect, buildingRect)) {
-                return true;
+            const hitboxes = this.createBuildingHitboxes(building);
+            for (const hitbox of hitboxes) {
+                if (rectangleCollision(rect, hitbox)) {
+                    return true;
+                }
             }
         }
         return false;
