@@ -764,7 +764,10 @@ class SocketListener extends EventEmitter2 {
             active: !!data.active,
             armed: !!data.armed,
             detonateAt: data.detonateAt ?? null,
-            reason: data.reason ?? null
+            reason: data.reason ?? null,
+            revealedAt: data.revealedAt ?? null,
+            triggeredBy: data.triggeredBy ?? null,
+            triggeredTeam: data.triggeredTeam ?? null
         };
     }
 
