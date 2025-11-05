@@ -1,12 +1,14 @@
-import {rectangleCollision} from "./collision-helpers";
-import {getPlayerRect} from "./collision-helpers";
+import {rectangleCollision} from "./collision-helpers.js";
+import {getPlayerRect} from "./collision-helpers.js";
 
 
-import {MAP_SQUARE_ROCK} from "../constants";
-import {MAP_SQUARE_BUILDING} from "../constants";
-import {BUILDING_COMMAND_CENTER} from "../constants";
+import {MAP_SQUARE_ROCK} from "../constants.js";
+import {MAP_SQUARE_BUILDING} from "../constants.js";
+import {BUILDING_COMMAND_CENTER} from "../constants.js";
+import {BUILDING_REPAIR} from "../constants.js";
 import {BUILDING_FACTORY} from "../constants";
-import {BUILDING_REPAIR} from "../constants";
+import buildingTypes from "../../../shared/buildingTypes.js";
+const {resolveBuildingFamily} = buildingTypes;;
 import {isHospitalBuilding} from "../utils/buildings";
 
 const TILE_SIZE = 48;
