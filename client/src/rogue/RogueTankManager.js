@@ -72,7 +72,7 @@ const vectorToDirection = (dx, dy, fallback = 0) => {
     }
     const normX = dx / length;
     const normY = dy / length;
-    const theta = Math.atan2(normX, normY);
+    const theta = Math.atan2(-normX, -normY);
     let direction = Math.round((-theta / Math.PI) * 16);
     direction %= 32;
     if (direction < 0) {
