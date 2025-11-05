@@ -6,20 +6,9 @@ import {MAP_SQUARE_ROCK} from "../constants.js";
 import {MAP_SQUARE_BUILDING} from "../constants.js";
 import {BUILDING_COMMAND_CENTER} from "../constants.js";
 import {BUILDING_REPAIR} from "../constants.js";
+import buildingTypes from "../../../shared/buildingTypes.js";
 
-const resolveBuildingFamily = (type) => {
-    if (type === null || type === undefined) {
-        return null;
-    }
-    const numeric = Number(type);
-    if (!Number.isFinite(numeric)) {
-        return null;
-    }
-    if (numeric < 100) {
-        return numeric;
-    }
-    return Math.floor(numeric / 100);
-};
+const {resolveBuildingFamily} = buildingTypes;
 
 const TILE_SIZE = 48;
 const BULLET_SIZE = 4;
