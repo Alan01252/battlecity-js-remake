@@ -1,6 +1,7 @@
 import {checkPlayerCollision} from "./collision/collision-player";
 
 import {MOVEMENT_SPEED_PLAYER} from './constants';
+import {MAX_HEALTH} from "./constants";
 import {COLLISION_MAP_EDGE_LEFT} from "./constants";
 import {COLLISION_MAP_EDGE_RIGHT} from "./constants";
 import {COLLISION_MAP_EDGE_TOP} from "./constants";
@@ -9,9 +10,15 @@ import {COLLISION_BLOCKING} from "./constants";
 import {COLLISION_MINE} from "./constants";
 import {COLLISION_DFG} from "./constants";
 import {getCitySpawn} from "./utils/citySpawns";
+import {getPlayerRect} from "./collision/collision-helpers";
+import {rectangleCollision} from "./collision/collision-helpers";
+import {isHospitalBuilding} from "./utils/buildings";
+import {getHospitalDriveableRect} from "./utils/buildings";
 
 const TILE_SIZE = 48;
 const NEAREST_SAFE_MAX_RADIUS_TILES = 12;
+const HOSPITAL_HEAL_INTERVAL = 150;
+const HOSPITAL_HEAL_AMOUNT = 2;
 
 const BLOCKING_COLLISIONS = new Set([
     COLLISION_BLOCKING,
@@ -43,6 +50,44 @@ const updateLastSafeOffset = (game) => {
         x: game.player.offset.x,
         y: game.player.offset.y
     };
+};
+
+const applyHospitalHealing = (game) => {
+    if (!game || !game.player || !game.buildingFactory || typeof game.buildingFactory.findBuildingAtTile !== 'function') {
+        return;
+    }
+
+    const playerRect = getPlayerRect(game.player);
+    const centerX = playerRect.x + (playerRect.w / 2);
+    const centerY = playerRect.y + (playerRect.h / 2);
+    const tileX = Math.floor(centerX / TILE_SIZE);
+    const tileY = Math.floor(centerY / TILE_SIZE);
+    const building = game.buildingFactory.findBuildingAtTile(tileX, tileY);
+    if (!isHospitalBuilding(building)) {
+        return;
+    }
+
+    const healZone = getHospitalDriveableRect(building);
+    if (!healZone || !rectangleCollision(playerRect, healZone)) {
+        return;
+    }
+
+    if (!Number.isFinite(game.player.health) || game.player.health >= MAX_HEALTH) {
+        return;
+    }
+
+    const now = game.tick || Date.now();
+    const lastHeal = Number.isFinite(game.player.lastHospitalHealAt) ? game.player.lastHospitalHealAt : 0;
+    if (now < lastHeal + HOSPITAL_HEAL_INTERVAL) {
+        return;
+    }
+
+    const previousHealth = game.player.health;
+    game.player.health = Math.min(MAX_HEALTH, previousHealth + HOSPITAL_HEAL_AMOUNT);
+    game.player.lastHospitalHealAt = now;
+    if (game.player.health !== previousHealth) {
+        game.forceDraw = true;
+    }
 };
 
 const isBlockingCollision = (collisionCode) => BLOCKING_COLLISIONS.has(collisionCode);
@@ -425,6 +470,8 @@ export const play = (game) => {
     } else if (isFrozen) {
         game.player.isMoving = 0;
     }
+
+    applyHospitalHealing(game);
 
     if (!isFrozen) {
         ensurePlayerUnstuck(game);

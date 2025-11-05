@@ -23,6 +23,7 @@ class Player {
         this.isFrozen = false;
         this.frozenUntil = 0;
         this.frozenBy = null;
+        this.lastHospitalHealAt = 0;
         this.isSystemControlled = false;
         this.isFake = false;
         this.isFakeRecruit = false;
