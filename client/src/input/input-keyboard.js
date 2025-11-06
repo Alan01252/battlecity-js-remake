@@ -15,6 +15,7 @@ import {
     ITEM_TYPE_SLEEPER
 } from "../constants";
 import { SOUND_IDS } from "../audio/AudioManager";
+import spawnMuzzleFlash, { computeTankMuzzlePosition, normaliseDirection } from "../effects/muzzleFlash";
 
 const DIRECT_DROP_TYPES = new Set([
     ITEM_TYPE_TURRET,
@@ -262,33 +263,29 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             return;
         }
 
-        const direction = Math.round(game.player.direction) % 32;
-        const reverseCenter = (direction + 16 + 32) % 32;
-        const reverseLeft = (direction + 20 + 32) % 32;
-        const reverseRight = (direction + 12 + 32) % 32;
-        const angles = [reverseLeft, reverseCenter, reverseRight];
-
-        const angleDegrees = (reverseCenter / 32) * 360;
-        const radians = (angleDegrees * Math.PI) / 180;
-        const xComponent = Math.sin(radians);
-        const yComponent = Math.cos(radians) * -1;
-
-        const originX = ((game.player.offset.x) + 24) + (xComponent * 30);
-        const originY = ((game.player.offset.y) + 24) + (yComponent * 30);
+        const currentDirection = normaliseDirection(game.player.direction);
+        const reverseCenter = normaliseDirection(currentDirection + 16);
+        const reverseLeft = normaliseDirection(currentDirection + 20);
+        const reverseRight = normaliseDirection(currentDirection + 12);
+        const origin = computeTankMuzzlePosition(game.player.offset, reverseCenter);
+        const originX = origin.x;
+        const originY = origin.y;
         const teamId = game.player.city ?? null;
 
         lastShot = game.tick + TIMER_SHOOT_FLARE;
+        spawnMuzzleFlash(game, originX, originY);
 
-        angles.forEach((dir) => {
+        [reverseLeft, reverseCenter, reverseRight].forEach((dir) => {
+            const shotDirection = normaliseDirection(dir);
             const packet = {
                 shooter: game.player.id,
                 x: originX,
                 y: originY,
                 type: 3,
-                angle: -dir,
+                angle: -shotDirection,
                 team: teamId
             };
-            game.bulletFactory.newBullet(game.player.id, originX, originY, 3, -dir, teamId);
+            game.bulletFactory.newBullet(game.player.id, originX, originY, 3, -shotDirection, teamId);
             game.socketListener.sendBulletShot(packet);
         });
         playShotSound(game, SOUND_IDS.FLARE, { x: originX, y: originY });
@@ -319,17 +316,14 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         if (game.tick > lastShot) {
             lastShot = game.tick + cooldown;
 
-            var angle = game.player.direction;
-            var angleInDegrees = (angle / 32) * 360;
-
-            var x = (Math.sin((angleInDegrees * 3.14) / 180));
-            var y = (Math.cos((angleInDegrees * 3.14) / 180) * -1);
-
-            var x2 = ((game.player.offset.x) + 24) + (x * 30);
-            var y2 = ((game.player.offset.y) + 24) + (y * 30);
-
+            const direction = normaliseDirection(game.player.direction);
+            const muzzle = computeTankMuzzlePosition(game.player.offset, direction);
+            const shotAngle = -direction;
+            const x2 = muzzle.x;
+            const y2 = muzzle.y;
             const teamId = game.player.city ?? null;
-            game.bulletFactory.newBullet(game.player.id, x2, y2, bulletType, -angle, teamId);
+            spawnMuzzleFlash(game, x2, y2);
+            game.bulletFactory.newBullet(game.player.id, x2, y2, bulletType, shotAngle, teamId);
             const soundId = canFireRocket ? SOUND_IDS.ROCKET : SOUND_IDS.LASER;
             playShotSound(game, soundId, { x: x2, y: y2 });
             game.socketListener.sendBulletShot({
@@ -337,7 +331,7 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
                 x: x2,
                 y: y2,
                 type: bulletType,
-                angle: -angle,
+                angle: shotAngle,
                 team: teamId
             });
         }

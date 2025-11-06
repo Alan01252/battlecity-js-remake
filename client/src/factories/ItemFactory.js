@@ -19,6 +19,7 @@ import {TIMER_CLOAK} from "../constants";
 import {ITEM_INITIAL_LIFE} from "../constants";
 import {ITEM_BURN_THRESHOLDS} from "../constants";
 import { SOUND_IDS } from '../audio/AudioManager';
+import spawnMuzzleFlash from "../effects/muzzleFlash";
 
 const STRUCTURE_ITEM_TYPES = new Set([
     ITEM_TYPE_WALL,
@@ -199,6 +200,7 @@ class ItemFactory {
             const shooterId = item.ownerId ?? item.owner ?? this.game.player.id;
             const shooterTeam = item.teamId ?? this.game.player.city ?? null;
 
+            spawnMuzzleFlash(this.game, x2, y2);
             this.game.bulletFactory.newBullet(shooterId, x2, y2, 0, direction, shooterTeam, {
                 sourceId: item.id ?? null,
                 sourceType: this.resolveItemSourceType(item),

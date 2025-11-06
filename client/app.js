@@ -1055,6 +1055,7 @@ const resourcesToLoad = [
     { name: 'imgSmoke', url: assetUrl('imgSmoke.png') },
     { name: 'imgLEExplosion', url: assetUrl('imgLExplosion.png') },
     { name: 'imgSExplosion', url: assetUrl('imgSExplosion.png') },
+    { name: 'imgMuzzleFlash', url: assetUrl('imgMuzzleFlash.png') },
     {
         name: 'mapData',
         url: assetUrl('map.dat'),
@@ -1132,7 +1133,8 @@ function setup() {
         resources.imgMoneyDown,
         resources.imgSmoke,
         resources.imgLEExplosion,
-        resources.imgSExplosion
+        resources.imgSExplosion,
+        resources.imgMuzzleFlash
     ];
 
     colorKeyTargets.forEach((resource) => applyColorKey(resource));
@@ -1165,6 +1167,7 @@ function setup() {
     game.textures['imageLEExplosion'] = resources.imgLEExplosion.texture;
     game.textures['imgLEExplosion'] = resources.imgLEExplosion.texture;
     game.textures['imageSExplosion'] = resources.imgSExplosion.texture;
+    game.textures['imageMuzzleFlash'] = resources.imgMuzzleFlash.texture;
 
 
     setupKeyboardInputs(game);

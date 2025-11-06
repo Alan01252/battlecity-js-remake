@@ -15,6 +15,13 @@ const EXPLOSION_VARIANTS = {
         duration: 90,
         textureKey: 'imageLEExplosion',
         fallbackKey: 'imageSExplosion'
+    },
+    muzzle: {
+        frameSize: 12,
+        totalFrames: 2,
+        duration: 45,
+        textureKey: 'imageMuzzleFlash',
+        fallbackKey: 'imageSExplosion'
     }
 };
 const EXPLOSION_FRAME_DURATION = 100;

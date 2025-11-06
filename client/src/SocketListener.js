@@ -2,6 +2,7 @@ import { io } from 'socket.io-client';
 import { EventEmitter2 } from 'eventemitter2';
 import { getCitySpawn } from './utils/citySpawns';
 import { SOUND_IDS } from './audio/AudioManager';
+import spawnMuzzleFlash from './effects/muzzleFlash';
 
 const CHAT_MAX_LENGTH = 240;
 const CONTROL_CHAR_PATTERN = /[\u0000-\u001F\u007F]/g;
@@ -178,7 +179,11 @@ class SocketListener extends EventEmitter2 {
                 data.team ?? null,
                 options
             );
-            if (!this.shouldSuppressShotSound(data)) {
+            const suppressSound = this.shouldSuppressShotSound(data);
+            if (!suppressSound) {
+                spawnMuzzleFlash(this.game, data.x, data.y);
+            }
+            if (!suppressSound) {
                 this.playBulletShotSound(data);
             }
         });
