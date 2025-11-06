@@ -13,6 +13,24 @@ export const setupMouseInputs = (game) => {
 
     gameArea.on('mousedown', (event) => {
         console.log("Got mouse down event");
+        if (!game?.player?.isMayor) {
+            if (game.notify) {
+                game.notify({
+                    title: 'Construction Restricted',
+                    message: 'Only mayors can place or demolish city structures.',
+                    variant: 'warn',
+                    timeout: 3200
+                });
+            } else {
+                console.warn('Construction restricted: only mayors may build or demolish.');
+            }
+            if (game.clearGhostBuilding) {
+                game.clearGhostBuilding();
+            }
+            game.showBuildMenu = false;
+            game.isDemolishing = false;
+            return;
+        }
         if (game.isBuilding && game.isDragging) {
             var offTileXBuild = Math.floor(game.player.offset.x % 48);
             var offTileYBuild = Math.floor(game.player.offset.y % 48);

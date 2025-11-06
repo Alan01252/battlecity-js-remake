@@ -121,6 +121,16 @@ export const setupBuildingMenu = (game) => {
         return;
     }
 
+    const isMayor = !!(game && game.player && game.player.isMayor);
+    if (!isMayor) {
+        clearGhostBuilding(game);
+        menuContainer.visible = false;
+        if (!menuContainer.parent) {
+            game.stage.addChild(menuContainer);
+        }
+        return;
+    }
+
     const playerCity = Number.isFinite(game?.player?.city) ? game.player.city : null;
     const cityState = (playerCity !== null && Array.isArray(game?.cities))
         ? game.cities[playerCity]

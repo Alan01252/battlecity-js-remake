@@ -107,6 +107,20 @@ class BuildingFactory {
         const coordKey = `${x}_${y}`;
         const cityId = Number.isFinite(city) ? city : parseInt(city, 10) || 0;
         const isLocalPlacement = notifyServer && owner !== null && owner !== undefined && this.game?.player && owner === this.game.player.id;
+        if (isLocalPlacement && !this.game?.player?.isMayor) {
+            if (this.game.notify) {
+                this.game.notify({
+                    title: 'Construction Restricted',
+                    message: 'Only mayors can authorise new construction.',
+                    variant: 'warn',
+                    timeout: 3600
+                });
+            } else {
+                console.warn('Construction restricted: only mayors may build.');
+            }
+            this.game.forceDraw = true;
+            return false;
+        }
         if (isLocalPlacement) {
             const cityState = this.game.cities?.[cityId];
             if (!cityState) {
@@ -238,6 +252,20 @@ class BuildingFactory {
     demolishBuilding(x, y) {
 
         console.log("Trying to demolish building at " + x + " " + y);
+        if (!this.game?.player?.isMayor) {
+            if (this.game.notify) {
+                this.game.notify({
+                    title: 'Demolition Restricted',
+                    message: 'Only mayors can order demolitions.',
+                    variant: 'warn',
+                    timeout: 3200
+                });
+            } else {
+                console.warn('Demolition restricted: only mayors may demolish buildings.');
+            }
+            this.game.isDemolishing = false;
+            return;
+        }
 
         const buildingNode = this.findBuildingAtTile(x, y);
         if (!buildingNode) {

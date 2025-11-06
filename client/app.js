@@ -957,6 +957,21 @@ game.showHelpMessage = () => {
 };
 
 game.toggleBuildMenuFromPanel = () => {
+    if (!game?.player?.isMayor) {
+        if (game.notify) {
+            game.notify({
+                title: 'Construction Restricted',
+                message: 'Only the mayor can access the build menu.',
+                variant: 'warn',
+                timeout: 3600
+            });
+        } else {
+            console.warn('Build menu unavailable: only mayors can construct buildings.');
+        }
+        game.showBuildMenu = false;
+        game.forceDraw = true;
+        return;
+    }
     game.showBuildMenu = !game.showBuildMenu;
     if (game.notify) {
         game.notify({
