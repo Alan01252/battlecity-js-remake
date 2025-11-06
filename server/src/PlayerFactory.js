@@ -96,6 +96,7 @@ class PlayerFactory {
         this.callsigns = new CallsignRegistry();
         this.chatManager = null;
         this.userStore = options.userStore || null;
+        this.scoreService = options.scoreService || null;
     }
 
     listen(io) {
@@ -336,6 +337,10 @@ class PlayerFactory {
         this.chatManager = chatManager;
     }
 
+    setScoreService(scoreService) {
+        this.scoreService = scoreService || null;
+    }
+
     getPlayerTeam(socketId) {
         const player = this.game.players[socketId];
         if (!player) {
@@ -356,6 +361,127 @@ class PlayerFactory {
             return player.callsign;
         }
         return this.callsigns.get(socketId);
+    }
+
+    getHumanPlayersInCity(cityId) {
+        const id = normaliseCityIdValue(cityId, null);
+        if (id === null) {
+            return [];
+        }
+        const players = Object.values(this.game.players || {});
+        return players.filter((player) => {
+            if (!player || player.isSystemControlled) {
+                return false;
+            }
+            return normaliseCityIdValue(player.city, null) === id;
+        });
+    }
+
+    getScoringUserIdsForCity(cityId) {
+        const participants = this.getHumanPlayersInCity(cityId);
+        const ids = [];
+        for (const player of participants) {
+            if (!player || !player.userId) {
+                continue;
+            }
+            const identifier = String(player.userId);
+            if (!ids.includes(identifier)) {
+                ids.push(identifier);
+            }
+        }
+        return ids;
+    }
+
+    handleScoreServiceResult(result) {
+        if (!result) {
+            return;
+        }
+        if (Array.isArray(result.promotions)) {
+            result.promotions.forEach((promotion) => this.announcePromotion(promotion));
+        }
+        if (result.changed) {
+            this.emitLobbySnapshot();
+        }
+    }
+
+    announcePromotion(promotion) {
+        if (!promotion || !promotion.rankTitle) {
+            return;
+        }
+        const displayName = (promotion.displayName && promotion.displayName.trim()) || 'A player';
+        const message = `${displayName} has been promoted to ${promotion.rankTitle}!`;
+        if (this.chatManager && typeof this.chatManager.broadcastSystemMessage === 'function') {
+            this.chatManager.broadcastSystemMessage(message);
+        } else if (this.io) {
+            this.io.emit('score:promotion', JSON.stringify({
+                name: displayName,
+                rankTitle: promotion.rankTitle,
+                userId: promotion.userId || null
+            }));
+        }
+    }
+
+    recordOrbVictoryForCity({ attackerCityId, points, orbPlayer }) {
+        if (!this.scoreService) {
+            return;
+        }
+        const cityId = normaliseCityIdValue(attackerCityId, null);
+        if (cityId === null) {
+            return;
+        }
+        const participantUserIds = this.getScoringUserIdsForCity(cityId);
+        if (!participantUserIds.length) {
+            return;
+        }
+        const orbHolderUserId = orbPlayer && orbPlayer.userId ? String(orbPlayer.userId) : null;
+        const result = this.scoreService.recordOrbVictory({
+            participantUserIds,
+            orbHolderUserId,
+            points
+        });
+        this.handleScoreServiceResult(result);
+    }
+
+    handleDeathScore(player, killSummary) {
+        if (!this.scoreService || !player) {
+            return;
+        }
+        const victimUserId = player.userId ? String(player.userId) : null;
+        if (!victimUserId) {
+            return;
+        }
+        const victimProfile = this.scoreService.getProfile(victimUserId);
+        const applyPenalty = !!(victimProfile && Number(victimProfile.points) > 100);
+        const victimCityId = normaliseCityIdValue(player.city, null);
+
+        let killerCityId = null;
+        if (killSummary) {
+            killerCityId = normaliseCityIdValue(killSummary.killerCity, null);
+            if (killerCityId === null) {
+                killerCityId = normaliseCityIdValue(killSummary.teamId, null);
+            }
+        }
+
+        let killerUserId = null;
+        if (killSummary && killSummary.killerId) {
+            const killerPlayer = this.game.players[killSummary.killerId];
+            if (killerPlayer && killerPlayer.userId) {
+                killerUserId = String(killerPlayer.userId);
+            }
+        }
+
+        const shouldRewardOpponents = applyPenalty
+            && killerCityId !== null
+            && victimCityId !== null
+            && killerCityId !== victimCityId;
+
+        const killerUserIds = shouldRewardOpponents ? this.getScoringUserIdsForCity(killerCityId) : [];
+        const result = this.scoreService.recordDeath({
+            victimUserId,
+            killerUserIds,
+            killerUserId
+        });
+        this.handleScoreServiceResult(result);
     }
 
     describeKillOrigin(details) {
@@ -802,6 +928,7 @@ class PlayerFactory {
             this.emitStatusUpdate(player);
         }
         const killSummary = this.resolveKillSummary(player, meta);
+        this.handleDeathScore(player, killSummary);
         const victimCallsign = player.callsign || this.getPlayerCallsign(player.id);
         if (this.io) {
             this.io.emit('player:dead', JSON.stringify({
@@ -878,6 +1005,9 @@ class PlayerFactory {
         if (identity) {
             player.userId = identity.id;
             player.callsign = identity.name;
+            if (this.scoreService && typeof this.scoreService.syncIdentity === 'function') {
+                this.scoreService.syncIdentity(identity);
+            }
         } else {
             player.userId = null;
             player.callsign = this.callsigns.assign(player.id, { category: 'human' });
@@ -1339,10 +1469,14 @@ class PlayerFactory {
     buildLobbySnapshot() {
         const cityIds = this.getCityCandidates();
         const entries = cityIds.map((id) => this.buildLobbyEntry(id)).filter((entry) => !!entry);
+        const highScores = this.scoreService && typeof this.scoreService.getHighScores === 'function'
+            ? this.scoreService.getHighScores(20)
+            : [];
         return {
             cities: entries,
             maxRecruitsPerCity: this.maxRecruitsPerCity,
-            updatedAt: Date.now()
+            updatedAt: Date.now(),
+            highScores
         };
     }
 

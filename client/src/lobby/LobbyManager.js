@@ -27,6 +27,8 @@ class LobbyManager {
         this.googleScriptPromise = null;
         this.googleInitialized = false;
         this.googleBusy = false;
+        this.activeTab = 'cities';
+        this.lastHighScores = [];
         this.isActivated = options.autoShow !== false;
 
         this.onLobbySnapshot = (snapshot) => this.updateSnapshot(snapshot);
@@ -96,6 +98,47 @@ class LobbyManager {
                 color: #b3b9c9;
                 margin: 0;
             }
+            .lobby-tabs {
+                display: flex;
+                gap: 8px;
+                border-bottom: 1px solid rgba(53, 63, 83, 0.8);
+                padding-bottom: 8px;
+            }
+            .lobby-tab {
+                background: transparent;
+                border: none;
+                color: #b3b9c9;
+                font-size: 14px;
+                padding: 6px 12px;
+                border-radius: 6px 6px 0 0;
+                cursor: pointer;
+                transition: background 0.2s, color 0.2s;
+            }
+            .lobby-tab:hover {
+                color: #f5f7ff;
+            }
+            .lobby-tab:focus {
+                outline: none;
+                box-shadow: 0 0 0 2px rgba(123, 225, 125, 0.35);
+            }
+            .lobby-tab.active {
+                background: rgba(53, 63, 83, 0.6);
+                color: #f5f7ff;
+                font-weight: 600;
+            }
+            .lobby-tab-panels {
+                flex: 1;
+                display: flex;
+                position: relative;
+            }
+            .lobby-tab-panel {
+                flex: 1;
+                display: none;
+                flex-direction: column;
+            }
+            .lobby-tab-panel.active {
+                display: flex;
+            }
             .lobby-city-list {
                 flex: 1;
                 overflow-y: auto;
@@ -123,6 +166,56 @@ class LobbyManager {
             .lobby-city-row.waiting {
                 border-color: #5c9eff;
                 box-shadow: 0 0 0 1px rgba(92, 158, 255, 0.35);
+            }
+            .lobby-highscore-list {
+                flex: 1;
+                overflow-y: auto;
+                padding-right: 6px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .lobby-highscore-empty {
+                color: #b3b9c9;
+                font-size: 14px;
+                text-align: center;
+                padding: 24px 0;
+            }
+            .lobby-highscore-row {
+                display: grid;
+                grid-template-columns: 44px 1fr 120px;
+                align-items: center;
+                background: rgba(22, 27, 38, 0.85);
+                border: 1px solid rgba(53, 63, 83, 0.8);
+                border-radius: 6px;
+                padding: 10px 14px;
+                gap: 12px;
+                font-size: 14px;
+            }
+            .lobby-highscore-info {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                min-width: 0;
+            }
+            .lobby-highscore-rank {
+                font-weight: 600;
+                color: #7be17d;
+                text-align: center;
+            }
+            .lobby-highscore-name {
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            }
+            .lobby-highscore-score {
+                text-align: right;
+                color: #ffc977;
+                font-weight: 600;
+            }
+            .lobby-highscore-meta {
+                font-size: 12px;
+                color: #8d94a7;
             }
             .lobby-city-info {
                 display: flex;
@@ -321,8 +414,45 @@ class LobbyManager {
         header.appendChild(title);
         header.appendChild(subtitle);
 
+        this.tabContainer = document.createElement('div');
+        this.tabContainer.className = 'lobby-tabs';
+
+        this.lobbyTabButton = document.createElement('button');
+        this.lobbyTabButton.type = 'button';
+        this.lobbyTabButton.className = 'lobby-tab';
+        this.lobbyTabButton.textContent = 'Lobby';
+        this.lobbyTabButton.addEventListener('click', () => this.setActiveTab('cities'));
+
+        this.highScoreTabButton = document.createElement('button');
+        this.highScoreTabButton.type = 'button';
+        this.highScoreTabButton.className = 'lobby-tab';
+        this.highScoreTabButton.textContent = 'High Scores';
+        this.highScoreTabButton.addEventListener('click', () => this.setActiveTab('scores'));
+
+        this.tabContainer.appendChild(this.lobbyTabButton);
+        this.tabContainer.appendChild(this.highScoreTabButton);
+
+        this.tabPanels = document.createElement('div');
+        this.tabPanels.className = 'lobby-tab-panels';
+
+        this.cityPanel = document.createElement('div');
+        this.cityPanel.className = 'lobby-tab-panel';
+        this.cityPanel.dataset.tab = 'cities';
+
         this.cityListContainer = document.createElement('div');
         this.cityListContainer.className = 'lobby-city-list';
+        this.cityPanel.appendChild(this.cityListContainer);
+
+        this.highScorePanel = document.createElement('div');
+        this.highScorePanel.className = 'lobby-tab-panel';
+        this.highScorePanel.dataset.tab = 'scores';
+
+        this.highScoreContainer = document.createElement('div');
+        this.highScoreContainer.className = 'lobby-highscore-list';
+        this.highScorePanel.appendChild(this.highScoreContainer);
+
+        this.tabPanels.appendChild(this.cityPanel);
+        this.tabPanels.appendChild(this.highScorePanel);
 
         const actions = document.createElement('div');
         actions.className = 'lobby-actions';
@@ -435,12 +565,15 @@ class LobbyManager {
         this.statusNode.dataset.type = 'info';
 
         panel.appendChild(header);
-        panel.appendChild(this.cityListContainer);
+        panel.appendChild(this.tabContainer);
+        panel.appendChild(this.tabPanels);
         panel.appendChild(actions);
         panel.appendChild(this.statusNode);
 
         this.overlay.appendChild(panel);
         document.body.appendChild(this.overlay);
+        this.setActiveTab(this.activeTab || 'cities');
+        this.renderHighScores();
     }
 
     attachSocket(socketListener) {
@@ -873,13 +1006,92 @@ class LobbyManager {
             return;
         }
         this.lastSnapshot = data;
+        this.lastHighScores = Array.isArray(data.highScores) ? data.highScores : [];
         this.renderCityList();
+        this.renderHighScores();
         if (!this.waiting) {
             const hasVacancy = data.cities.some((city) => city.openMayor || (city.openRecruits > 0));
             if (!hasVacancy && this.visible) {
                 this.setStatus('All cities are currently full. Please wait for an opening.', { type: 'warn' });
             }
         }
+    }
+
+    setActiveTab(tab) {
+        const target = tab === 'scores' ? 'scores' : 'cities';
+        this.activeTab = target;
+        if (this.lobbyTabButton) {
+            this.lobbyTabButton.classList.toggle('active', target === 'cities');
+            this.lobbyTabButton.setAttribute('aria-selected', target === 'cities' ? 'true' : 'false');
+        }
+        if (this.highScoreTabButton) {
+            this.highScoreTabButton.classList.toggle('active', target === 'scores');
+            this.highScoreTabButton.setAttribute('aria-selected', target === 'scores' ? 'true' : 'false');
+        }
+        if (this.cityPanel) {
+            this.cityPanel.classList.toggle('active', target === 'cities');
+        }
+        if (this.highScorePanel) {
+            this.highScorePanel.classList.toggle('active', target === 'scores');
+        }
+    }
+
+    renderHighScores() {
+        if (!this.highScoreContainer) {
+            return;
+        }
+        const entries = Array.isArray(this.lastHighScores) ? this.lastHighScores : [];
+        this.highScoreContainer.innerHTML = '';
+        if (!entries.length) {
+            const empty = document.createElement('div');
+            empty.className = 'lobby-highscore-empty';
+            empty.textContent = 'No player scores yet.';
+            this.highScoreContainer.appendChild(empty);
+            return;
+        }
+        entries.forEach((entry, index) => {
+            const row = document.createElement('div');
+            row.className = 'lobby-highscore-row';
+            row.dataset.rank = String(index + 1);
+
+            const rank = document.createElement('div');
+            rank.className = 'lobby-highscore-rank';
+            rank.textContent = `#${index + 1}`;
+
+            const info = document.createElement('div');
+            info.className = 'lobby-highscore-info';
+
+            const name = document.createElement('div');
+            name.className = 'lobby-highscore-name';
+            name.textContent = (entry && typeof entry.name === 'string' && entry.name.trim().length)
+                ? entry.name
+                : 'Unknown Pilot';
+
+            const meta = document.createElement('div');
+            meta.className = 'lobby-highscore-meta';
+            const rankTitle = entry && entry.rankTitle ? entry.rankTitle : 'Private';
+            const details = [`Rank: ${rankTitle}`];
+            if (entry && Number.isFinite(entry.orbs) && entry.orbs > 0) {
+                details.push(`Orbs: ${entry.orbs}`);
+            }
+            if (entry && Number.isFinite(entry.assists) && entry.assists > 0) {
+                details.push(`Assists: ${entry.assists}`);
+            }
+            meta.textContent = details.join(' • ');
+
+            info.appendChild(name);
+            info.appendChild(meta);
+
+            const score = document.createElement('div');
+            score.className = 'lobby-highscore-score';
+            const points = entry && Number.isFinite(entry.points) ? entry.points : Number(entry?.points) || 0;
+            score.textContent = `${Math.max(0, Math.floor(points)).toLocaleString()} pts`;
+
+            row.appendChild(rank);
+            row.appendChild(info);
+            row.appendChild(score);
+            this.highScoreContainer.appendChild(row);
+        });
     }
 
     renderCityList() {

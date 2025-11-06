@@ -295,6 +295,30 @@ class ChatManager {
         }
     }
 
+    broadcastSystemMessage(text) {
+        if (!text || !text.toString().trim().length) {
+            return;
+        }
+        const sanitized = this.sanitiseMessage(String(text));
+        if (!sanitized) {
+            return;
+        }
+        const payload = {
+            id: `system-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            scope: "global",
+            text: sanitized,
+            createdAt: Date.now(),
+            senderId: null,
+            senderCity: null,
+            senderCallsign: "System",
+            senderDisplay: "System"
+        };
+        this.pushHistory(payload);
+        if (this.io) {
+            this.io.emit("chat:message", JSON.stringify(payload));
+        }
+    }
+
     sendHistoryForSocket(socketOrId) {
         if (!this.history.length) {
             return;
