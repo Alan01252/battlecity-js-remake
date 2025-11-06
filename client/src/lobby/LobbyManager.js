@@ -1,7 +1,7 @@
 import { getCityDisplayName } from '../utils/citySpawns';
 
 class LobbyManager {
-    constructor(game) {
+    constructor(game, options = {}) {
         this.game = game;
         this.socketListener = null;
         this.lastSnapshot = null;
@@ -27,6 +27,7 @@ class LobbyManager {
         this.googleScriptPromise = null;
         this.googleInitialized = false;
         this.googleBusy = false;
+        this.isActivated = options.autoShow !== false;
 
         this.onLobbySnapshot = (snapshot) => this.updateSnapshot(snapshot);
         this.onLobbyUpdate = (snapshot) => this.updateSnapshot(snapshot);
@@ -38,7 +39,11 @@ class LobbyManager {
 
         this.injectStyles();
         this.createOverlay();
-        this.show();
+        if (this.isActivated) {
+            this.show();
+        } else {
+            this.hide();
+        }
         this.setStatus("Connecting to lobby...");
     }
 
@@ -804,6 +809,7 @@ class LobbyManager {
     }
 
     show() {
+        this.isActivated = true;
         if (this.overlay) {
             this.overlay.classList.add('visible');
         }
@@ -831,6 +837,14 @@ class LobbyManager {
 
     isInGame() {
         return this.inGame;
+    }
+
+    activate() {
+        if (this.isActivated) {
+            return;
+        }
+        this.isActivated = true;
+        this.show();
     }
 
     setStatus(message, options = {}) {
@@ -1037,7 +1051,9 @@ class LobbyManager {
             fragments.push(`They earned ${points} points.`);
         }
 
-        this.show();
+        if (this.isActivated) {
+            this.show();
+        }
         this.setStatus(fragments.join(' '), { type: 'error' });
         this.renderCityList();
         this.requestSnapshot();
@@ -1067,7 +1083,9 @@ class LobbyManager {
         this.waiting = false;
         this.waitingCity = null;
         this.waitingRole = null;
-        this.show();
+        if (this.isActivated) {
+            this.show();
+        }
         this.setStatus('Connected. Choose a city to enter.', { type: 'info' });
         this.requestSnapshot();
     }
@@ -1077,7 +1095,9 @@ class LobbyManager {
         this.waiting = false;
         this.waitingCity = null;
         this.waitingRole = null;
-        this.show();
+        if (this.isActivated) {
+            this.show();
+        }
         const label = reason ? `Connection lost (${reason}). Reconnecting...` : 'Connection lost. Reconnecting...';
         this.setStatus(label, { type: 'error' });
     }

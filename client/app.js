@@ -37,6 +37,7 @@ import ChatManager from "./src/ui/ChatManager";
 import IdentityManager from "./src/identity/IdentityManager";
 import AudioManager from './src/audio/AudioManager';
 import MusicManager from './src/audio/MusicManager';
+import IntroModal from "./src/ui/IntroModal";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -994,7 +995,7 @@ if (game.chatManager) {
 if (game.identityManager) {
     game.identityManager.bindSocket(game.socketListener);
 }
-game.lobby = new LobbyManager(game);
+game.lobby = new LobbyManager(game, { autoShow: false });
 game.lobby.attachSocket(game.socketListener);
 if (game.identityManager) {
     game.lobby.attachIdentityManager(game.identityManager);
@@ -1008,6 +1009,24 @@ if (game.identityManager) {
 game.iconFactory = new IconFactory(game);
 game.itemFactory = new ItemFactory(game);
 game.rogueTankManager = new RogueTankManager(game);
+
+game.introModal = new IntroModal({
+    heading: 'Battle City Remastered',
+    blurb: 'Roll in, build your city, and hold the line against rival mayors.',
+    buttonLabel: 'Play Now',
+    onStart: async () => {
+        if (game.audio && typeof game.audio.resumeContext === 'function') {
+            try {
+                await game.audio.resumeContext();
+            } catch (error) {
+                console.debug('[audio] resume context failed', error?.message || error);
+            }
+        }
+        if (game.lobby && typeof game.lobby.activate === 'function') {
+            game.lobby.activate();
+        }
+    }
+});
 
 const resourcesToLoad = [
     { name: 'imgTanks', url: assetUrl('imgTanks.png') },
