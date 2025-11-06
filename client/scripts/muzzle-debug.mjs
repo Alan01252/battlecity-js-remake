@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { computeTankMuzzlePosition, normaliseDirection } from '../src/effects/muzzleFlash.js';
+import MUZZLE_OFFSETS from '../src/data/muzzleOffsets.js';
 
 const headings = [
     { label: '0°', step: 0 },
@@ -29,10 +30,13 @@ const rows = headings.map(({ label, step }) => {
     return {
         heading: label,
         step: normalised,
+        frame: modern.frameIndex,
         legacyX: legacy.x.toFixed(2),
         legacyY: legacy.y.toFixed(2),
         modernX: modern.x.toFixed(2),
         modernY: modern.y.toFixed(2),
+        offsetX: MUZZLE_OFFSETS[modern.frameIndex]?.x.toFixed(2) ?? 'n/a',
+        offsetY: MUZZLE_OFFSETS[modern.frameIndex]?.y.toFixed(2) ?? 'n/a',
         deltaX: (modern.x - legacy.x).toFixed(2),
         deltaY: (modern.y - legacy.y).toFixed(2),
     };

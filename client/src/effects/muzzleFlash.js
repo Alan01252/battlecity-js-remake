@@ -1,6 +1,7 @@
+import FRAMED_MUZZLE_OFFSETS, { STEP_MUZZLE_OFFSETS } from '../data/muzzleOffsets.js';
+
 const DIRECTION_STEPS = 32;
-const DEFAULT_BASE_OFFSET = 24;
-const DEFAULT_DISTANCE = 30;
+const TILE_CENTER = 24;
 
 export const normaliseDirection = (value) => {
     if (!Number.isFinite(value)) {
@@ -23,22 +24,36 @@ export const computeTankMuzzlePosition = (offset, direction, options = {}) => {
             direction: dir
         };
     }
-    const baseOffset = Number.isFinite(options.baseOffset) ? options.baseOffset : DEFAULT_BASE_OFFSET;
-    const distance = Number.isFinite(options.distance) ? options.distance : DEFAULT_DISTANCE;
-    const angleDegrees = (dir / DIRECTION_STEPS) * 360;
-    const radians = (angleDegrees * Math.PI) / 180;
-    const baseX = (Number(offset.x) || 0) + baseOffset;
-    const baseY = (Number(offset.y) || 0) + baseOffset;
-    const xComponent = Math.sin(radians);
-    const yComponent = Math.cos(radians) * -1;
+    const baseX = (Number(offset.x) || 0) + TILE_CENTER;
+    const baseY = (Number(offset.y) || 0) + TILE_CENTER;
+    const stepFloat = dir % STEP_MUZZLE_OFFSETS.length;
+    const baseStep = Math.floor(stepFloat);
+    const nextStep = (baseStep + 1) % STEP_MUZZLE_OFFSETS.length;
+    const t = stepFloat - baseStep;
+    const baseOffset = STEP_MUZZLE_OFFSETS[baseStep];
+    const nextOffset = STEP_MUZZLE_OFFSETS[nextStep];
+    const stepOffset = {
+        x: (baseOffset?.x ?? 0) * (1 - t) + (nextOffset?.x ?? 0) * t,
+        y: (baseOffset?.y ?? 0) * (1 - t) + (nextOffset?.y ?? 0) * t
+    };
+    const frameIndex = Number.isFinite(options.frameIndex)
+        ? Math.max(0, Math.min(FRAMED_MUZZLE_OFFSETS.length - 1, Math.floor(options.frameIndex)))
+        : Math.floor(dir / 2) % FRAMED_MUZZLE_OFFSETS.length;
+    const muzzleOffset = stepOffset || FRAMED_MUZZLE_OFFSETS[frameIndex] || { x: 0, y: -20 };
+    const muzzleX = baseX + muzzleOffset.x;
+    const muzzleY = baseY + muzzleOffset.y;
+    const magnitude = Math.hypot(muzzleOffset.x, muzzleOffset.y);
+    const xComponent = magnitude > 0 ? (muzzleOffset.x / magnitude) : 0;
+    const yComponent = magnitude > 0 ? (muzzleOffset.y / magnitude) : -1;
     return {
-        x: baseX + (xComponent * distance),
-        y: baseY + (yComponent * distance),
+        x: muzzleX,
+        y: muzzleY,
         direction: dir,
         vector: {
             x: xComponent,
             y: yComponent
-        }
+        },
+        frameIndex
     };
 };
 

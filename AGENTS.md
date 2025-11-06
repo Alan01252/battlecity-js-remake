@@ -35,6 +35,11 @@
 - Collision helpers expect rectangles shaped as `{x, y, w, h}` in pixel coordinates; reuse `getPlayerRect`/`rectangleCollision` utilities.
 - Linked-list factories require updating `next`/`previous` pointers when inserting/removing to keep iteration stable.
 
+## Artwork & Rendering Notes
+- The tank muzzle flash is now driven by measured offsets extracted directly from `client/data/imgTanks.png` (see `client/src/data/muzzleOffsets.js`). `computeTankMuzzlePosition` interpolates between 32 recorded steps so the flash aligns with the painted barrel tip at every heading.
+- Visual debugging helpers live under `client/scripts/`: `muzzle-debug.mjs` prints per-heading offsets while `muzzle-visualize.mjs` emits 64×64 PPMs showing the muzzle marker overlaid on the sprite.
+- Remaining misalignment is art-side: some frames shorten or skew the barrel. To get math-perfect alignment, the sprite should keep the muzzle highlight at a constant radius/angle from the turret pivot across all frames.
+
 ## Known Gaps / TODOs
 - Socket.IO server CORS is pinned to the dev client URL (`http://localhost:8020`); adjust in `server/app.js` if the client origin changes.
 - No automated tests; any changes that touch movement/collision should be exercised manually in the running client.
