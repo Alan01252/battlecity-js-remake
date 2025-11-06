@@ -1411,14 +1411,26 @@ class PlayerFactory {
         const playerCount = players.length;
         const cityState = this.game.cities ? this.game.cities[id] : null;
         const isFake = !!(cityState && cityState.isFake);
+        const rawMayorSlots = cityState ? toFiniteNumber(cityState.fakeBotMayorSlots, null) : null;
+        const rawRecruitCapacity = cityState ? toFiniteNumber(cityState.fakeBotRecruitCapacity, null) : null;
+        const fakeMayorSlots = Number.isFinite(rawMayorSlots) ? Math.max(0, Math.floor(rawMayorSlots)) : 0;
+        const fakeRecruitCapacity = Number.isFinite(rawRecruitCapacity)
+            ? Math.max(0, Math.floor(rawRecruitCapacity))
+            : 0;
         let capacity = 1 + this.maxRecruitsPerCity;
+        if (isFake) {
+            const desiredCapacity = fakeMayorSlots + fakeRecruitCapacity;
+            capacity = Math.max(1, desiredCapacity);
+        }
         let openMayor = !hasMayor;
         if (isFake) {
-            capacity = 1;
-            openMayor = false;
+            openMayor = fakeMayorSlots > 0 && !hasMayor;
         }
         const recruitCount = hasMayor ? Math.max(0, playerCount - 1) : playerCount;
-        const openRecruits = Math.max(0, capacity - playerCount);
+        let openRecruits = Math.max(0, capacity - playerCount);
+        if (isFake) {
+            openRecruits = Math.max(0, fakeRecruitCapacity - recruitCount);
+        }
         return {
             cityId: id,
             roster,

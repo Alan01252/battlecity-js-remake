@@ -559,6 +559,12 @@ class CityManager {
         city.lastOrbBounty = 0;
         city.lastOrbReward = 0;
         city.activeOrbCount = 0;
+        if ('fakeBotMayorSlots' in city) {
+            delete city.fakeBotMayorSlots;
+        }
+        if ('fakeBotRecruitCapacity' in city) {
+            delete city.fakeBotRecruitCapacity;
+        }
         this.clearOrbHoldersForCity(city.id, { consume: false });
         this.clearCityInventory(city.id);
         city.destroyedAt = now;

@@ -683,12 +683,34 @@ class FakeCityManager {
         return resolveBotsPerCity(resolvedEntry, this.config);
     }
 
+    updateCityBotCapacityMetadata(cityId, desiredCount) {
+        if (!Number.isFinite(cityId)) {
+            return;
+        }
+        const numericCity = Math.max(0, Math.floor(cityId));
+        const desired = Number.isFinite(desiredCount) ? Math.max(0, Math.floor(desiredCount)) : 0;
+        const mayorSlots = desired > 0 ? 1 : 0;
+        const recruitCapacity = Math.max(0, desired - mayorSlots);
+        const cityManager = this.buildingFactory?.cityManager;
+        if (!cityManager) {
+            return;
+        }
+        const cityState = cityManager.ensureCity(numericCity);
+        if (!cityState) {
+            return;
+        }
+        cityState.fakeBotMayorSlots = mayorSlots;
+        cityState.fakeBotRecruitCapacity = recruitCapacity;
+    }
+
     ensureCityBotCount(cityId, desiredCount = DEFAULT_BOTS_PER_CITY) {
         if (!Number.isFinite(cityId)) {
             return 0;
         }
         const numericCity = Math.max(0, Math.floor(cityId));
         const target = Math.max(0, Math.floor(desiredCount));
+
+        this.updateCityBotCapacityMetadata(numericCity, target);
 
         const record = this.activeCities.get(numericCity);
         if (!record || !Array.isArray(record.buildingIds) || record.buildingIds.length === 0) {
@@ -705,7 +727,13 @@ class FakeCityManager {
         while ((this.botProcesses.get(numericCity)?.size || 0) < target) {
             const index = (this.botProcesses.get(numericCity)?.size || 0) + 1;
             const nameHint = `bot-${numericCity}-${index}`;
-            const child = this.spawnCityBot(numericCity, { name: nameHint });
+            const currentBots = this.botProcesses.get(numericCity)?.size || 0;
+            const cityState = this.playerFactory && typeof this.playerFactory.computeCityState === 'function'
+                ? this.playerFactory.computeCityState(numericCity)
+                : null;
+            const shouldRequestMayor = currentBots === 0 && (!cityState || cityState.openMayor);
+            const role = shouldRequestMayor ? 'mayor' : 'recruit';
+            const child = this.spawnCityBot(numericCity, { name: nameHint, role });
             if (!child) {
                 break;
             }
@@ -2754,6 +2782,8 @@ class FakeCityManager {
         if (spawnedIds.length === 0) {
             if (cityState) {
                 delete cityState.isFake;
+                delete cityState.fakeBotMayorSlots;
+                delete cityState.fakeBotRecruitCapacity;
             }
             return false;
         }
@@ -2838,6 +2868,8 @@ class FakeCityManager {
             const city = cityManager.getCity(cityId);
             if (city) {
                 delete city.isFake;
+                delete city.fakeBotMayorSlots;
+                delete city.fakeBotRecruitCapacity;
                 if (city.nameOverride) {
                     delete city.nameOverride;
                 }
