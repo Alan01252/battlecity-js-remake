@@ -50,6 +50,11 @@ class UserStore {
         if (!sanitisedName) {
             return null;
         }
+        if (this._isNameTaken(sanitisedName)) {
+            const error = new Error("Display name already taken");
+            error.code = "NAME_TAKEN";
+            throw error;
+        }
         const now = Date.now();
         const id = this._generateId();
         const entry = {
@@ -80,6 +85,11 @@ class UserStore {
         }
         if (existing.name === sanitisedName) {
             return Object.assign({}, existing);
+        }
+        if (this._isNameTaken(sanitisedName, existing.id)) {
+            const error = new Error("Display name already taken");
+            error.code = "NAME_TAKEN";
+            throw error;
         }
         const updated = Object.assign({}, existing, {
             name: sanitisedName,
@@ -164,15 +174,19 @@ class UserStore {
         }
 
         const existing = this.findByProvider(provider, providerId);
-        const sanitisedName = this._sanitizeName(details.name) || this._deriveFallbackName(provider, providerId, details);
+        const sanitisedName = this._sanitizeName(details.name);
+        const fallbackName = sanitisedName || this._deriveFallbackName(provider, providerId, details);
         const sanitizedEmail = this._sanitizeEmail(details.email);
 
         if (existing) {
             let changed = false;
             const updated = Object.assign({}, existing);
-            if (sanitisedName && sanitisedName !== existing.name) {
-                updated.name = sanitisedName;
-                changed = true;
+            if (!existing.name && fallbackName) {
+                const uniqueName = this._generateUniqueName(fallbackName, existing.id);
+                if (uniqueName && uniqueName !== existing.name) {
+                    updated.name = uniqueName;
+                    changed = true;
+                }
             }
             if ((sanitizedEmail || null) !== (existing.email || null)) {
                 updated.email = sanitizedEmail || null;
@@ -186,14 +200,18 @@ class UserStore {
             return Object.assign({}, existing);
         }
 
-        if (!sanitisedName) {
+        if (!fallbackName) {
             return null;
         }
 
         const now = Date.now();
+        const uniqueName = this._generateUniqueName(fallbackName, null);
+        if (!uniqueName) {
+            return null;
+        }
         const entry = {
             id: this._generateId(),
-            name: sanitisedName,
+            name: uniqueName,
             provider,
             providerId,
             email: sanitizedEmail || null,
@@ -460,6 +478,58 @@ class UserStore {
             return null;
         }
         return trimmed.slice(0, 254);
+    }
+
+    _isNameTaken(name, excludeId = null) {
+        const sanitised = this._sanitizeName(name);
+        if (!sanitised) {
+            return false;
+        }
+        const conditions = [`lower(name) = lower(${escapeValue(sanitised)})`];
+        if (excludeId) {
+            conditions.push(`id <> ${escapeValue(this._normaliseId(excludeId))}`);
+        }
+        const sql = `
+            SELECT id
+            FROM users
+            WHERE ${conditions.join(" AND ")}
+            LIMIT 1;
+        `;
+        const rows = this._query(sql);
+        return Array.isArray(rows) && rows.length > 0;
+    }
+
+    _generateUniqueName(baseName, excludeId = null) {
+        let base = this._sanitizeName(baseName);
+        if (!base) {
+            base = "Pilot";
+        }
+        if (!this._isNameTaken(base, excludeId)) {
+            return base;
+        }
+        const normalisedBase = this._normalizeWhitespace(base).replace(/\s+\d+$/, "");
+        const cleanedBase = normalisedBase.slice(0, NAME_MAX_LENGTH).trim();
+        for (let attempt = 2; attempt <= 99; attempt += 1) {
+            const suffix = String(attempt);
+            const separator = cleanedBase.length ? " " : "";
+            const allowedLength = NAME_MAX_LENGTH - suffix.length - separator.length;
+            const prefix = allowedLength > 0 ? cleanedBase.slice(0, allowedLength) : "";
+            const candidate = this._sanitizeName(`${prefix}${separator}${suffix}`);
+            if (candidate && !this._isNameTaken(candidate, excludeId)) {
+                return candidate;
+            }
+        }
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+            const suffix = randomBytes(2).toString("hex");
+            const separator = cleanedBase.length ? " " : "";
+            const allowedLength = NAME_MAX_LENGTH - suffix.length - separator.length;
+            const prefix = allowedLength > 0 ? cleanedBase.slice(0, allowedLength) : "";
+            const candidate = this._sanitizeName(`${prefix}${separator}${suffix}`);
+            if (candidate && !this._isNameTaken(candidate, excludeId)) {
+                return candidate;
+            }
+        }
+        return base;
     }
 
     _deriveFallbackName(provider, providerId, details = {}) {
