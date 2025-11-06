@@ -1,10 +1,12 @@
 import { io } from 'socket.io-client';
 import { EventEmitter2 } from 'eventemitter2';
 import { getCitySpawn } from './utils/citySpawns';
+import { SOUND_IDS } from './audio/AudioManager';
 
 const CHAT_MAX_LENGTH = 240;
 const CONTROL_CHAR_PATTERN = /[\u0000-\u001F\u007F]/g;
 const DEFAULT_CHAT_SCOPE = 'team';
+const LOCAL_SHOT_CACHE_TTL_MS = 700;
 
 import {updateBotWaypoints} from "./draw/draw-bot-debug";
 
@@ -15,6 +17,7 @@ class SocketListener extends EventEmitter2 {
         this.game = game;
         this.sequenceCounter = 0;
         this.lastServerSequence = 0;
+        this.localShotCache = new Map();
 
         this.on('bot:debug', (data) => {
             updateBotWaypoints(data);
@@ -150,28 +153,34 @@ class SocketListener extends EventEmitter2 {
             }
         });
 
-        this.io.on("bullet_shot", (bullet) => {
-            var bullet = JSON.parse(bullet);
+        this.io.on("bullet_shot", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data) {
+                return;
+            }
             const options = {
-                sourceId: bullet.sourceId ?? null,
-                sourceType: bullet.sourceType ?? null,
-                targetId: bullet.targetId ?? null,
+                sourceId: data.sourceId ?? null,
+                sourceType: data.sourceType ?? null,
+                targetId: data.targetId ?? null,
             };
-            if (bullet.damage !== undefined) {
-                const numericDamage = Number(bullet.damage);
+            if (data.damage !== undefined) {
+                const numericDamage = Number(data.damage);
                 if (Number.isFinite(numericDamage)) {
                     options.damage = numericDamage;
                 }
             }
             this.game.bulletFactory.newBullet(
-                bullet.shooter,
-                bullet.x,
-                bullet.y,
-                bullet.type,
-                bullet.angle,
-                bullet.team ?? null,
+                data.shooter,
+                data.x,
+                data.y,
+                data.type,
+                data.angle,
+                data.team ?? null,
                 options
             );
+            if (!this.shouldSuppressShotSound(data)) {
+                this.playBulletShotSound(data);
+            }
         });
 
         this.io.on("new_icon", (icon) => {
@@ -372,6 +381,9 @@ class SocketListener extends EventEmitter2 {
         });
         this.io.on("city:orbed", (payload) => {
             const data = this.safeParse(payload);
+            if (data) {
+                this.handleCityOrbedAudio(data);
+            }
             this.emit('city:orbed', data);
         });
         this.io.on("lobby:evicted", (payload) => {
@@ -406,6 +418,9 @@ class SocketListener extends EventEmitter2 {
     }
 
     sendBulletShot(bullet) {
+        if (bullet) {
+            this.markLocalShot(bullet);
+        }
         if (this.io && !this.io.disconnected) {
             this.io.emit("bullet_shot", JSON.stringify(bullet));
         }
@@ -830,7 +845,22 @@ class SocketListener extends EventEmitter2 {
         }
         const myId = this.io?.id;
         if (myId && update.id === myId) {
-            this.game.player.health = Math.max(0, healthValue);
+            const previous = Number.isFinite(this.game.player?.health) ? this.game.player.health : healthValue;
+            const nextHealth = Math.max(0, healthValue);
+            if (this.game.player) {
+                this.game.player.health = nextHealth;
+                if (nextHealth <= 0) {
+                    this.game.player.engineLoopActive = false;
+                }
+            }
+            if (this.game.audio) {
+                if (nextHealth <= 0 && previous > 0) {
+                    this.game.audio.playEffect(SOUND_IDS.DIE, { volume: 0.8 });
+                    this.game.audio.setLoopState(SOUND_IDS.ENGINE, false);
+                } else if (nextHealth < previous) {
+                    this.game.audio.playEffect(SOUND_IDS.HIT, { volume: 0.7 });
+                }
+            }
             return;
         }
         if (!this.game.otherPlayers[update.id]) {
@@ -869,6 +899,115 @@ class SocketListener extends EventEmitter2 {
         }
         if (myId && update.id === myId) {
             this.game.forceDraw = true;
+        }
+    }
+
+    playBulletShotSound(bullet) {
+        if (!this.game || !this.game.audio) {
+            return;
+        }
+        const soundId = this.resolveShotSoundId(bullet);
+        if (!soundId) {
+            return;
+        }
+        const x = this.toFiniteNumber(bullet?.x, null);
+        const y = this.toFiniteNumber(bullet?.y, null);
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+            this.game.audio.playEffect(soundId, { position: { x, y } });
+        } else {
+            this.game.audio.playEffect(soundId);
+        }
+    }
+
+    resolveShotSoundId(bullet) {
+        const type = this.toFiniteNumber(bullet?.type, 0);
+        if (type === 1) {
+            return SOUND_IDS.ROCKET;
+        }
+        if (type === 3) {
+            return SOUND_IDS.FLARE;
+        }
+        const sourceType = typeof bullet?.sourceType === 'string'
+            ? bullet.sourceType.toLowerCase()
+            : null;
+        if (sourceType && (sourceType === 'turret' || sourceType === 'plasma' || sourceType === 'sleeper')) {
+            return SOUND_IDS.TURRET;
+        }
+        return SOUND_IDS.LASER;
+    }
+
+    markLocalShot(bullet) {
+        if (!bullet) {
+            return;
+        }
+        if (!this.localShotCache) {
+            this.localShotCache = new Map();
+        }
+        const now = Date.now();
+        if (bullet.shooter) {
+            this.localShotCache.set(`shooter:${bullet.shooter}`, now);
+        }
+        if (bullet.sourceId) {
+            this.localShotCache.set(`source:${bullet.sourceId}`, now);
+        }
+        this.pruneLocalShots(now);
+    }
+
+    pruneLocalShots(now = Date.now()) {
+        if (!this.localShotCache) {
+            return;
+        }
+        const threshold = now - LOCAL_SHOT_CACHE_TTL_MS;
+        this.localShotCache.forEach((timestamp, key) => {
+            if (timestamp < threshold) {
+                this.localShotCache.delete(key);
+            }
+        });
+    }
+
+    shouldSuppressShotSound(bullet) {
+        if (!bullet || !this.localShotCache) {
+            return false;
+        }
+        const now = Date.now();
+        this.pruneLocalShots(now);
+        if (bullet.shooter) {
+            const key = `shooter:${bullet.shooter}`;
+            const timestamp = this.localShotCache.get(key);
+            if (timestamp && now - timestamp < LOCAL_SHOT_CACHE_TTL_MS) {
+                return true;
+            }
+        }
+        if (bullet.sourceId) {
+            const key = `source:${bullet.sourceId}`;
+            const timestamp = this.localShotCache.get(key);
+            if (timestamp && now - timestamp < LOCAL_SHOT_CACHE_TTL_MS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    handleCityOrbedAudio(event) {
+        if (!event || !this.game || !this.game.audio) {
+            return;
+        }
+        const myCity = this.toFiniteNumber(this.game.player?.city, null);
+        if (myCity === null) {
+            return;
+        }
+        const targetCity = this.toFiniteNumber(event.targetCity, null);
+        const attackerCity = this.toFiniteNumber(event.attackerCity, null);
+        if (Number.isFinite(targetCity) && myCity === targetCity) {
+            this.game.audio.playEffect(SOUND_IDS.DIE);
+            this.game.audio.setLoopState(SOUND_IDS.ENGINE, false);
+            if (this.game.player) {
+                this.game.player.engineLoopActive = false;
+            }
+            return;
+        }
+        if (Number.isFinite(attackerCity) && myCity === attackerCity) {
+            this.game.audio.playEffect(SOUND_IDS.SCREECH);
         }
     }
 

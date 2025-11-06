@@ -14,6 +14,7 @@ import {getPlayerRect} from "./collision/collision-helpers";
 import {rectangleCollision} from "./collision/collision-helpers";
 import {isHospitalBuilding} from "./utils/buildings";
 import {getHospitalDriveableRect} from "./utils/buildings";
+import { SOUND_IDS } from "./audio/AudioManager";
 
 const TILE_SIZE = 48;
 const NEAREST_SAFE_MAX_RADIUS_TILES = 12;
@@ -438,6 +439,12 @@ const ensurePlayerUnstuck = (game) => {
 var killPlayer = (game) => {
     game.player.offset.x = 0;
     game.player.offset.y = 0;
+    if (game.player.engineLoopActive) {
+        game.player.engineLoopActive = false;
+    }
+    if (game.audio) {
+        game.audio.setLoopState(SOUND_IDS.ENGINE, false);
+    }
     updateLastSafeOffset(game);
 };
 
@@ -475,6 +482,21 @@ export const play = (game) => {
 
     if (!isFrozen) {
         ensurePlayerUnstuck(game);
+    }
+
+    if (game && game.audio && game.player && Number.isFinite(game.player.offset?.x) && Number.isFinite(game.player.offset?.y)) {
+        const listenerX = game.player.offset.x + 24;
+        const listenerY = game.player.offset.y + 24;
+        game.audio.setListenerPosition(listenerX, listenerY);
+
+        const shouldLoopEngine = !isFrozen && !!game.player.isMoving && game.player.health > 0;
+        if (shouldLoopEngine && !game.player.engineLoopActive) {
+            game.audio.setLoopState(SOUND_IDS.ENGINE, true, { volume: 0.3 });
+            game.player.engineLoopActive = true;
+        } else if ((!shouldLoopEngine || game.player.health <= 0) && game.player.engineLoopActive) {
+            game.audio.setLoopState(SOUND_IDS.ENGINE, false);
+            game.player.engineLoopActive = false;
+        }
     }
 
     if (game.player.health === 0) {

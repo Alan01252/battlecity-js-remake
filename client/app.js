@@ -35,6 +35,8 @@ import NotificationManager from "./src/ui/NotificationManager";
 import CallsignRegistry from "./src/utils/callsigns";
 import ChatManager from "./src/ui/ChatManager";
 import IdentityManager from "./src/identity/IdentityManager";
+import AudioManager from './src/audio/AudioManager';
+import MusicManager from './src/audio/MusicManager';
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -166,6 +168,7 @@ const game = {
     maxMapY: RESOLUTION_Y,
     maxCities: 0,
     otherPlayers: {},
+    audio: null,
     showBuildMenu: false,
     buildMenuOffset: {
         x: ((RESOLUTION_X - 200) / 2),
@@ -203,7 +206,8 @@ const game = {
         frozenUntil: 0,
         frozenBy: null,
         callsign: null,
-        userId: null
+        userId: null,
+        engineLoopActive: false
     },
     explosions: [],
     panelState: {
@@ -229,6 +233,13 @@ const game = {
     },
     gBotDebug: null,
 };
+
+game.audio = new AudioManager();
+game.audio.bindGestureUnlock();
+game.audio.preloadAll().catch((error) => {
+    console.warn('Audio assets failed to preload', error);
+});
+game.music = new MusicManager(game.audio);
 
 const orbHintElement = document.createElement('div');
 orbHintElement.id = 'orb-hint';

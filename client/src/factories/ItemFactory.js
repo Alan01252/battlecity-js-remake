@@ -18,6 +18,7 @@ import {TIMER_DFG} from "../constants";
 import {TIMER_CLOAK} from "../constants";
 import {ITEM_INITIAL_LIFE} from "../constants";
 import {ITEM_BURN_THRESHOLDS} from "../constants";
+import { SOUND_IDS } from '../audio/AudioManager';
 
 const STRUCTURE_ITEM_TYPES = new Set([
     ITEM_TYPE_WALL,
@@ -62,6 +63,17 @@ const getBurnThreshold = (type) => {
         return ITEM_BURN_THRESHOLDS[type];
     }
     return null;
+};
+
+const playSound = (game, soundId, position) => {
+    if (!game || !game.audio || !soundId) {
+        return;
+    }
+    if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+        game.audio.playEffect(soundId, { position });
+    } else {
+        game.audio.playEffect(soundId);
+    }
 };
 
 class ItemFactory {
@@ -192,6 +204,7 @@ class ItemFactory {
                 sourceType: this.resolveItemSourceType(item),
                 targetId: item.target ?? null
             });
+            playSound(this.game, this.resolveDefenseShotSound(item), { x: x2, y: y2 });
             this.emitItemBulletShot(item, {
                 x: x2,
                 y: y2,
@@ -252,6 +265,12 @@ class ItemFactory {
             this.game.player.isCloaked = true;
             this.game.player.cloakExpiresAt = expiresAt;
             this.game.forceDraw = true;
+        }
+        const offset = this.game.player?.offset;
+        if (offset && Number.isFinite(offset.x) && Number.isFinite(offset.y)) {
+            playSound(this.game, SOUND_IDS.CLOAK, { x: offset.x + 24, y: offset.y + 24 });
+        } else {
+            playSound(this.game, SOUND_IDS.CLOAK);
         }
         if (this.game.socketListener && typeof this.game.socketListener.useItem === 'function') {
             this.game.socketListener.useItem('cloak', {
@@ -642,6 +661,16 @@ class ItemFactory {
         return null;
     }
 
+    resolveDefenseShotSound(item) {
+        if (!item) {
+            return SOUND_IDS.LASER;
+        }
+        if (item.type === ITEM_TYPE_TURRET || item.type === ITEM_TYPE_PLASMA || item.type === ITEM_TYPE_SLEEPER) {
+            return SOUND_IDS.TURRET;
+        }
+        return SOUND_IDS.LASER;
+    }
+
     resolveItemTeam(item, fallback = null) {
         if (!item) {
             return fallback;
@@ -949,6 +978,7 @@ class ItemFactory {
             nextFrameTick: null,
             variant: 'small'
         });
+        playSound(this.game, SOUND_IDS.EXPLOSION, { x, y });
     }
 
     toFiniteNumber(value, fallback) {

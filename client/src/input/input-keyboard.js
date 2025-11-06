@@ -14,6 +14,7 @@ import {
     ITEM_TYPE_WALL,
     ITEM_TYPE_SLEEPER
 } from "../constants";
+import { SOUND_IDS } from "../audio/AudioManager";
 
 const DIRECT_DROP_TYPES = new Set([
     ITEM_TYPE_TURRET,
@@ -64,6 +65,17 @@ const hasEquippedItem = (game, type) => {
         return true;
     }
     return quantity > 0;
+};
+
+const playShotSound = (game, soundId, position) => {
+    if (!game || !game.audio || !soundId) {
+        return;
+    }
+    if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+        game.audio.playEffect(soundId, { position });
+    } else {
+        game.audio.playEffect(soundId);
+    }
 };
 
 var keyboard = (keyCode) => {
@@ -279,6 +291,7 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             game.bulletFactory.newBullet(game.player.id, originX, originY, 3, -dir, teamId);
             game.socketListener.sendBulletShot(packet);
         });
+        playShotSound(game, SOUND_IDS.FLARE, { x: originX, y: originY });
     };
 
     shift.press = function () {
@@ -317,6 +330,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
 
             const teamId = game.player.city ?? null;
             game.bulletFactory.newBullet(game.player.id, x2, y2, bulletType, -angle, teamId);
+            const soundId = canFireRocket ? SOUND_IDS.ROCKET : SOUND_IDS.LASER;
+            playShotSound(game, soundId, { x: x2, y: y2 });
             game.socketListener.sendBulletShot({
                 shooter: game.player.id,
                 x: x2,

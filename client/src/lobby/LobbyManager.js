@@ -811,6 +811,9 @@ class LobbyManager {
         if (this.identityManager && typeof this.identityManager.getIdentity === 'function') {
             this.updateIdentityDisplay(this.identityManager.getIdentity());
         }
+        if (this.game?.music && typeof this.game.music.playLobby === 'function' && !this.inGame) {
+            this.game.music.playLobby();
+        }
     }
 
     hide() {
@@ -820,6 +823,9 @@ class LobbyManager {
         this.visible = false;
         if (this.identityFormVisible) {
             this.toggleIdentityForm(false);
+        }
+        if (this.game?.music && typeof this.game.music.stop === 'function') {
+            this.game.music.stop();
         }
     }
 

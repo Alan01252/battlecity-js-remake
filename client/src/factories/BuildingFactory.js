@@ -9,6 +9,7 @@ import _ from 'underscore';
 import {BUILDING_COMMAND_CENTER} from "../constants";
 import {MAP_SQUARE_BUILDING} from "../constants";
 import {getCityDisplayName} from '../utils/citySpawns';
+import { SOUND_IDS } from '../audio/AudioManager';
 
 const TILE_SIZE = 48;
 const MAX_BUILDING_CHAIN_DISTANCE = TILE_SIZE * 20;
@@ -65,6 +66,17 @@ const TYPE_LABEL_LOOKUP = Object.keys(LABELS).reduce((acc, key) => {
 }, {});
 
 const isFactoryType = (type) => type >= 100 && type < 200;
+
+const playEffect = (game, soundId, position) => {
+    if (!game || !game.audio || !soundId) {
+        return;
+    }
+    if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+        game.audio.playEffect(soundId, { position });
+    } else {
+        game.audio.playEffect(soundId);
+    }
+};
 
 class BuildingFactory {
 
@@ -187,6 +199,8 @@ class BuildingFactory {
             this.game.map[x][y] = MAP_SQUARE_BUILDING;
         }
 
+        playEffect(this.game, SOUND_IDS.BUILD, { x: x * TILE_SIZE, y: y * TILE_SIZE });
+
         if (isLocalPlacement) {
             const cityState = this.game.cities?.[cityId];
             if (cityState) {
@@ -258,6 +272,7 @@ class BuildingFactory {
                 nextFrameTick: (this.game.tick || Date.now()) + 75,
                 variant: 'large'
             });
+            playEffect(this.game, SOUND_IDS.DEMOLISH, { x: tileX * TILE_SIZE, y: tileY * TILE_SIZE });
         }
 
         if (isFactoryType(building.type)) {
