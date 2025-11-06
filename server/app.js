@@ -9,6 +9,7 @@ var server = http.createServer(app);
 var { Server } = require('socket.io');
 var citySpawns = require('../shared/citySpawns.json');
 var UserStore = require('./src/users/UserStore');
+var ScoreService = require('./src/users/ScoreService');
 
 const parseClientIds = (value) => {
     if (!value || typeof value !== 'string') {
@@ -203,7 +204,8 @@ const verifyGoogleToken = async (credential) => {
     return payload;
 };
 
-const playerFactory = new PlayerFactory(game, { userStore });
+const scoreService = new ScoreService({ userStore });
+const playerFactory = new PlayerFactory(game, { userStore, scoreService });
 playerFactory.listen(io);
 const bulletFactory = new BulletFactory(game, playerFactory);
 bulletFactory.listen(io);
@@ -240,6 +242,9 @@ const chatManager = new ChatManager({
 });
 chatManager.listen(io);
 playerFactory.setChatManager(chatManager);
+if (typeof playerFactory.setScoreService === 'function') {
+    playerFactory.setScoreService(scoreService);
+}
 
 app.post('/api/users/register', (req, res) => {
     const name = typeof req.body?.name === 'string' ? req.body.name : '';
@@ -297,6 +302,15 @@ app.get('/api/identity/config', (_req, res) => {
             clientId: clientIds.length > 0 ? clientIds[0] : null,
         },
     });
+});
+
+app.get('/api/scores/high', (req, res) => {
+    const limitRaw = req.query && req.query.limit ? Number(req.query.limit) : null;
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, Math.floor(limitRaw))) : 20;
+    const players = scoreService && typeof scoreService.getHighScores === 'function'
+        ? scoreService.getHighScores(limit)
+        : [];
+    res.json({ players });
 });
 
 app.put('/api/users/:id', (req, res) => {

@@ -118,6 +118,14 @@ class OrbManager {
             }
         }
 
+        if (this.playerFactory && typeof this.playerFactory.recordOrbVictoryForCity === 'function') {
+            this.playerFactory.recordOrbVictoryForCity({
+                attackerCityId: playerCity,
+                points,
+                orbPlayer: player
+            });
+        }
+
         if (this.playerFactory && typeof this.playerFactory.evictCityPlayers === 'function') {
             this.playerFactory.evictCityPlayers(targetCity, {
                 reason: 'orb',
