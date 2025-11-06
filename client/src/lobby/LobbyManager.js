@@ -130,11 +130,13 @@ class LobbyManager {
                 flex: 1;
                 display: flex;
                 position: relative;
+                min-height: 0;
             }
             .lobby-tab-panel {
                 flex: 1;
                 display: none;
                 flex-direction: column;
+                min-height: 0;
             }
             .lobby-tab-panel.active {
                 display: flex;
@@ -146,6 +148,7 @@ class LobbyManager {
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
+                min-height: 0;
             }
             .lobby-city-empty {
                 color: #b3b9c9;
@@ -174,6 +177,7 @@ class LobbyManager {
                 display: flex;
                 flex-direction: column;
                 gap: 8px;
+                min-height: 0;
             }
             .lobby-highscore-empty {
                 color: #b3b9c9;
