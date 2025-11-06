@@ -33,6 +33,38 @@ Use this document to record gameplay rules, mechanics, and feature behaviors as 
 - Tank sprites render in-world nameplates: mayors display `Mayor <callsign> of <City>`, recruits show the same recruit formatting, and rogue tanks broadcast their own callsigns so players can ID threats at a glance. (client/src/draw/draw-changing.js:24)
 - Fake city garrisons now spawn up to two automated recruits that anchor near the command center, scan ~18 tiles for enemies from other cities, fire laser volleys every ~1.4s, and respawn 45 seconds after being destroyed—with hazards and bullets damaging them exactly like human tanks. (server/src/FakeCityManager.js:196, server/src/FakeCityManager.js:397, server/src/PlayerFactory.js:244)
 
+## Points & Ranks
+- Capturing an enemy city’s orb grants its point value to every active member of the attacking city; the orbing player gains an Orb stat while teammates log assists. (original/Battle-City/server/CCity.cpp:283)
+- Orb value scales with the target city’s development: `maxBuildingCount` ≥ `ORBABLE_SIZE` (21) is worth 30 points, ≥ `ORBABLE_SIZE + 5` yields 40, and ≥ `ORBABLE_SIZE + 10` pays 50; legacy Orb or Bomb factories keep a city worth 20 or 10 respectively, and the total is boosted by +5 for each orb already stolen. (original/Battle-City/server/CConstants.h:30, original/Battle-City/server/CCity.cpp:401)
+- Death only impacts standings after a player has more than 100 points; at that threshold the victim loses 2 points and, when the killer’s city differs from the victim’s, every in-game member of that opposing city receives 2. (original/Battle-City/server/CProcess.cpp:963)
+- Point totals map to fixed rank titles from Private (<100) up through King (≥ 500,000); crossing a threshold triggers a promotion broadcast to the lobby and all combatants. (original/Battle-City/server/CAccount.cpp:435, original/Battle-City/server/CAccount.cpp:514)
+- Full promotion ladder from the original server:
+  | Points | Rank |
+  | --- | --- |
+  | < 100 | Private |
+  | < 200 | Corporal |
+  | < 500 | Sergeant |
+  | < 1,000 | Sergeant Major |
+  | < 2,000 | Lieutenant |
+  | < 4,000 | Captain |
+  | < 8,000 | Major |
+  | < 16,000 | Colonel |
+  | < 30,000 | Brigadier |
+  | < 45,000 | General |
+  | < 60,000 | Baron |
+  | < 80,000 | Earl |
+  | < 100,000 | Count |
+  | < 125,000 | Duke |
+  | < 150,000 | Archduke |
+  | < 200,000 | Grand Duke |
+  | < 250,000 | Lord |
+  | < 300,000 | Chancellor |
+  | < 350,000 | Royaume |
+  | < 400,000 | Emperor |
+  | < 500,000 | Auror |
+  | ≥ 500,000 | King |
+- Source: original/Battle-City/server/CAccount.cpp:435
+
 ## Buildings & Items
 - Building placement consumes the appropriate resources and links into the building factory's list (`next`/`previous` pointers must remain valid).
 - Mayors can only place a building when their city's cash balance covers `COST_BUILDING`; insufficient funds now reject the placement server-side and refund any optimistic client adjustments. (server/src/BuildingFactory.js:87, client/src/factories/BuildingFactory.js:50)
