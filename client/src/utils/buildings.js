@@ -16,7 +16,7 @@ const parseNumericType = (value) => {
     return NaN;
 };
 
-const HOSPITAL_TYPE_CODES = new Set([CAN_BUILD_HOSPITAL, 301, 401]);
+const HOSPITAL_TYPE_CODES = new Set([CAN_BUILD_HOSPITAL, 301]);
 
 export const isHospitalBuilding = (buildingOrType) => {
     const typeValue = (buildingOrType && typeof buildingOrType === 'object')

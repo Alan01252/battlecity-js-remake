@@ -18,7 +18,7 @@ const isHouse = (type) => getFamilyCode(type) === 3;
 const isResearch = (type) => getFamilyCode(type) === 4;
 const isFactory = (type) => getFamilyCode(type) === 1 && type !== 100;
 const isCommandCenter = (type) => type === 0;
-const HOSPITAL_TYPE_CODES = new Set([200, 301, 401]);
+const HOSPITAL_TYPE_CODES = new Set([200, 301]);
 
 const isHospital = (type) => {
     const numeric = Number.isFinite(type) ? type : Number(type);
