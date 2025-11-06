@@ -1,6 +1,13 @@
 "use strict";
 
-const { TILE_SIZE, DAMAGE_MINE, DAMAGE_BOMB, BOMB_TIMER_MS, BOMB_EXPLOSION_TILE_RADIUS, TIMER_DFG } = require("../gameplay/constants");
+const {
+    TILE_SIZE,
+    DAMAGE_MINE,
+    DAMAGE_BOMB,
+    BOMB_TIMER_MS,
+    BOMB_EXPLOSION_TILE_RADIUS,
+    TIMER_DFG,
+} = require("../gameplay/constants");
 const { ITEM_TYPES, normalizeItemType } = require("../items");
 const { rectangleCollision } = require("../gameplay/geometry");
 
@@ -408,6 +415,12 @@ class HazardManager {
         const centerTileX = Math.floor((hazard.x + TILE_SIZE / 2) / TILE_SIZE);
         const centerTileY = Math.floor((hazard.y + TILE_SIZE / 2) / TILE_SIZE);
 
+        this.damagePlayersInRadius(hazard, centerTileX, centerTileY);
+        this.destroyBuildingsInRadius(hazard, centerTileX, centerTileY);
+        this.removeHazard(hazard.id, "bomb_detonated");
+    }
+
+    damagePlayersInRadius(hazard, centerTileX, centerTileY) {
         for (const [socketId, player] of Object.entries(this.game.players)) {
             if (!this.shouldDamagePlayer(hazard, socketId, player)) {
                 continue;
@@ -423,8 +436,17 @@ class HazardManager {
                 });
             }
         }
+    }
 
-        this.removeHazard(hazard.id, "bomb_detonated");
+    destroyBuildingsInRadius(hazard, centerTileX, centerTileY) {
+        if (!this.game || !this.game.buildingFactory || typeof this.game.buildingFactory.destroyBuildingsInRadius !== 'function') {
+            return;
+        }
+        this.game.buildingFactory.destroyBuildingsInRadius(centerTileX, centerTileY, BOMB_EXPLOSION_TILE_RADIUS, {
+            excludeCommandCenters: true,
+            reason: 'bomb_detonated',
+            hazard,
+        });
     }
 
     shouldDamagePlayer(hazard, socketId, player) {

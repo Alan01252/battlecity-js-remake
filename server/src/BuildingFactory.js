@@ -10,10 +10,16 @@ const {
     isHouse,
     isFactory,
     isResearch,
+    isHospital,
+    isCommandCenter,
     POPULATION_MAX_HOUSE,
     POPULATION_MAX_NON_HOUSE,
     COST_BUILDING,
 } = require('./constants');
+const {
+    COMMAND_CENTER_WIDTH_TILES,
+    COMMAND_CENTER_HEIGHT_TILES,
+} = require('./gameplay/constants');
 
 const ITEM_TYPE_ORB = ITEM_TYPES.ORB;
 const HAZARD_ITEM_TYPES = new Map([
@@ -455,6 +461,99 @@ class BuildingFactory {
         }
 
         this.broadcastFactoryPurge(normalisedCityId, itemType);
+    }
+
+    getBuildingFootprint(building) {
+        const fallback = {
+            width: COMMAND_CENTER_WIDTH_TILES,
+            height: COMMAND_CENTER_HEIGHT_TILES,
+        };
+        if (!building) {
+            return fallback;
+        }
+        const explicitWidth = Number.isFinite(building.width) ? building.width : null;
+        const explicitHeight = Number.isFinite(building.height) ? building.height : null;
+        if (explicitWidth !== null && explicitHeight !== null) {
+            return {
+                width: explicitWidth,
+                height: explicitHeight,
+            };
+        }
+        const numericType = Number(building.type);
+        if (Number.isFinite(numericType)) {
+            if (isHouse(numericType)) {
+                return { width: 1, height: 1 };
+            }
+            if (isCommandCenter(numericType) || isHospital(numericType)) {
+                return {
+                    width: COMMAND_CENTER_WIDTH_TILES,
+                    height: COMMAND_CENTER_HEIGHT_TILES,
+                };
+            }
+        }
+        return fallback;
+    }
+
+    destroyBuildingsInRadius(centerTileX, centerTileY, radiusTiles, options = {}) {
+        const centerX = Number.isFinite(centerTileX) ? Math.floor(centerTileX) : null;
+        const centerY = Number.isFinite(centerTileY) ? Math.floor(centerTileY) : null;
+        const radius = Number.isFinite(radiusTiles) ? Math.max(0, Math.floor(radiusTiles)) : null;
+        if (centerX === null || centerY === null || radius === null) {
+            return 0;
+        }
+
+        const excludeTypes = options.excludeTypes instanceof Set ? options.excludeTypes : null;
+        const excludeCommandCenters = options.excludeCommandCenters !== false;
+        const broadcast = options.broadcast !== false;
+        const reason = typeof options.reason === 'string' ? options.reason : 'destroyed';
+        const hazardId = options.hazard?.id;
+        const destroyed = [];
+
+        for (const building of this.buildings.values()) {
+            const tileX = Number.isFinite(building.x) ? Math.floor(building.x) : null;
+            const tileY = Number.isFinite(building.y) ? Math.floor(building.y) : null;
+            if (tileX === null || tileY === null) {
+                continue;
+            }
+            const footprint = this.getBuildingFootprint(building);
+            const widthTiles = Math.max(1, Math.floor(Number.isFinite(footprint.width) ? footprint.width : COMMAND_CENTER_WIDTH_TILES));
+            const heightTiles = Math.max(1, Math.floor(Number.isFinite(footprint.height) ? footprint.height : COMMAND_CENTER_HEIGHT_TILES));
+            const minTileX = tileX;
+            const maxTileX = tileX + widthTiles - 1;
+            const minTileY = tileY;
+            const maxTileY = tileY + heightTiles - 1;
+            const nearestX = Math.max(minTileX, Math.min(centerX, maxTileX));
+            const nearestY = Math.max(minTileY, Math.min(centerY, maxTileY));
+            if (Math.abs(nearestX - centerX) > radius || Math.abs(nearestY - centerY) > radius) {
+                continue;
+            }
+            if (excludeCommandCenters && isCommandCenter(building.type)) {
+                continue;
+            }
+            if (excludeTypes && excludeTypes.has(building.type)) {
+                continue;
+            }
+            destroyed.push(building);
+        }
+
+        if (destroyed.length === 0) {
+            return 0;
+        }
+
+        destroyed.forEach((building) => {
+            debug(`[${reason}] Destroying building ${building.id} (${building.type}) at ${building.x},${building.y}${hazardId ? ` via hazard ${hazardId}` : ''}`);
+            this.removeBuilding(building.id, broadcast);
+        });
+
+        if (typeof options.onDestroy === 'function') {
+            try {
+                options.onDestroy(destroyed);
+            } catch (error) {
+                debug('destroyBuildingsInRadius callback failed', error);
+            }
+        }
+
+        return destroyed.length;
     }
 
     broadcastFactoryPurge(cityId, itemType) {
