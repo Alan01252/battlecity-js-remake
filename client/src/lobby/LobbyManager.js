@@ -413,7 +413,7 @@ class LobbyManager {
 
         const subtitle = document.createElement('p');
         subtitle.className = 'lobby-subtitle';
-        subtitle.textContent = 'Choose a city to join as mayor or recruit. Everyone starts at the same time.';
+        subtitle.textContent = 'Choose a city to join as mayor or recruit.';
 
         header.appendChild(title);
         header.appendChild(subtitle);
@@ -621,7 +621,10 @@ class LobbyManager {
         const name = identity && typeof identity.name === 'string' ? identity.name.trim() : '';
         const manager = this.identityManager;
         const googleEnabled = !!(manager && typeof manager.isGoogleAuthEnabled === 'function' && manager.isGoogleAuthEnabled());
-        const usingGoogle = !!(identity && identity.provider === 'google');
+        const provider = identity && typeof identity.provider === 'string'
+            ? identity.provider.trim().toLowerCase()
+            : null;
+        const usingGoogle = provider === 'google';
         if (this.identitySummary) {
             if (usingGoogle && name.length) {
                 this.identitySummary.textContent = `Signed in as ${name}`;
@@ -734,23 +737,41 @@ class LobbyManager {
             });
             this.googleInitialized = true;
         }
-        if (this.googleButtonTarget) {
-            this.googleButtonTarget.innerHTML = '';
-            window.google.accounts.id.renderButton(this.googleButtonTarget, {
-                theme: 'outline',
-                size: 'medium',
-                text: 'signup_with',
-                width: 240,
-            });
-        }
+        this.renderGoogleButton();
         const identity = manager && typeof manager.getIdentity === 'function'
             ? manager.getIdentity()
             : null;
-        if (identity && identity.provider === 'google') {
+        const provider = identity && typeof identity.provider === 'string'
+            ? identity.provider.trim().toLowerCase()
+            : null;
+        if (this.googleButtonTarget) {
+            if (provider === 'google') {
+                this.googleButtonTarget.style.display = 'none';
+            } else {
+                this.googleButtonTarget.style.display = '';
+            }
+        }
+        if (provider === 'google') {
             this.setGoogleFeedback('Registered with Google.', 'success');
         } else if (!this.googleBusy && !this.identityBusy && !this.identityFormVisible) {
             this.setGoogleFeedback('Register with Google to save your progress.', 'info');
         }
+    }
+
+    renderGoogleButton() {
+        if (!this.googleButtonTarget) {
+            return;
+        }
+        if (typeof window === 'undefined' || !window.google || !window.google.accounts || !window.google.accounts.id) {
+            return;
+        }
+        this.googleButtonTarget.innerHTML = '';
+        window.google.accounts.id.renderButton(this.googleButtonTarget, {
+            theme: 'outline',
+            size: 'medium',
+            text: 'signup_with',
+            width: 240,
+        });
     }
 
     async handleGoogleCredential(response) {
@@ -818,6 +839,10 @@ class LobbyManager {
         }
         const manager = this.identityManager;
         const enabled = !!(manager && typeof manager.isGoogleAuthEnabled === 'function' && manager.isGoogleAuthEnabled());
+        const provider = identity && typeof identity.provider === 'string'
+            ? identity.provider.trim().toLowerCase()
+            : null;
+        const usingGoogle = provider === 'google';
         if (!enabled) {
             this.googleContainer.classList.remove('visible');
             this.setGoogleFeedback('', 'info');
@@ -829,7 +854,17 @@ class LobbyManager {
             this.ensureGoogleClient();
             return;
         }
-        if (identity && identity.provider === 'google') {
+        if (this.googleButtonTarget) {
+            if (usingGoogle) {
+                this.googleButtonTarget.style.display = 'none';
+            } else {
+                this.googleButtonTarget.style.display = '';
+                if (!this.googleButtonTarget.firstChild) {
+                    this.renderGoogleButton();
+                }
+            }
+        }
+        if (usingGoogle) {
             this.setGoogleFeedback('Registered with Google.', 'success');
         } else if (!this.googleBusy && !this.identityBusy && !this.identityFormVisible) {
             this.setGoogleFeedback('Register with Google to save your progress.', 'info');

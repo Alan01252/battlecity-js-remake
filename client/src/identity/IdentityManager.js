@@ -78,6 +78,17 @@ class IdentityManager {
         this.handleIdentityAck = this.handleIdentityAck.bind(this);
     }
 
+    _normaliseProvider(value) {
+        if (!value || typeof value !== 'string') {
+            return null;
+        }
+        const trimmed = value.trim();
+        if (!trimmed.length) {
+            return null;
+        }
+        return trimmed.toLowerCase();
+    }
+
     _normaliseBase(value) {
         if (!value || typeof value !== 'string') {
             return computeDefaultServerUrl();
@@ -106,7 +117,7 @@ class IdentityManager {
                 const identity = {
                     id: parsed.id,
                     name: parsed.name,
-                    provider: typeof parsed.provider === 'string' ? parsed.provider : null,
+                    provider: typeof parsed.provider === 'string' ? this._normaliseProvider(parsed.provider) : null,
                     email: typeof parsed.email === 'string' ? parsed.email : null,
                     createdAt: parsed.createdAt ?? null,
                     updatedAt: parsed.updatedAt ?? null
@@ -151,6 +162,7 @@ class IdentityManager {
         if (!name) {
             throw new Error('Name must be between 2 and 32 characters.');
         }
+        const currentProvider = this._normaliseProvider(this.identity?.provider) || null;
         let response;
         if (this.identity && this.identity.id) {
             response = await this._request(
@@ -170,7 +182,7 @@ class IdentityManager {
         this.identity = {
             id: response.id,
             name: response.name,
-            provider: response.provider ?? (this.identity?.provider || 'local'),
+            provider: this._normaliseProvider(response.provider) || currentProvider || 'local',
             email: response.email ?? this.identity?.email ?? null,
             createdAt: response.createdAt ?? null,
             updatedAt: response.updatedAt ?? null
@@ -191,10 +203,11 @@ class IdentityManager {
             { credential },
             { fallbackMessage: 'Google sign-in failed.' }
         );
+        const provider = this._normaliseProvider(response.provider) || 'google';
         this.identity = {
             id: response.id,
             name: response.name,
-            provider: response.provider ?? 'google',
+            provider,
             email: response.email ?? null,
             createdAt: response.createdAt ?? null,
             updatedAt: response.updatedAt ?? null
@@ -202,7 +215,8 @@ class IdentityManager {
         this._persistIdentity();
         this.applyIdentity(this.identity);
         this.notifySocket();
-        return Object.assign({}, this.identity);
+        const refreshed = await this.refresh();
+        return refreshed || Object.assign({}, this.identity);
     }
 
     async refresh() {
@@ -219,7 +233,7 @@ class IdentityManager {
             this.identity = {
                 id: response.id,
                 name: response.name,
-                provider: response.provider ?? this.identity.provider ?? null,
+                provider: this._normaliseProvider(response.provider) ?? this._normaliseProvider(this.identity.provider) ?? null,
                 email: response.email ?? this.identity.email ?? null,
                 createdAt: response.createdAt ?? this.identity.createdAt ?? null,
                 updatedAt: response.updatedAt ?? Date.now()
@@ -253,9 +267,11 @@ class IdentityManager {
             return;
         }
         if (payload.id && payload.name) {
+            const provider = this._normaliseProvider(this.identity?.provider) ?? null;
             this.identity = {
                 id: payload.id,
                 name: payload.name,
+                provider,
                 createdAt: this.identity?.createdAt ?? null,
                 updatedAt: Date.now()
             };
@@ -282,7 +298,7 @@ class IdentityManager {
             this.game.identity = {
                 id: identity.id,
                 name: identity.name,
-                provider: identity.provider ?? null,
+                provider: this._normaliseProvider(identity.provider) ?? null,
                 email: identity.email ?? null
             };
             if (this.game.player) {
@@ -333,6 +349,8 @@ class IdentityManager {
                 if (data && typeof data === 'object' && data.error) {
                     if (data.error === 'invalid_name') {
                         message = 'Name must be between 2 and 32 characters.';
+                    } else if (data.error === 'name_taken') {
+                        message = 'That name is already taken.';
                     } else if (data.error === 'not_found') {
                         message = 'Registration record not found.';
                     } else if (data.error === 'invalid_id') {
@@ -343,6 +361,8 @@ class IdentityManager {
                         message = 'Google sign-in is not configured for this server.';
                     } else if (data.error === 'registration_failed') {
                         message = 'We were unable to save your Google profile.';
+                    } else if (data.error === 'save_failed') {
+                        message = 'Unable to save your identity. Please try again.';
                     } else if (data.error === 'upstream_unavailable') {
                         message = 'Google services are currently unavailable. Please try again later.';
                     } else if (data.error === 'missing_credential') {
@@ -416,7 +436,7 @@ class IdentityManager {
         const payload = {
             id: this.identity.id,
             name: this.identity.name,
-            provider: this.identity.provider ?? null,
+            provider: this._normaliseProvider(this.identity.provider) ?? null,
             email: this.identity.email ?? null,
             createdAt: this.identity.createdAt ?? Date.now(),
             updatedAt: this.identity.updatedAt ?? Date.now()

@@ -248,12 +248,21 @@ if (typeof playerFactory.setScoreService === 'function') {
 
 app.post('/api/users/register', (req, res) => {
     const name = typeof req.body?.name === 'string' ? req.body.name : '';
-    const user = userStore.register(name);
-    if (!user) {
-        res.status(400).json({ error: 'invalid_name' });
-        return;
+    try {
+        const user = userStore.register(name);
+        if (!user) {
+            res.status(400).json({ error: 'invalid_name' });
+            return;
+        }
+        res.status(201).json(user);
+    } catch (error) {
+        if (error?.code === 'NAME_TAKEN') {
+            res.status(409).json({ error: 'name_taken' });
+            return;
+        }
+        console.warn('[users] register failed:', error?.message || error);
+        res.status(500).json({ error: 'save_failed' });
     }
-    res.status(201).json(user);
 });
 
 app.post('/api/auth/google', async (req, res) => {
@@ -283,6 +292,10 @@ app.post('/api/auth/google', async (req, res) => {
         }
         if (error.code === 'AUDIENCE_MISMATCH') {
             res.status(403).json({ error: 'audience_mismatch' });
+            return;
+        }
+        if (error.code === 'NAME_TAKEN') {
+            res.status(409).json({ error: 'name_taken' });
             return;
         }
         if (error.status && error.status >= 500) {
@@ -330,8 +343,17 @@ app.put('/api/users/:id', (req, res) => {
         res.status(404).json({ error: 'not_found' });
         return;
     }
-    const updated = userStore.update(id, sanitized);
-    res.json(updated);
+    try {
+        const updated = userStore.update(id, sanitized);
+        res.json(updated);
+    } catch (error) {
+        if (error?.code === 'NAME_TAKEN') {
+            res.status(409).json({ error: 'name_taken' });
+            return;
+        }
+        console.warn('[users] update failed:', error?.message || error);
+        res.status(500).json({ error: 'save_failed' });
+    }
 });
 
 app.get('/api/users/:id', (req, res) => {
