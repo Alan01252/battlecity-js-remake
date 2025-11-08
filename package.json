@@ -7,7 +7,9 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
-    "lint": "npx eslint client server --ext .js,.jsx,.ts,.tsx"
+    "lint": "npx eslint client server --ext .js,.jsx,.ts,.tsx",
+    "build": "npm run build --workspace client",
+    "start": "npm run start --workspace server"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

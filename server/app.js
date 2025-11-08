@@ -4,9 +4,21 @@
 var express = require('express');
 var http = require('http');
 var https = require('https');
+var path = require('path');
+var fs = require('fs');
+var { Server } = require('socket.io');
 var app = express();
 var server = http.createServer(app);
-var { Server } = require('socket.io');
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+var isRender = process.env.RENDER === 'true';
+var isProduction = process.env.NODE_ENV === 'production' || isRender;
+
+var CLIENT_DIST_DIR = path.join(__dirname, '..', 'client', 'dist');
+var CLIENT_INDEX_FILE = path.join(CLIENT_DIST_DIR, 'index.html');
+var hasBuiltClient = fs.existsSync(CLIENT_INDEX_FILE);
+
 var citySpawns = require('../shared/citySpawns.json');
 var UserStore = require('./src/users/UserStore');
 var ScoreService = require('./src/users/ScoreService');
@@ -76,8 +88,9 @@ const resolveResponseOrigin = (originHeader) => {
     return CLIENT_ORIGINS[0] || 'http://localhost:8020';
 };
 
-var io = new Server(server, {
-    cors: {
+var socketOptions = {};
+if (!isProduction) {
+    socketOptions.cors = {
         origin(origin, callback) {
             if (!origin || isOriginAllowed(origin)) {
                 callback(null, true);
@@ -86,23 +99,55 @@ var io = new Server(server, {
             callback(new Error('Not allowed by CORS'));
         },
         methods: ["GET", "POST"]
-    }
-});
+    };
+}
+
+var io = new Server(server, socketOptions);
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
 app.use((req, res, next) => {
-    const requestOrigin = req.headers.origin;
-    const responseOrigin = resolveResponseOrigin(requestOrigin);
-    res.header('Access-Control-Allow-Origin', responseOrigin);
-    res.header('Vary', 'Origin');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
-    if (req.method === 'OPTIONS') {
-        res.sendStatus(204);
-        return;
-    }
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     next();
 });
+
+if (!isProduction) {
+    app.use((req, res, next) => {
+        const requestOrigin = req.headers.origin;
+        const responseOrigin = resolveResponseOrigin(requestOrigin);
+        res.header('Access-Control-Allow-Origin', responseOrigin);
+        res.append('Vary', 'Origin');
+        res.header('Access-Control-Allow-Headers', 'Content-Type');
+        res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+        if (req.method === 'OPTIONS') {
+            res.sendStatus(204);
+            return;
+        }
+        next();
+    });
+}
+
+var staticOptions = {
+    index: false,
+    etag: true,
+    redirect: false,
+    maxAge: isProduction ? '1h' : 0,
+    setHeaders(res, filePath) {
+        if (path.extname(filePath) === '.html') {
+            res.setHeader('Cache-Control', 'no-cache');
+        } else if (isProduction) {
+            res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+        }
+        res.append('Vary', 'Accept-Encoding');
+    }
+};
+
+if (hasBuiltClient) {
+    app.use(express.static(CLIENT_DIST_DIR, staticOptions));
+}
 
 var PlayerFactory = require('./src/PlayerFactory');
 var BulletFactory = require('./src/BulletFactory');
@@ -115,7 +160,8 @@ var { loadMapData } = require('./src/utils/mapLoader');
 var ChatManager = require('./src/chat/ChatManager');
 
 app.get('/health', (_req, res) => {
-    res.json({ status: 'ok' });
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.json({ status: 'ok', uptime: process.uptime() });
 });
 
 var PORT = process.env.PORT || 8021;
@@ -369,6 +415,24 @@ app.get('/api/users/:id', (req, res) => {
     }
     res.json(user);
 });
+
+if (hasBuiltClient) {
+    app.get('*', (req, res, next) => {
+        if (req.method !== 'GET') {
+            next();
+            return;
+        }
+        if (req.path.startsWith('/api') || req.path.startsWith('/socket.io/')) {
+            next();
+            return;
+        }
+        res.sendFile(CLIENT_INDEX_FILE, (error) => {
+            if (error) {
+                next(error);
+            }
+        });
+    });
+}
 
 const shutdown = () => {
     const botProcesses = fakeCityManager.getBotProcesses();
