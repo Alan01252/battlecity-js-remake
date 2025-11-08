@@ -522,17 +522,41 @@ class BulletFactory {
             return [baseRect];
         }
 
-        const blockedTiles = Math.max(0, heightTiles - OPEN_BAY_HEIGHT_TILES);
+        const walkwayTiles = Math.min(OPEN_BAY_HEIGHT_TILES, Math.max(heightTiles - 1, 0));
+        if (walkwayTiles <= 0) {
+            return [baseRect];
+        }
+
+        const blockedTiles = heightTiles - walkwayTiles;
         if (blockedTiles <= 0) {
             return [];
         }
 
-        const blockedHeight = Math.max((blockedTiles * TILE_SIZE) - BULLET_BUILDING_PADDING, 8);
-        const topRect = Object.assign({}, baseRect, {
-            h: Math.min(baseRect.h, blockedHeight)
-        });
+        const topBlockedTiles = Math.ceil(blockedTiles / 2);
+        const bottomBlockedTiles = blockedTiles - topBlockedTiles;
+        const hitboxes = [];
 
-        return [topRect];
+        if (topBlockedTiles > 0) {
+            const blockedHeight = Math.max((topBlockedTiles * TILE_SIZE) - BULLET_BUILDING_PADDING, 8);
+            hitboxes.push(Object.assign({}, baseRect, {
+                h: Math.min(baseRect.h, blockedHeight)
+            }));
+        }
+
+        if (bottomBlockedTiles > 0) {
+            const offsetTiles = topBlockedTiles + walkwayTiles;
+            const offsetPixels = offsetTiles * TILE_SIZE;
+            const blockedHeight = Math.max((bottomBlockedTiles * TILE_SIZE) - BULLET_BUILDING_PADDING, 8);
+            const remainingHeight = Math.max(0, baseRect.h - offsetPixels);
+            if (remainingHeight > 0) {
+                hitboxes.push(Object.assign({}, baseRect, {
+                    y: baseRect.y + offsetPixels,
+                    h: Math.min(remainingHeight, blockedHeight)
+                }));
+            }
+        }
+
+        return hitboxes;
     }
 
     hitsBuilding(rect) {

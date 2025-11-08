@@ -25,11 +25,14 @@ const isHospital = (type) => {
     if (!Number.isFinite(numeric)) {
         return false;
     }
-    if (HOSPITAL_TYPE_CODES.has(numeric)) {
+    const expanded = (Number.isInteger(numeric) && numeric >= 0 && numeric < 100)
+        ? numeric * 100
+        : numeric;
+    if (HOSPITAL_TYPE_CODES.has(expanded)) {
         return true;
     }
-    const family = getFamilyCode(numeric);
-    return family === 2 && numeric >= 200 && numeric < 300;
+    const family = getFamilyCode(expanded);
+    return family === 2 && expanded >= 200 && expanded < 300;
 };
 
 const FACTORY_ITEM_LIMITS = {

@@ -181,7 +181,13 @@ class UserStore {
         if (existing) {
             let changed = false;
             const updated = Object.assign({}, existing);
-            if (!existing.name && fallbackName) {
+            if (sanitisedName) {
+                const uniqueName = this._generateUniqueName(sanitisedName, existing.id);
+                if (uniqueName && uniqueName !== existing.name) {
+                    updated.name = uniqueName;
+                    changed = true;
+                }
+            } else if (!existing.name && fallbackName) {
                 const uniqueName = this._generateUniqueName(fallbackName, existing.id);
                 if (uniqueName && uniqueName !== existing.name) {
                     updated.name = uniqueName;
