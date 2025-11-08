@@ -4,8 +4,12 @@ const MAX_NAME_LENGTH = 32;
 
 const resolveEnvServerUrl = () => {
     try {
-        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SERVER_URL) {
-            return String(import.meta.env.VITE_SERVER_URL);
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
+            const env = import.meta.env;
+            const explicit = env.VITE_SOCKET_URL || env.VITE_SERVER_URL || null;
+            if (explicit) {
+                return String(explicit);
+            }
         }
     } catch (error) {
         // ignore
@@ -15,9 +19,18 @@ const resolveEnvServerUrl = () => {
 
 const computeDefaultServerUrl = () => {
     if (typeof window !== 'undefined' && window.location) {
-        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-        const hostname = window.location.hostname || 'localhost';
-        return `${protocol}//${hostname}:8021`;
+        const { protocol, hostname } = window.location;
+        const normalisedProtocol = protocol === 'https:' ? 'https:' : 'http:';
+        const lowerHost = (hostname || '').toLowerCase();
+        const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(lowerHost);
+        if (isLocalhost) {
+            return `${normalisedProtocol}//${hostname}:8021`;
+        }
+        if (window.location.origin) {
+            return window.location.origin;
+        }
+        const portSegment = window.location.port ? `:${window.location.port}` : '';
+        return `${normalisedProtocol}//${hostname}${portSegment}`;
     }
     return 'http://localhost:8021';
 };

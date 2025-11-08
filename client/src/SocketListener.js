@@ -11,6 +11,48 @@ const LOCAL_SHOT_CACHE_TTL_MS = 700;
 
 import {updateBotWaypoints} from "./draw/draw-bot-debug";
 
+const LOCAL_SOCKET_PORT = 8021;
+
+const resolveSocketUrl = () => {
+    let explicitUrl = null;
+    try {
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
+            const env = import.meta.env;
+            explicitUrl = env.VITE_SOCKET_URL || env.VITE_SERVER_URL || null;
+            if (explicitUrl) {
+                explicitUrl = String(explicitUrl).trim();
+            }
+        }
+    } catch (error) {
+        // ignore env access errors
+    }
+
+    if (explicitUrl) {
+        return explicitUrl.replace(/\/$/, '');
+    }
+
+    if (typeof window !== 'undefined' && window.location) {
+        const { protocol, hostname } = window.location;
+        const isSecure = protocol === 'https:';
+        const normalisedProtocol = isSecure ? 'https:' : 'http:';
+        const lowerHost = (hostname || '').toLowerCase();
+        const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(lowerHost);
+
+        if (isLocalhost) {
+            return `${normalisedProtocol}//${hostname}:${LOCAL_SOCKET_PORT}`;
+        }
+
+        if (window.location.origin) {
+            return window.location.origin;
+        }
+
+        const portSegment = window.location.port ? `:${window.location.port}` : '';
+        return `${normalisedProtocol}//${hostname}${portSegment}`;
+    }
+
+    return `http://localhost:${LOCAL_SOCKET_PORT}`;
+};
+
 class SocketListener extends EventEmitter2 {
 
     constructor(game) {
@@ -26,7 +68,8 @@ class SocketListener extends EventEmitter2 {
     }
 
     listen() {
-        this.io = io("http://localhost:8021", {
+        const socketUrl = resolveSocketUrl();
+        this.io = io(socketUrl, {
             transports: ['websocket']
         });
         this.io.on("connect", () => {
