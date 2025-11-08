@@ -1360,7 +1360,7 @@ class PlayerFactory {
     }
 
     getCityCandidates() {
-        const candidates = [];
+        const candidates = new Set(this.defaultCityPool);
         const cityList = this.game && Array.isArray(this.game.cities) ? this.game.cities : null;
 
         if (cityList) {
@@ -1373,18 +1373,16 @@ class PlayerFactory {
                     continue;
                 }
                 const id = Number.isFinite(entry?.id) ? entry.id : index;
-                if (!candidates.includes(id)) {
-                    candidates.push(id);
-                }
+                candidates.add(id);
             }
         }
 
-        if (!candidates.length) {
+        if (!candidates.size) {
             return this.defaultCityPool.slice();
         }
 
-        candidates.sort((a, b) => a - b);
-        return candidates;
+        const sorted = Array.from(candidates).sort((a, b) => a - b);
+        return sorted;
     }
 
     ensureCityRoster(cityId) {
@@ -1406,7 +1404,10 @@ class PlayerFactory {
         const roster = this.ensureCityRoster(id);
         const players = Object.values(this.game.players || {}).filter((player) => normaliseCityIdValue(player && player.city, null) === id);
         const mayorPlayer = players.find((player) => player && player.isMayor);
-        const mayorId = mayorPlayer ? mayorPlayer.id : (roster.mayor || null);
+        const mayorIdCandidate = mayorPlayer ? mayorPlayer.id : (roster.mayor || null);
+        const mayorEntity = mayorPlayer || (mayorIdCandidate && this.game.players ? this.game.players[mayorIdCandidate] : null);
+        const mayorId = mayorEntity ? mayorEntity.id : mayorIdCandidate;
+        const mayorName = mayorEntity ? (mayorEntity.callsign || null) : null;
         const hasMayor = !!mayorId;
         const playerCount = players.length;
         const cityState = this.game.cities ? this.game.cities[id] : null;
@@ -1436,6 +1437,7 @@ class PlayerFactory {
             roster,
             players,
             mayorId,
+            mayorName,
             playerCount,
             recruitCount,
             openMayor,
@@ -1459,6 +1461,7 @@ class PlayerFactory {
             id: state.cityId,
             name: displayName,
             mayorId: state.mayorId || null,
+            mayorName: state.mayorName || null,
             mayorLabel: shortenId(state.mayorId || null),
             playerCount: state.playerCount,
             recruitCount: state.recruitCount,

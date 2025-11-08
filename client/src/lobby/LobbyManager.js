@@ -1167,7 +1167,8 @@ class LobbyManager {
             name.className = 'lobby-city-name';
             name.textContent = city.name || `City ${city.id}`;
 
-            const mayorLabel = city.openMayor ? '(open)' : (city.mayorLabel || '(unknown)');
+            const mayorDisplayName = city.mayorName || city.mayorLabel || '(unknown)';
+            const mayorLabel = city.openMayor ? '(open)' : mayorDisplayName;
             const capacity = Number.isFinite(city.capacity) ? city.capacity : (1 + (city.maxRecruits ?? 3));
             const playerCount = Number.isFinite(city.playerCount) ? city.playerCount : 0;
             const meta = document.createElement('div');
