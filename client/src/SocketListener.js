@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 import { EventEmitter2 } from 'eventemitter2';
-import { getCitySpawn } from './utils/citySpawns';
+import { getCitySpawn, getCityDisplayName } from './utils/citySpawns';
 import { SOUND_IDS } from './audio/AudioManager';
 import spawnMuzzleFlash from './effects/muzzleFlash';
 
@@ -681,6 +681,12 @@ class SocketListener extends EventEmitter2 {
             updated.userId = existing.userId;
         }
         this.game.otherPlayers[player.id] = updated;
+        const isSnapshot = context && context.source === 'snapshot';
+        const isEnterGame = context && context.source === 'enter_game';
+        const isNewPlayer = !existing;
+        if (isNewPlayer && !isSnapshot && isEnterGame) {
+            this.notifyPlayerJoined(updated);
+        }
     }
 
     syncLocalPlayer(player, context = {}) {
@@ -787,6 +793,54 @@ class SocketListener extends EventEmitter2 {
             const shouldForce = context && context.source === 'enter_game';
             this.game.updateOrbHint({ force: shouldForce });
         }
+    }
+
+    notifyPlayerJoined(player) {
+        if (!player || !this.game || typeof this.game.notify !== 'function') {
+            return;
+        }
+        const label = this.buildPlayerLabel(player);
+        if (!label) {
+            return;
+        }
+        const cityName = this.buildPlayerCityLabel(player);
+        const suffix = cityName ? ` in ${cityName}` : '';
+        this.game.notify({
+            title: 'Player joined',
+            message: `${label} joined${suffix}.`,
+            variant: 'info',
+            timeout: 4200
+        });
+    }
+
+    buildPlayerLabel(player) {
+        if (!player) {
+            return null;
+        }
+        if (typeof player.callsign === 'string' && player.callsign.trim().length) {
+            return player.callsign.trim();
+        }
+        if (this.game && typeof this.game.resolveCallsign === 'function') {
+            const resolved = this.game.resolveCallsign(player.id);
+            if (resolved) {
+                return resolved;
+            }
+        }
+        if (player.id !== undefined && player.id !== null) {
+            return `Player ${player.id}`;
+        }
+        return 'Player';
+    }
+
+    buildPlayerCityLabel(player) {
+        if (!player) {
+            return null;
+        }
+        const numericCity = Number(player.city);
+        if (!Number.isFinite(numericCity)) {
+            return null;
+        }
+        return getCityDisplayName(numericCity);
     }
 
     normalisePlayerPayload(payload) {
