@@ -5,32 +5,27 @@ const { TILE_SIZE, PLAYER_HITBOX_GAP } = require("./constants");
 const RECT_GAP = PLAYER_HITBOX_GAP;
 const PLAYER_RECT_SIZE = TILE_SIZE - (RECT_GAP * 2);
 
-const cloneRect = (rect) => ({
-    x: rect.x,
-    y: rect.y,
-    w: rect.w,
-    h: rect.h
-});
-
 const rectangleCollision = (rect1, rect2) => {
-    const r1 = cloneRect(rect1);
-    const r2 = cloneRect(rect2);
+    const r1x1 = rect1.x;
+    const r1y1 = rect1.y;
+    const r1x2 = r1x1 + rect1.w;
+    const r1y2 = r1y1 + rect1.h;
 
-    r1.w += r1.x;
-    r1.h += r1.y;
-    r2.w += r2.x;
-    r2.h += r2.y;
+    const r2x1 = rect2.x;
+    const r2y1 = rect2.y;
+    const r2x2 = r2x1 + rect2.w;
+    const r2y2 = r2y1 + rect2.h;
 
-    if (r1.w <= r2.x) {
+    if (r1x2 <= r2x1) {
         return false;
     }
-    if (r2.w <= r1.x) {
+    if (r2x2 <= r1x1) {
         return false;
     }
-    if (r1.h <= r2.y) {
+    if (r1y2 <= r2y1) {
         return false;
     }
-    if (r2.h <= r1.y) {
+    if (r2y2 <= r1y1) {
         return false;
     }
     return true;

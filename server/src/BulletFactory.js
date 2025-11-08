@@ -13,7 +13,7 @@ const {
     COMMAND_CENTER_WIDTH_TILES,
     COMMAND_CENTER_HEIGHT_TILES
 } = require("./gameplay/constants");
-const { createBulletRect, getPlayerRect, rectangleCollision } = require("./gameplay/geometry");
+const { getPlayerRect, rectangleCollision } = require("./gameplay/geometry");
 const { isCommandCenter, isHospital, isHouse } = require('./constants');
 
 let bulletCounter = 0;
@@ -44,6 +44,26 @@ const resolveBulletSpeed = (type) => {
     return BULLET_SPEED_UNITS_PER_MS;
 };
 
+const decorateBulletMotion = (bullet) => {
+    const radians = (bullet.angle / 16) * Math.PI;
+    const unitX = Math.sin(radians) * -1;
+    const unitY = Math.cos(radians) * -1;
+    const velocityXPerMs = unitX * bullet.speed;
+    const velocityYPerMs = unitY * bullet.speed;
+    bullet.unitX = unitX;
+    bullet.unitY = unitY;
+    bullet.velocityXPerMs = velocityXPerMs;
+    bullet.velocityYPerMs = velocityYPerMs;
+    bullet.maxVelocityPerMs = Math.max(Math.abs(velocityXPerMs), Math.abs(velocityYPerMs));
+    bullet.rect = {
+        x: bullet.x,
+        y: bullet.y,
+        w: 4,
+        h: 4
+    };
+    return bullet;
+};
+
 const BLOCKING_TILE_VALUES = new Set([2, 3]);
 const MAP_SIZE_TILES = 512;
 const MAP_PIXEL_SIZE = MAP_SIZE_TILES * TILE_SIZE;
@@ -61,6 +81,7 @@ class BulletFactory {
         this.bullets = new Map();
         this.recentSourceShots = new Map();
         this.sourceCleanupAt = 0;
+        this.buildingHitboxCache = new WeakMap();
         if (!Array.isArray(this.game?.map) || !Array.isArray(this.game.map[0])) {
             debug('[bullet] Warning: game.map is missing or malformed; terrain collisions disabled');
         }
@@ -128,7 +149,7 @@ class BulletFactory {
             : socket.id;
 
         const id = `bullet_${++bulletCounter}`;
-        const bullet = Object.assign({
+        const bullet = decorateBulletMotion(Object.assign({
             id,
             shooterId,
             emitterId: socket.id,
@@ -138,7 +159,7 @@ class BulletFactory {
             maxRange: BULLET_MAX_RANGE,
             createdAt: now,
             lastUpdateAt: now,
-        }, bulletData);
+        }, bulletData));
 
         this.bullets.set(id, bullet);
 
@@ -186,7 +207,7 @@ class BulletFactory {
         }
 
         const id = `bullet_${++bulletCounter}`;
-        const bullet = Object.assign({
+        const bullet = decorateBulletMotion(Object.assign({
             id,
             shooterId,
             emitterId: shooterId,
@@ -196,7 +217,7 @@ class BulletFactory {
             maxRange: BULLET_MAX_RANGE,
             createdAt: now,
             lastUpdateAt: now,
-        }, bulletData);
+        }, bulletData));
 
         this.bullets.set(id, bullet);
 
@@ -310,10 +331,17 @@ class BulletFactory {
     }
 
     removeBulletsForShooter(shooterId) {
-        for (const [id, bullet] of Array.from(this.bullets.entries())) {
+        if (!shooterId) {
+            return;
+        }
+        const removals = [];
+        for (const [id, bullet] of this.bullets.entries()) {
             if (bullet.shooterId === shooterId || bullet.emitterId === shooterId) {
-                this.bullets.delete(id);
+                removals.push(id);
             }
+        }
+        for (const id of removals) {
+            this.bullets.delete(id);
         }
     }
 
@@ -322,25 +350,31 @@ class BulletFactory {
             return;
         }
 
-        for (const bullet of Array.from(this.bullets.values())) {
-            this.updateBullet(bullet, deltaMs);
+        const now = Date.now();
+        const removals = [];
+        for (const bullet of this.bullets.values()) {
+            this.updateBullet(bullet, deltaMs, now);
             if (bullet._destroy) {
-                this.bullets.delete(bullet.id);
+                removals.push(bullet.id);
+            }
+        }
+        if (removals.length > 0) {
+            for (const id of removals) {
+                this.bullets.delete(id);
             }
         }
     }
 
-    updateBullet(bullet, deltaMs) {
-        const now = Date.now();
+    updateBullet(bullet, deltaMs, now) {
         bullet.lifeMs += deltaMs;
         bullet.lastUpdateAt = now;
 
-        const velocityX = Math.sin((bullet.angle / 16) * Math.PI) * -1 * bullet.speed * deltaMs;
-        const velocityY = Math.cos((bullet.angle / 16) * Math.PI) * -1 * bullet.speed * deltaMs;
-
-        const stepCount = Math.max(1, Math.ceil(Math.max(Math.abs(velocityX), Math.abs(velocityY)) / 8));
-        const stepX = velocityX / stepCount;
-        const stepY = velocityY / stepCount;
+        const deltaX = bullet.velocityXPerMs * deltaMs;
+        const deltaY = bullet.velocityYPerMs * deltaMs;
+        const maxStep = bullet.maxVelocityPerMs * deltaMs;
+        const stepCount = Math.max(1, Math.ceil(maxStep / 8));
+        const stepX = deltaX / stepCount;
+        const stepY = deltaY / stepCount;
 
         for (let index = 0; index < stepCount; index += 1) {
             const nextX = bullet.x + stepX;
@@ -350,19 +384,26 @@ class BulletFactory {
             bullet.x = nextX;
             bullet.y = nextY;
 
-            if (this.checkTerrainCollision(bullet)) {
+            const rect = this.getMutableBulletRect(bullet);
+            this.clampRectToMap(rect);
+
+            if (this.hitsBlockingTile(rect)) {
                 bullet.x = prevX;
                 bullet.y = prevY;
                 bullet._destroy = true;
-                debug(`Bullet ${bullet.id} hit terrain at (${prevX.toFixed(1)}, ${prevY.toFixed(1)})`);
+                if (debug.enabled) {
+                    debug(`Bullet ${bullet.id} hit terrain at (${prevX.toFixed(1)}, ${prevY.toFixed(1)})`);
+                }
                 break;
             }
 
-            if (this.checkStructureCollision(bullet)) {
+            if (this.hitsBuilding(rect)) {
                 bullet.x = prevX;
                 bullet.y = prevY;
                 bullet._destroy = true;
-                debug(`Bullet ${bullet.id} hit structure at (${prevX.toFixed(1)}, ${prevY.toFixed(1)})`);
+                if (debug.enabled) {
+                    debug(`Bullet ${bullet.id} hit structure at (${prevX.toFixed(1)}, ${prevY.toFixed(1)})`);
+                }
                 break;
             }
         }
@@ -511,6 +552,12 @@ class BulletFactory {
         const widthTiles = Math.max(1, Number.isFinite(footprint.width) ? footprint.width : DEFAULT_BUILDING_WIDTH_TILES);
         const heightTiles = Math.max(1, Number.isFinite(footprint.height) ? footprint.height : DEFAULT_BUILDING_HEIGHT_TILES);
 
+        const cacheKey = `${tileX}|${tileY}|${widthTiles}|${heightTiles}|${Number(building.type) || 0}`;
+        const cached = this.buildingHitboxCache.get(building);
+        if (cached && cached.key === cacheKey) {
+            return cached.hitboxes;
+        }
+
         const baseRect = {
             x: (tileX * TILE_SIZE) + BULLET_BUILDING_PADDING,
             y: (tileY * TILE_SIZE) + BULLET_BUILDING_PADDING,
@@ -519,17 +566,23 @@ class BulletFactory {
         };
 
         if (!this.hasOpenBay(building) || heightTiles <= OPEN_BAY_HEIGHT_TILES) {
-            return [baseRect];
+            const hitboxes = [baseRect];
+            this.buildingHitboxCache.set(building, { key: cacheKey, hitboxes });
+            return hitboxes;
         }
 
         const walkwayTiles = Math.min(OPEN_BAY_HEIGHT_TILES, Math.max(heightTiles - 1, 0));
         if (walkwayTiles <= 0) {
-            return [baseRect];
+            const hitboxes = [baseRect];
+            this.buildingHitboxCache.set(building, { key: cacheKey, hitboxes });
+            return hitboxes;
         }
 
         const blockedTiles = heightTiles - walkwayTiles;
         if (blockedTiles <= 0) {
-            return [];
+            const hitboxes = [];
+            this.buildingHitboxCache.set(building, { key: cacheKey, hitboxes });
+            return hitboxes;
         }
 
         const topBlockedTiles = Math.ceil(blockedTiles / 2);
@@ -556,6 +609,7 @@ class BulletFactory {
             }
         }
 
+        this.buildingHitboxCache.set(building, { key: cacheKey, hitboxes });
         return hitboxes;
     }
 
@@ -581,27 +635,35 @@ class BulletFactory {
         return false;
     }
 
-    clampBulletRect(bullet) {
-        const rect = createBulletRect(bullet);
+    getMutableBulletRect(bullet) {
+        if (!bullet.rect) {
+            bullet.rect = {
+                x: bullet.x,
+                y: bullet.y,
+                w: 4,
+                h: 4
+            };
+        } else {
+            bullet.rect.x = bullet.x;
+            bullet.rect.y = bullet.y;
+        }
+        return bullet.rect;
+    }
+
+    clampRectToMap(rect) {
         rect.x = Math.max(0, Math.min(rect.x, MAP_PIXEL_SIZE - rect.w));
         rect.y = Math.max(0, Math.min(rect.y, MAP_PIXEL_SIZE - rect.h));
         return rect;
     }
 
     checkTerrainCollision(bullet) {
-        const rect = this.clampBulletRect(bullet);
-        if (this.hitsBlockingTile(rect)) {
-            return true;
-        }
-        return false;
+        const rect = this.clampRectToMap(this.getMutableBulletRect(bullet));
+        return this.hitsBlockingTile(rect);
     }
 
     checkStructureCollision(bullet) {
-        const rect = this.clampBulletRect(bullet);
-        if (this.hitsBuilding(rect)) {
-            return true;
-        }
-        return false;
+        const rect = this.clampRectToMap(this.getMutableBulletRect(bullet));
+        return this.hitsBuilding(rect);
     }
 
     registerSourceShot(sourceId, now) {
@@ -622,7 +684,7 @@ class BulletFactory {
     }
 
     checkPlayerCollision(bullet) {
-        const bulletRect = createBulletRect(bullet);
+        const bulletRect = this.getMutableBulletRect(bullet);
         for (const [socketId, player] of Object.entries(this.game.players)) {
             if (!player || !player.offset) {
                 continue;
