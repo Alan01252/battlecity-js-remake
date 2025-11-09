@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1.7
+ARG VITE_SOCKET_URL
 
 # Build the client assets and prepare the workspace
 FROM node:20-bookworm AS builder
+ENV VITE_SOCKET_URL=${VITE_SOCKET_URL}
 WORKDIR /app
 
 # Install dependencies (uses npm workspaces)

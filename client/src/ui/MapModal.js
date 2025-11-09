@@ -100,6 +100,8 @@ class MapModal {
         this.panel = null;
         this.canvas = null;
         this.legendContainer = null;
+        this.playerIndicator = null;
+        this.playerIndicator = null;
         this.handleKeyDown = this.handleKeyDown.bind(this);
         this.palette = {
             ground: TERRAIN_PALETTE.ground,
@@ -198,6 +200,19 @@ class MapModal {
                 box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
                 display: block;
             }
+            .battlecity-map-player-indicator {
+                position: absolute;
+                width: 24px;
+                height: 24px;
+                clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+                background: #fdfefe;
+                border: 1px solid rgba(255, 255, 255, 0.9);
+                box-shadow: 0 0 16px rgba(255, 255, 255, 0.85), 0 0 30px rgba(245, 247, 255, 0.45);
+                animation: battlecity-player-pulse 1500ms ease-in-out infinite;
+                pointer-events: none;
+                transform-origin: center;
+                display: none;
+            }
             .battlecity-map-legend {
                 display: flex;
                 flex-wrap: wrap;
@@ -249,6 +264,20 @@ class MapModal {
                 letter-spacing: 0.2px;
                 color: rgba(226, 233, 255, 0.88);
             }
+            @keyframes battlecity-player-pulse {
+                0% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+                50% {
+                    transform: scale(1.25);
+                    opacity: 0.6;
+                }
+                100% {
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
         `;
         document.head.appendChild(style);
     }
@@ -282,8 +311,11 @@ class MapModal {
 
         const legend = document.createElement('div');
         legend.className = 'battlecity-map-legend';
+        const playerIndicator = document.createElement('div');
+        playerIndicator.className = 'battlecity-map-player-indicator';
 
         canvasWrapper.appendChild(canvas);
+        canvasWrapper.appendChild(playerIndicator);
 
         const content = document.createElement('div');
         content.className = 'battlecity-map-content';
@@ -298,6 +330,7 @@ class MapModal {
         this.panel = panel;
         this.canvas = canvas;
         this.legendContainer = legend;
+        this.playerIndicator = playerIndicator;
     }
 
     open() {
@@ -536,11 +569,12 @@ class MapModal {
         if (!context) {
             return;
         }
+        const scale = this.scale;
         if (!width || !height) {
             context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.updatePlayerIndicator(null, scale);
             return;
         }
-        const scale = this.scale;
         const renderWidth = width * scale;
         const renderHeight = height * scale;
         if (this.canvas.width !== renderWidth || this.canvas.height !== renderHeight) {
@@ -576,6 +610,7 @@ class MapModal {
         this.drawStructureMarkers(context, structures, scale);
         this.drawCityMarkers(context, cities, scale);
         this.drawPlayerMarker(context, playerPosition, scale);
+        this.updatePlayerIndicator(playerPosition, scale);
     }
 
     drawStructureMarkers(context, structures, scale) {
@@ -703,6 +738,41 @@ class MapModal {
         context.fill();
         context.stroke();
         context.restore();
+    }
+
+    updatePlayerIndicator(playerPosition, scale) {
+        const indicator = this.playerIndicator;
+        if (!indicator || !this.canvas) {
+            return;
+        }
+        if (!playerPosition) {
+            indicator.style.display = 'none';
+            return;
+        }
+        const centerTileX = Number(playerPosition.centerTileX);
+        const centerTileY = Number(playerPosition.centerTileY);
+        if (!Number.isFinite(centerTileX) || !Number.isFinite(centerTileY)) {
+            indicator.style.display = 'none';
+            return;
+        }
+        const centerX = centerTileX * scale;
+        const centerY = centerTileY * scale;
+        if (!Number.isFinite(centerX) || !Number.isFinite(centerY)) {
+            indicator.style.display = 'none';
+            return;
+        }
+        const canvasWidth = this.canvas.width;
+        const canvasHeight = this.canvas.height;
+        if (centerX < 0 || centerY < 0 || centerX > canvasWidth || centerY > canvasHeight) {
+            indicator.style.display = 'none';
+            return;
+        }
+        const size = Math.max(18, Math.round(scale * 2.4));
+        indicator.style.width = `${size}px`;
+        indicator.style.height = `${size}px`;
+        indicator.style.left = `${centerX - (size / 2)}px`;
+        indicator.style.top = `${centerY - (size / 2)}px`;
+        indicator.style.display = 'block';
     }
 
     getPlayerCenter() {
