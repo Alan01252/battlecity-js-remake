@@ -10,6 +10,13 @@ if (PIXI.settings) {
     if (PIXI.SCALE_MODES) {
         PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
     }
+    if (typeof PIXI.settings.SPRITE_MAX_TEXTURES === 'number') {
+        PIXI.settings.SPRITE_MAX_TEXTURES = Math.min(PIXI.settings.SPRITE_MAX_TEXTURES, 16);
+    }
+}
+
+if (PIXI.Text) {
+    PIXI.Text.defaultResolution = 1;
 }
 
 if (typeof window !== 'undefined') {

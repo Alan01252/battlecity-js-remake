@@ -129,7 +129,11 @@ const shortenId = (value) => {
 
 var app = new PIXI.Application({
     width: window.innerWidth,
-    height: window.innerHeight
+    height: window.innerHeight,
+    antialias: false,
+    useContextAlpha: false,
+    powerPreference: 'high-performance',
+    backgroundAlpha: 1
 });
 
 app.renderer.plugins.interaction.cursorStyles = {
@@ -146,7 +150,13 @@ document.getElementById("game").appendChild(stats.dom);
 const gameContainer = document.getElementById("game");
 
 var objectContainer = new PIXI.Container();
+objectContainer.interactive = false;
+objectContainer.interactiveChildren = false;
+
 var commandCenterLabelLayer = new PIXI.Container();
+commandCenterLabelLayer.interactive = false;
+commandCenterLabelLayer.interactiveChildren = false;
+
 var panelContainer = new PIXI.Container();
 var groundTiles = null;
 var backgroundTiles = null;
@@ -1761,9 +1771,20 @@ function setup() {
 
 
     groundTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['groundTexture'], true);
+    groundTiles.interactive = false;
+    groundTiles.interactiveChildren = false;
+
     backgroundTiles = new PIXI.Container();
+    backgroundTiles.interactive = false;
+    backgroundTiles.interactiveChildren = false;
+
     iconTiles = new PIXI.tilemap.CompositeRectTileLayer(0, game.textures['imageItems'], true);
+    iconTiles.interactive = false;
+    iconTiles.interactiveChildren = false;
+
     itemTiles = new PIXI.tilemap.CompositeRectTileLayer(0, null, true);
+    itemTiles.interactive = false;
+    itemTiles.interactiveChildren = false;
     commandCenterLabelLayer.removeChildren();
     if (game.commandCenterLabelCache && typeof game.commandCenterLabelCache.clear === 'function') {
         game.commandCenterLabelCache.clear();

@@ -6,6 +6,7 @@ export const setupMouseInputs = (game) => {
     gameArea.hitArea = new PIXI.Rectangle(0, 0, game.maxMapX, game.maxMapY);
 
     gameArea.interactive = true;
+    gameArea.interactiveChildren = false;
     gameArea.cursor = "cursor";
     game.stage.addChild(gameArea);
     game.interactionLayer = gameArea;

@@ -11,6 +11,7 @@ import {BUILDING_REPAIR} from "../constants";
 import {POPULATION_MAX_HOUSE} from "../constants";
 import {POPULATION_MAX_NON_HOUSE} from "../constants";
 import { getCityDisplayName } from '../utils/citySpawns';
+import { scheduleDestroy } from '../utils/pixiPerformance';
 
 var minTX = 0;
 var maxTX = 0;
@@ -325,7 +326,7 @@ const syncCommandCenterLabels = (game) => {
                 if (record.label.parent) {
                     record.label.parent.removeChild(record.label);
                 }
-                record.label.destroy();
+                scheduleDestroy(record.label, { minDelay: 16, maxDelay: 200 });
             }
             cache.delete(key);
         }
@@ -372,7 +373,7 @@ const pruneCommandCenterLabels = (game) => {
             if (record.label.parent) {
                 record.label.parent.removeChild(record.label);
             }
-            record.label.destroy();
+            scheduleDestroy(record.label, { minDelay: 16, maxDelay: 200 });
             cache.delete(key);
         } else if (!record.label.visible) {
             record.lastHiddenAt = now;

@@ -1,5 +1,6 @@
 import PIXI from '../pixi';
 import { getCityDisplayName } from '../utils/citySpawns';
+import { scheduleDestroy } from '../utils/pixiPerformance';
 
 const EXPLOSION_VARIANTS = {
     small: {
@@ -430,7 +431,7 @@ export const drawChanging = (game) => {
                 if (record.label.parent) {
                     record.label.parent.removeChild(record.label);
                 }
-                record.label.destroy();
+                scheduleDestroy(record.label, { minDelay: 16, maxDelay: 200 });
             }
             cache.delete(key);
         }

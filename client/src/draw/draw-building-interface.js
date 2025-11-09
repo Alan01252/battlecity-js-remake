@@ -1,4 +1,5 @@
 import PIXI from "../pixi";
+import { scheduleDestroy } from "../utils/pixiPerformance";
 
 import { LABELS } from "../constants";
 import { CAN_BUILD } from "../constants";
@@ -49,7 +50,7 @@ const clearGhostBuilding = (game) => {
         pointerMoveListener = null;
     }
     if (activeGhostBuilding) {
-        activeGhostBuilding.destroy();
+        scheduleDestroy(activeGhostBuilding, { minDelay: 0, maxDelay: 120, destroyTexture: true, destroyBaseTexture: false });
         activeGhostBuilding = null;
     }
     game.isBuilding = false;
