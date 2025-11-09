@@ -265,14 +265,35 @@ orbHintStyle.pointerEvents = 'none';
 orbHintStyle.display = 'none';
 game.orbHintElement = orbHintElement;
 
+const menuToggleButton = document.createElement('button');
+menuToggleButton.id = 'menu-toggle-button';
+menuToggleButton.innerHTML = '&#9776;'; // Hamburger menu icon
+menuToggleButton.title = 'Toggle Menu';
+const menuToggleStyle = menuToggleButton.style;
+menuToggleStyle.position = 'fixed';
+menuToggleStyle.bottom = '24px';
+menuToggleStyle.left = '24px';
+menuToggleStyle.width = '48px';
+menuToggleStyle.height = '48px';
+menuToggleStyle.borderRadius = '12px';
+menuToggleStyle.background = 'rgba(10, 18, 52, 0.82)';
+menuToggleStyle.border = '1px solid rgba(123, 152, 255, 0.35)';
+menuToggleStyle.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.45)';
+menuToggleStyle.fontSize = '24px';
+menuToggleStyle.color = '#f0f6ff';
+menuToggleStyle.cursor = 'pointer';
+menuToggleStyle.zIndex = '1200';
+menuToggleStyle.transition = 'all 0.2s ease';
+menuToggleStyle.display = 'flex';
+menuToggleStyle.alignItems = 'center';
+menuToggleStyle.justifyContent = 'center';
+menuToggleStyle.fontFamily = 'Arial, sans-serif';
+
 const fullscreenButton = document.createElement('button');
 fullscreenButton.id = 'fullscreen-button';
 fullscreenButton.textContent = '\u26F6';
 fullscreenButton.title = 'Toggle Fullscreen (F)';
 const fullscreenStyle = fullscreenButton.style;
-fullscreenStyle.position = 'fixed';
-fullscreenStyle.bottom = '24px';
-fullscreenStyle.left = '24px';
 fullscreenStyle.width = '48px';
 fullscreenStyle.height = '48px';
 fullscreenStyle.borderRadius = '12px';
@@ -282,7 +303,6 @@ fullscreenStyle.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.45)';
 fullscreenStyle.fontSize = '24px';
 fullscreenStyle.color = '#f0f6ff';
 fullscreenStyle.cursor = 'pointer';
-fullscreenStyle.zIndex = '1000';
 fullscreenStyle.transition = 'all 0.2s ease';
 fullscreenStyle.display = 'flex';
 fullscreenStyle.alignItems = 'center';
@@ -301,10 +321,76 @@ fullscreenButton.addEventListener('click', () => {
         game.toggleFullscreen();
     }
 });
+
+const menuContainer = document.createElement('div');
+menuContainer.id = 'game-menu-container';
+const menuContainerStyle = menuContainer.style;
+menuContainerStyle.position = 'fixed';
+menuContainerStyle.left = '18px';
+menuContainerStyle.bottom = '84px';
+menuContainerStyle.display = 'none';
+menuContainerStyle.flexDirection = 'column';
+menuContainerStyle.gap = '12px';
+menuContainerStyle.zIndex = '1150';
+menuContainerStyle.pointerEvents = 'auto';
+
+menuContainer.appendChild(fullscreenButton);
+
+game.menuOpen = false;
+game.menuToggleButton = menuToggleButton;
 game.fullscreenButton = fullscreenButton;
+game.menuContainer = menuContainer;
+
+game.toggleMenu = () => {
+    game.menuOpen = !game.menuOpen;
+
+    if (game.menuOpen) {
+        menuToggleButton.innerHTML = '&#10005;'; // X icon
+        menuToggleButton.title = 'Close Menu';
+
+        // Show chat input controls first
+        if (game.chatManager && typeof game.chatManager.showControls === 'function') {
+            game.chatManager.showControls();
+        }
+
+        // Calculate position based on chat container height after showing controls
+        setTimeout(() => {
+            const chatContainer = document.getElementById('battlecity-chat-container');
+            if (chatContainer) {
+                const containerHeight = chatContainer.offsetHeight;
+                // Position menu below chat container
+                menuContainerStyle.bottom = `${84 + containerHeight + 12}px`;
+            }
+            menuContainerStyle.display = 'flex';
+        }, 10);
+    } else {
+        // Hide menu
+        menuContainerStyle.display = 'none';
+        menuToggleButton.innerHTML = '&#9776;'; // Hamburger icon
+        menuToggleButton.title = 'Toggle Menu';
+
+        // Hide chat input controls
+        if (game.chatManager && typeof game.chatManager.hideControls === 'function') {
+            game.chatManager.hideControls();
+        }
+    }
+};
+
+menuToggleButton.addEventListener('mouseenter', () => {
+    menuToggleStyle.background = 'rgba(15, 28, 72, 0.92)';
+    menuToggleStyle.transform = 'scale(1.05)';
+});
+menuToggleButton.addEventListener('mouseleave', () => {
+    menuToggleStyle.background = 'rgba(10, 18, 52, 0.82)';
+    menuToggleStyle.transform = 'scale(1)';
+});
+menuToggleButton.addEventListener('click', () => {
+    game.toggleMenu();
+});
 
 gameContainer.appendChild(orbHintElement);
-gameContainer.appendChild(fullscreenButton);
+gameContainer.appendChild(menuContainer);
+gameContainer.appendChild(menuToggleButton);
 
 initialiseCameraShake(game);
 game.lastOrbHintMessage = '';
