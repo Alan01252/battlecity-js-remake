@@ -4,6 +4,53 @@ class IconFactory {
     constructor(game) {
         this.game = game;
         this.iconListHead = null;
+        this.iconsById = new Map();
+    }
+
+    generateIconId(prefix = "icon") {
+        const base = this.game?.socketListener?.io?.id ?? "local";
+        return `${prefix}_${base}_${Date.now()}_${Math.random().toString(16).slice(-6)}`;
+    }
+
+    normalizeIconId(id) {
+        if (typeof id === "string" && id.trim().length > 0) {
+            return id.trim();
+        }
+        return null;
+    }
+
+    registerIcon(icon) {
+        if (!icon || !icon.id) {
+            return;
+        }
+        this.iconsById.set(icon.id, icon);
+    }
+
+    unregisterIcon(icon) {
+        if (!icon || !icon.id) {
+            return;
+        }
+        this.iconsById.delete(icon.id);
+    }
+
+    getIconById(id) {
+        const normalized = this.normalizeIconId(id);
+        if (!normalized) {
+            return null;
+        }
+        return this.iconsById.get(normalized) || null;
+    }
+
+    removeIconById(id, options = {}) {
+        const icon = this.getIconById(id);
+        if (!icon) {
+            return false;
+        }
+        if (options.onlyUnowned && icon.owner != null) {
+            return false;
+        }
+        this.deleteIcon(icon);
+        return true;
     }
 
     cycle() {}
@@ -76,8 +123,11 @@ class IconFactory {
             owner === this.game.player?.id
               ? (this.game.player.city ?? null)
               : null;
+        const resolvedId = this.normalizeIconId(options.id);
+        const shouldGenerateId = !resolvedId && options.isSharedDrop;
 
         var icon = {
+            id: resolvedId || (shouldGenerateId ? this.generateIconId("drop") : null),
             owner: owner,
             x: x,
             y: y,
@@ -90,6 +140,8 @@ class IconFactory {
             armed: !!options.armed,
             city: resolvedCity,
             teamId: resolvedTeam,
+            isSharedDrop: !!options.isSharedDrop,
+            synced: options.synced !== undefined ? !!options.synced : true,
         };
 
         console.log("creating icon");
@@ -103,8 +155,9 @@ class IconFactory {
 
         this.iconListHead = icon;
         icon.quantity = Math.max(1, parseInt(icon.quantity, 10) || 1);
+        this.registerIcon(icon);
 
-        if (this.game.buildingFactory && icon.owner == null) {
+        if (this.game.buildingFactory && icon.owner == null && !icon.isSharedDrop) {
             if (
                 !icon.sourceBuildingId &&
         typeof this.game.buildingFactory.assignIconSource === "function"
@@ -145,6 +198,10 @@ class IconFactory {
         var icon = this.findIconByLocation();
         if (icon) {
             const ownerId = this.game.player.id;
+            const isSharedDrop = !!icon.isSharedDrop;
+            if (isSharedDrop && icon.synced === false) {
+                return;
+            }
             const quantityToAdd = icon.quantity ?? 1;
             const allowedQuantity = this.getAllowedQuantity(
                 ownerId,
@@ -155,15 +212,24 @@ class IconFactory {
                 return;
             }
             const existing = this.findOwnedIconByType(ownerId, icon.type);
+            const sharedDropId = isSharedDrop ? icon.id : null;
+            const sharedDropTeam = isSharedDrop ? icon.teamId ?? null : null;
 
             icon.owner = ownerId;
             icon.city = this.game.player.city ?? null;
             icon.teamId = this.game.player.city ?? null;
             icon.quantity = quantityToAdd;
+            icon.isSharedDrop = false;
+            icon.synced = true;
+            if (sharedDropId) {
+                this.unregisterIcon(icon);
+                icon.id = null;
+            }
 
             if (
                 this.game.buildingFactory &&
-        typeof this.game.buildingFactory.handleIconCollected === "function"
+        typeof this.game.buildingFactory.handleIconCollected === "function" &&
+        !isSharedDrop
             ) {
                 this.game.buildingFactory.handleIconCollected(icon);
             }
@@ -212,6 +278,18 @@ class IconFactory {
                 this.game.player.bombsArmed = false;
             }
 
+            if (sharedDropId &&
+        this.game.socketListener &&
+        typeof this.game.socketListener.collectDroppedIcon === "function") {
+                this.game.socketListener.collectDroppedIcon({
+                    id: sharedDropId,
+                    type: icon.type,
+                    cityId: this.game.player.city ?? null,
+                    teamId: sharedDropTeam ?? this.game.player.city ?? null,
+                    quantity: quantityToAdd,
+                });
+            }
+
             this.game.forceDraw = true;
         }
     }
@@ -237,6 +315,7 @@ class IconFactory {
             owner: this.game.player.id,
             city: this.game.player.city ?? null,
             teamId: this.game.player.city ?? null,
+            quantity: 1,
         };
 
         if (quantity > 1) {
@@ -372,6 +451,9 @@ class IconFactory {
             this.game.player.bombsArmed = icon.armed;
         }
 
+        this.unregisterIcon(icon);
+        icon.id = null;
+
         return returnIcon;
     }
 
@@ -421,7 +503,7 @@ class IconFactory {
         icon.teamId === null ||
         icon.teamId === undefined ||
         icon.teamId === teamId;
-            if (icon.owner == null && icon.type === type && matchesTeam) {
+            if (icon.owner == null && icon.type === type && matchesTeam && !icon.isSharedDrop) {
                 const dx = Math.abs(icon.x - x);
                 const dy = Math.abs(icon.y - y);
                 if (dx <= radius && dy <= radius) {
@@ -444,7 +526,7 @@ class IconFactory {
         icon.teamId === null ||
         icon.teamId === undefined ||
         icon.teamId === teamId;
-            if (icon.owner == null && icon.type === type && matchesTeam) {
+            if (icon.owner == null && icon.type === type && matchesTeam && !icon.isSharedDrop) {
                 const dx = Math.abs(icon.x - x);
                 const dy = Math.abs(icon.y - y);
                 if (dx <= radius && dy <= radius) {

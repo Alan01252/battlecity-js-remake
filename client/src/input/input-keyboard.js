@@ -205,11 +205,24 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             }
             // It's not been converted to an item and so is able to be picked up again
             if (!item) {
-                game.iconFactory.newIcon(null, parseInt(x2), parseInt(y2), dropInfo.type, {
+                const icon = game.iconFactory.newIcon(null, parseInt(x2), parseInt(y2), dropInfo.type, {
                     skipProductionUpdate: true,
                     teamId: game.player.city ?? null,
                     city: game.player.city ?? null,
-                })
+                    isSharedDrop: true,
+                    synced: false,
+                });
+                if (icon && game.socketListener && typeof game.socketListener.dropIcon === 'function') {
+                    game.socketListener.dropIcon({
+                        id: icon.id,
+                        type: icon.type,
+                        x: icon.x,
+                        y: icon.y,
+                        cityId: icon.city ?? null,
+                        teamId: icon.teamId ?? null,
+                        quantity: icon.quantity ?? 1,
+                    });
+                }
             }
         }
 

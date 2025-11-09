@@ -24,13 +24,14 @@ const toNumber = (value, fallback = null) => {
 };
 
 class OrbManager {
-    constructor({ game, cityManager, playerFactory, buildingFactory, hazardManager, defenseManager }) {
+    constructor({ game, cityManager, playerFactory, buildingFactory, hazardManager, defenseManager, iconDropManager = null }) {
         this.game = game;
         this.cityManager = cityManager;
         this.playerFactory = playerFactory;
         this.buildingFactory = buildingFactory;
         this.hazardManager = hazardManager;
         this.defenseManager = defenseManager;
+        this.iconDropManager = iconDropManager;
         this.io = null;
     }
 
@@ -110,6 +111,9 @@ class OrbManager {
 
         if (this.cityManager) {
             this.cityManager.resetCity(targetCity);
+            if (this.iconDropManager && typeof this.iconDropManager.clearCity === 'function') {
+                this.iconDropManager.clearCity(targetCity);
+            }
             this.cityManager.recordOrbVictory(playerCity, points);
             if (typeof this.cityManager.releaseOrbHolder === 'function') {
                 this.cityManager.releaseOrbHolder(socket.id, { consume: true });

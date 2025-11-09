@@ -233,17 +233,62 @@ class SocketListener extends EventEmitter2 {
 
         this.io.on("new_icon", (icon) => {
             const payload = typeof icon === 'string' ? JSON.parse(icon) : icon;
-            if (!payload) {
+            if (!payload || !this.game || !this.game.iconFactory) {
                 return;
             }
             const ownerId = payload.ownerId ?? payload.owner ?? null;
+            if (payload.id && typeof this.game.iconFactory.getIconById === 'function') {
+                const existing = this.game.iconFactory.getIconById(payload.id);
+                if (existing) {
+                    existing.x = payload.x;
+                    existing.y = payload.y;
+                    if (payload.quantity !== undefined) {
+                        existing.quantity = Math.max(1, parseInt(payload.quantity, 10) || 1);
+                    }
+                    existing.city = payload.cityId ?? existing.city;
+                    existing.teamId = payload.teamId ?? payload.cityId ?? existing.teamId;
+                    existing.isSharedDrop = !!payload.sharedDrop;
+                    existing.synced = true;
+                    return;
+                }
+            }
             this.game.iconFactory.newIcon(ownerId, payload.x, payload.y, payload.type, {
                 sourceBuildingId: payload.buildingId ?? payload.sourceBuildingId ?? null,
                 city: payload.cityId ?? null,
                 teamId: payload.teamId ?? payload.cityId ?? null,
                 quantity: payload.quantity ?? 1,
                 armed: !!payload.armed,
+                id: payload.id ?? null,
+                isSharedDrop: !!payload.sharedDrop,
+                skipProductionUpdate: !!payload.skipProductionUpdate,
+                synced: true,
             });
+        });
+
+        this.io.on("icon:remove", (payload) => {
+            const data = this.safeParse(payload);
+            if (!data || !this.game || !this.game.iconFactory) {
+                return;
+            }
+            if (data.id && typeof this.game.iconFactory.removeIconById === "function") {
+                const removed = this.game.iconFactory.removeIconById(data.id, { onlyUnowned: true });
+                if (removed) {
+                    return;
+                }
+            }
+            if (typeof data.x === "number" &&
+        typeof data.y === "number" &&
+        data.type !== undefined &&
+        typeof this.game.iconFactory.removeUnownedIconsNear === "function") {
+                this.game.iconFactory.removeUnownedIconsNear(
+                    data.x,
+                    data.y,
+                    data.type,
+                    1,
+                    32,
+                    data.teamId ?? data.cityId ?? null
+                );
+            }
         });
 
         this.io.on("factory:purge", (payload) => {
@@ -598,6 +643,22 @@ class SocketListener extends EventEmitter2 {
         }
         const payload = (typeof data === 'string') ? data : JSON.stringify(data);
         this.io.emit('factory:collect', payload);
+    }
+
+    dropIcon(data) {
+        if (!this.io || this.io.disconnected || !data) {
+            return;
+        }
+        const payload = (typeof data === 'string') ? data : JSON.stringify(data);
+        this.io.emit('icon:drop', payload);
+    }
+
+    collectDroppedIcon(data) {
+        if (!this.io || this.io.disconnected || !data) {
+            return;
+        }
+        const payload = (typeof data === 'string') ? data : JSON.stringify(data);
+        this.io.emit('icon:pickup', payload);
     }
 
     sendOrbDrop(drop) {

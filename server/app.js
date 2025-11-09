@@ -156,6 +156,7 @@ var HazardManager = require('./src/hazards/HazardManager');
 var OrbManager = require('./src/orb/OrbManager');
 var FakeCityManager = require('./src/FakeCityManager');
 var DefenseManager = require('./src/DefenseManager');
+var IconDropManager = require('./src/IconDropManager');
 var { loadMapData } = require('./src/utils/mapLoader');
 var ChatManager = require('./src/chat/ChatManager');
 var { LoopMonitor } = require('./src/utils/LoopMonitor');
@@ -295,6 +296,11 @@ const hazardManager = new HazardManager(game, playerFactory);
 hazardManager.setIo(io);
 const defenseManager = new DefenseManager({ game, playerFactory });
 defenseManager.setIo(io);
+const iconDropManager = new IconDropManager({
+    cityManager: buildingFactory.cityManager,
+    playerFactory
+});
+iconDropManager.setIo(io);
 buildingFactory.setManagers({ hazardManager, defenseManager, playerFactory });
 const orbManager = new OrbManager({
     game,
@@ -303,6 +309,7 @@ const orbManager = new OrbManager({
     buildingFactory,
     hazardManager,
     defenseManager,
+    iconDropManager,
 });
 orbManager.setIo(io);
 const fakeCityManager = new FakeCityManager({
@@ -652,6 +659,12 @@ io.on('connection', (socket) => {
     });
     socket.on('orb:drop', (payload) => {
         orbManager.handleDrop(socket, payload);
+    });
+    socket.on('icon:drop', (payload) => {
+        iconDropManager.handleDrop(socket, payload);
+    });
+    socket.on('icon:pickup', (payload) => {
+        iconDropManager.handlePickup(socket, payload);
     });
     socket.on('defense:spawn', (payload) => {
         defenseManager.handleSpawn(socket, payload);
