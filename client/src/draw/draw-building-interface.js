@@ -79,6 +79,8 @@ const startGhostBuilding = (game, buildingType, pointerData) => {
   building.alpha = 0.5;
   building.interactive = false;
   building.buttonMode = false;
+  // Center the sprite anchor so cursor is in the middle of the building
+  building.anchor.set(0.5, 0.5);
 
   game.stage.addChild(building);
   activeGhostBuilding = building;
@@ -128,11 +130,17 @@ const startGhostBuilding = (game, buildingType, pointerData) => {
     const worldPixelX = tileX * 48;
     const worldPixelY = tileY * 48;
 
+    // Since the building anchor is centered (0.5, 0.5), offset by half the building size
+    // to align the center of the building with the center of the 3x3 tile grid
+    const halfBuildingSize = 144 / 2; // 72 pixels
+    const centeredWorldX = worldPixelX + halfBuildingSize;
+    const centeredWorldY = worldPixelY + halfBuildingSize;
+
     // Transform world coordinates back to screen coordinates
     const screenX =
-      worldPixelX - game.player.offset.x + game.player.defaultOffset.x;
+      centeredWorldX - game.player.offset.x + game.player.defaultOffset.x;
     const screenY =
-      worldPixelY - game.player.offset.y + game.player.defaultOffset.y;
+      centeredWorldY - game.player.offset.y + game.player.defaultOffset.y;
 
     // Set position directly in screen space
     building.position.set(screenX, screenY);
