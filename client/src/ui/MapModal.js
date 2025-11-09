@@ -11,6 +11,10 @@ const DEFAULT_SCALE = 2;
 const MAX_SCALE = 4;
 const CITY_MARKER_COLOR = '#4da3ff';
 const CITY_MARKER_OUTLINE = 'rgba(4, 12, 24, 0.85)';
+const PLAYER_MARKER_COLOR = '#f5f7ff';
+const PLAYER_MARKER_OUTLINE = 'rgba(4, 12, 24, 0.92)';
+const TILE_SIZE = 48;
+const PLAYER_HALF_SIZE = TILE_SIZE / 2;
 
 const TERRAIN_LEGEND = [
     { id: 'ground', label: 'Grassland & Plains', color: '#27421f' },
@@ -28,7 +32,7 @@ const STRUCTURE_CATEGORY_DEFINITIONS = [
     { id: 'command', label: 'City Command Center', color: CITY_MARKER_COLOR, marker: 'structure', defaultFootprint: 3 }
 ];
 
-const LEGEND_ENTRIES = [...TERRAIN_LEGEND, ...STRUCTURE_CATEGORY_DEFINITIONS];
+const LEGEND_ENTRIES = [...TERRAIN_LEGEND, { id: 'player', label: 'Current Position', color: PLAYER_MARKER_COLOR, marker: 'player' }];
 
 const clampScale = (value) => {
     const numeric = Number(value);
@@ -96,8 +100,6 @@ class MapModal {
         this.panel = null;
         this.canvas = null;
         this.legendContainer = null;
-        this.cityList = null;
-        this.structureList = null;
         this.statusLabel = null;
         this.handleKeyDown = this.handleKeyDown.bind(this);
         this.palette = {
@@ -133,20 +135,21 @@ class MapModal {
                 pointer-events: auto;
             }
             .battlecity-map-panel {
-                width: min(960px, 100%);
+                width: min(92vw, 1120px);
                 max-height: calc(100vh - 48px);
-                overflow-y: auto;
+                overflow: hidden;
                 background: rgba(8, 10, 18, 0.96);
                 border: 1px solid rgba(145, 196, 255, 0.35);
-                box-shadow: 0 28px 56px rgba(0, 0, 0, 0.65);
+                box-shadow: 0 28px 56px rgba(0, 0, 0, 0.6);
                 border-radius: 20px;
-                padding: 32px 36px;
+                padding: 24px 28px 28px;
                 color: #f1f5ff;
                 font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
                 display: flex;
                 flex-direction: column;
-                gap: 22px;
+                gap: 18px;
                 position: relative;
+                align-items: center;
             }
             .battlecity-map-close {
                 position: absolute;
@@ -170,34 +173,33 @@ class MapModal {
                 margin: 0;
                 letter-spacing: 0.4px;
                 text-transform: uppercase;
+                text-align: center;
             }
             .battlecity-map-description {
                 margin: 0;
                 font-size: 14px;
                 line-height: 1.55;
                 color: rgba(221, 230, 255, 0.85);
+                text-align: center;
+                max-width: 760px;
             }
-            .battlecity-map-grid {
+            .battlecity-map-content {
+                width: 100%;
                 display: flex;
                 flex-direction: column;
-                gap: 24px;
-            }
-            @media (min-width: 960px) {
-                .battlecity-map-grid {
-                    display: grid;
-                    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-                    align-items: start;
-                    gap: 28px;
-                }
-            }
-            .battlecity-map-canvas-wrapper {
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
+                gap: 20px;
                 align-items: center;
             }
+            .battlecity-map-canvas-wrapper {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                align-items: center;
+                position: relative;
+            }
             .battlecity-map-canvas {
-                width: min(720px, 100%);
+                width: min(100%, 960px);
                 height: auto;
                 border-radius: 14px;
                 border: 1px solid rgba(255, 255, 255, 0.16);
@@ -208,146 +210,46 @@ class MapModal {
             }
             .battlecity-map-status {
                 margin: 0;
-                font-size: 13px;
-                color: rgba(214, 224, 255, 0.8);
+                font-size: 12px;
+                color: rgba(214, 224, 255, 0.78);
                 text-align: center;
             }
-            .battlecity-map-meta {
-                display: flex;
-                flex-direction: column;
-                gap: 24px;
-            }
-            .battlecity-map-section {
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-                background: rgba(18, 22, 34, 0.9);
-                border-radius: 16px;
-                padding: 18px 20px;
-                border: 1px solid rgba(145, 196, 255, 0.18);
-            }
-            .battlecity-map-section h2 {
-                margin: 0;
-                font-size: 16px;
-                font-weight: 600;
-                letter-spacing: 0.3px;
-            }
             .battlecity-map-legend {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-                gap: 12px;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px;
+                padding: 10px 14px;
+                background: rgba(12, 16, 26, 0.82);
+                border-radius: 14px;
+                border: 1px solid rgba(145, 196, 255, 0.18);
+                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
             }
             .battlecity-map-legend-entry {
                 display: flex;
                 align-items: center;
-                gap: 10px;
-                background: rgba(12, 16, 26, 0.9);
-                border-radius: 10px;
-                padding: 10px 12px;
+                gap: 8px;
+                background: rgba(8, 11, 20, 0.88);
+                border-radius: 8px;
+                padding: 6px 10px;
                 border: 1px solid rgba(145, 196, 255, 0.16);
+                font-size: 12px;
             }
             .battlecity-map-legend-swatch {
-                width: 18px;
-                height: 18px;
+                width: 14px;
+                height: 14px;
                 border-radius: 4px;
                 border: 1px solid rgba(255, 255, 255, 0.35);
                 box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
             }
-            .battlecity-map-legend-entry[data-marker='structure'] .battlecity-map-legend-swatch {
+            .battlecity-map-legend-entry[data-marker='player'] .battlecity-map-legend-swatch {
                 border-radius: 50%;
-                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
+                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
             }
             .battlecity-map-legend-label {
-                font-size: 13px;
+                font-size: 12px;
                 letter-spacing: 0.2px;
-            }
-            .battlecity-map-city-list {
-                list-style: none;
-                margin: 0;
-                padding: 0;
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 12px;
-            }
-            .battlecity-map-city-entry {
-                background: rgba(12, 16, 26, 0.9);
-                border: 1px solid rgba(145, 196, 255, 0.16);
-                border-radius: 10px;
-                padding: 10px 12px;
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-            }
-            .battlecity-map-city-name {
-                font-size: 14px;
-                font-weight: 600;
-                letter-spacing: 0.3px;
-            }
-            .battlecity-map-city-coords {
-                font-size: 12px;
-                color: rgba(215, 225, 255, 0.75);
-            }
-            .battlecity-map-empty {
-                font-size: 13px;
-                color: rgba(215, 225, 255, 0.65);
-            }
-            .battlecity-map-structure-groups {
-                display: flex;
-                flex-direction: column;
-                gap: 16px;
-            }
-            .battlecity-map-structure-group {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                background: rgba(12, 16, 26, 0.9);
-                border: 1px solid rgba(145, 196, 255, 0.16);
-                border-radius: 12px;
-                padding: 12px 14px;
-            }
-            .battlecity-map-structure-group-title {
-                margin: 0;
-                font-size: 14px;
-                font-weight: 600;
-                letter-spacing: 0.25px;
-            }
-            .battlecity-map-structure-list {
-                list-style: none;
-                margin: 0;
-                padding: 0;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-            .battlecity-map-structure-item {
-                display: flex;
-                align-items: flex-start;
-                gap: 10px;
-                background: rgba(8, 12, 20, 0.85);
-                border: 1px solid rgba(145, 196, 255, 0.18);
-                border-radius: 10px;
-                padding: 10px 12px;
-            }
-            .battlecity-map-structure-marker {
-                width: 14px;
-                height: 14px;
-                border-radius: 50%;
-                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
-                margin-top: 2px;
-            }
-            .battlecity-map-structure-content {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-            }
-            .battlecity-map-structure-name {
-                font-size: 13px;
-                font-weight: 600;
-                letter-spacing: 0.25px;
-            }
-            .battlecity-map-structure-meta {
-                font-size: 12px;
-                color: rgba(215, 225, 255, 0.7);
+                color: rgba(226, 233, 255, 0.88);
             }
         `;
         document.head.appendChild(style);
@@ -382,71 +284,37 @@ class MapModal {
         description.className = 'battlecity-map-description';
         description.textContent = 'Review the full theatre: terrain, active build zones, and every city centre are plotted below. Press Esc or Close to return to command.';
 
-        const grid = document.createElement('div');
-        grid.className = 'battlecity-map-grid';
-
         const canvasWrapper = document.createElement('div');
         canvasWrapper.className = 'battlecity-map-canvas-wrapper';
 
         const canvas = document.createElement('canvas');
         canvas.className = 'battlecity-map-canvas';
 
+        const legend = document.createElement('div');
+        legend.className = 'battlecity-map-legend';
+
         const status = document.createElement('p');
         status.className = 'battlecity-map-status';
         status.textContent = 'Loading terrain data…';
 
         canvasWrapper.appendChild(canvas);
+        canvasWrapper.appendChild(legend);
         canvasWrapper.appendChild(status);
 
-        const meta = document.createElement('div');
-        meta.className = 'battlecity-map-meta';
-
-        const legendSection = document.createElement('section');
-        legendSection.className = 'battlecity-map-section';
-        const legendHeading = document.createElement('h2');
-        legendHeading.textContent = 'Legend';
-        const legend = document.createElement('div');
-        legend.className = 'battlecity-map-legend';
-        legendSection.appendChild(legendHeading);
-        legendSection.appendChild(legend);
-
-        const citySection = document.createElement('section');
-        citySection.className = 'battlecity-map-section';
-        const cityHeading = document.createElement('h2');
-        cityHeading.textContent = 'Cities';
-        const cityList = document.createElement('ul');
-        cityList.className = 'battlecity-map-city-list';
-        citySection.appendChild(cityHeading);
-        citySection.appendChild(cityList);
-
-        const structureSection = document.createElement('section');
-        structureSection.className = 'battlecity-map-section';
-        const structureHeading = document.createElement('h2');
-        structureHeading.textContent = 'Structures';
-        const structureList = document.createElement('div');
-        structureList.className = 'battlecity-map-structure-groups';
-        structureSection.appendChild(structureHeading);
-        structureSection.appendChild(structureList);
-
-        meta.appendChild(legendSection);
-        meta.appendChild(citySection);
-        meta.appendChild(structureSection);
-
-        grid.appendChild(canvasWrapper);
-        grid.appendChild(meta);
+        const content = document.createElement('div');
+        content.className = 'battlecity-map-content';
+        content.appendChild(canvasWrapper);
 
         panel.appendChild(closeButton);
         panel.appendChild(heading);
         panel.appendChild(description);
-        panel.appendChild(grid);
+        panel.appendChild(content);
 
         overlay.appendChild(panel);
         this.overlay = overlay;
         this.panel = panel;
         this.canvas = canvas;
         this.legendContainer = legend;
-        this.cityList = cityList;
-        this.structureList = structureList;
         this.statusLabel = status;
     }
 
@@ -480,8 +348,6 @@ class MapModal {
         this.panel = null;
         this.canvas = null;
         this.legendContainer = null;
-        this.cityList = null;
-        this.structureList = null;
         this.statusLabel = null;
         this.isOpen = false;
         if (typeof this.onClose === 'function') {
@@ -502,10 +368,9 @@ class MapModal {
     render() {
         this.renderLegend();
         const cities = this.collectCities();
-        const structureData = this.collectStructures();
-        this.renderCityList(cities);
-        this.renderStructureList(structureData.groups);
-        this.renderMap(cities, structureData.structures);
+        const structures = this.collectStructures();
+        const playerPosition = this.getPlayerCenter();
+        this.renderMap(cities, structures, playerPosition);
     }
 
     renderLegend() {
@@ -531,107 +396,12 @@ class MapModal {
         });
     }
 
-    renderCityList(cities) {
-        if (!this.cityList) {
-            return;
-        }
-        this.cityList.replaceChildren();
-        if (!cities.length) {
-            const empty = document.createElement('p');
-            empty.className = 'battlecity-map-empty';
-            empty.textContent = 'No cities detected. Join a city or load a scenario to populate this list.';
-            this.cityList.appendChild(empty);
-            return;
-        }
-        cities.forEach((city) => {
-            const item = document.createElement('li');
-            item.className = 'battlecity-map-city-entry';
-            const name = document.createElement('span');
-            name.className = 'battlecity-map-city-name';
-            name.textContent = city.name;
-            const coords = document.createElement('span');
-            coords.className = 'battlecity-map-city-coords';
-            coords.textContent = `Tile: (${city.tileX}, ${city.tileY})`;
-            item.appendChild(name);
-            item.appendChild(coords);
-            this.cityList.appendChild(item);
-        });
-    }
-
-    renderStructureList(groups) {
-        if (!this.structureList) {
-            return;
-        }
-        this.structureList.replaceChildren();
-        const hasEntries = Array.isArray(groups)
-            && groups.some((group) => Array.isArray(group.entries) && group.entries.length > 0);
-        if (!hasEntries) {
-            const empty = document.createElement('p');
-            empty.className = 'battlecity-map-empty';
-            empty.textContent = 'No factories, research centres, or support structures detected yet.';
-            this.structureList.appendChild(empty);
-            return;
-        }
-        groups.forEach((group) => {
-            if (!Array.isArray(group.entries) || group.entries.length === 0) {
-                return;
-            }
-            const container = document.createElement('article');
-            container.className = 'battlecity-map-structure-group';
-            const title = document.createElement('h3');
-            title.className = 'battlecity-map-structure-group-title';
-            title.textContent = `${group.label} (${group.entries.length})`;
-            const list = document.createElement('ul');
-            list.className = 'battlecity-map-structure-list';
-            group.entries.forEach((structure) => {
-                const item = document.createElement('li');
-                item.className = 'battlecity-map-structure-item';
-                const marker = document.createElement('span');
-                marker.className = 'battlecity-map-structure-marker';
-                marker.style.background = group.color || '#9aa7bf';
-                const content = document.createElement('div');
-                content.className = 'battlecity-map-structure-content';
-                const name = document.createElement('span');
-                name.className = 'battlecity-map-structure-name';
-                name.textContent = structure.label || 'Structure';
-                const meta = document.createElement('span');
-                meta.className = 'battlecity-map-structure-meta';
-                const metaParts = [];
-                if (structure.cityName) {
-                    metaParts.push(structure.cityName);
-                }
-                metaParts.push(`Tile (${structure.tileX}, ${structure.tileY})`);
-                meta.textContent = metaParts.join(' · ');
-                content.appendChild(name);
-                content.appendChild(meta);
-                item.appendChild(marker);
-                item.appendChild(content);
-                list.appendChild(item);
-            });
-            container.appendChild(title);
-            container.appendChild(list);
-            this.structureList.appendChild(container);
-        });
-    }
-
     collectStructures() {
-        const groups = STRUCTURE_CATEGORY_DEFINITIONS
-            .filter((definition) => definition.id !== 'command')
-            .map((definition) => ({
-                id: definition.id,
-                label: definition.label,
-                color: definition.color,
-                entries: []
-            }));
-        const groupLookup = groups.reduce((acc, group) => {
-            acc[group.id] = group;
-            return acc;
-        }, {});
         const structures = [];
         const factory = this.game?.buildingFactory;
         const buildingStore = factory?.buildingsById;
         if (!buildingStore || typeof buildingStore !== 'object') {
-            return { structures, groups };
+            return structures;
         }
         const toTileCoordinate = (value) => {
             if (Number.isFinite(value)) {
@@ -674,7 +444,7 @@ class MapModal {
                 return;
             }
             const categoryId = this.determineStructureCategory(numericType);
-            if (categoryId === 'command' || !groupLookup[categoryId]) {
+            if (categoryId === 'command' || !STRUCTURE_CATEGORY_LOOKUP[categoryId]) {
                 return;
             }
             const tileX = toTileCoordinate(building.x);
@@ -708,10 +478,6 @@ class MapModal {
                 heightTiles: footprint.height
             };
             structures.push(structure);
-            groupLookup[categoryId].entries.push(structure);
-        });
-        groups.forEach((group) => {
-            group.entries.sort(comparator);
         });
         structures.sort((a, b) => {
             const orderA = STRUCTURE_CATEGORY_ORDER[a.category] ?? Number.MAX_SAFE_INTEGER;
@@ -721,7 +487,7 @@ class MapModal {
             }
             return comparator(a, b);
         });
-        return { structures, groups };
+        return structures;
     }
 
     resolveStructureFootprint(building, categoryId) {
@@ -778,7 +544,7 @@ class MapModal {
         return 'support';
     }
 
-    renderMap(cities, structures) {
+    renderMap(cities, structures, playerPosition) {
         if (!this.canvas) {
             return;
         }
@@ -831,6 +597,7 @@ class MapModal {
         context.imageSmoothingEnabled = false;
         this.drawStructureMarkers(context, structures, scale);
         this.drawCityMarkers(context, cities, scale);
+        this.drawPlayerMarker(context, playerPosition, scale);
         if (this.statusLabel) {
             const cityCount = Array.isArray(cities) ? cities.length : 0;
             const structureCount = Array.isArray(structures) ? structures.length : 0;
@@ -838,7 +605,11 @@ class MapModal {
             const structureText = structureCount
                 ? `${structureCount} structure${structureCount === 1 ? '' : 's'} tracked`
                 : 'No structures recorded yet';
-            this.statusLabel.textContent = `${cityText}; ${structureText}. Terrain refreshed just now.`;
+            const statusParts = [cityText, structureText];
+            if (playerPosition && Number.isFinite(playerPosition.tileX) && Number.isFinite(playerPosition.tileY)) {
+                statusParts.push(`You are at tile (${playerPosition.tileX}, ${playerPosition.tileY})`);
+            }
+            this.statusLabel.textContent = `${statusParts.join(' · ')}. Terrain refreshed just now.`;
         }
     }
 
@@ -907,6 +678,67 @@ class MapModal {
             context.fillStyle = '#f6f9ff';
             context.fillText(city.name, centerX, labelY);
         });
+    }
+
+    drawPlayerMarker(context, playerPosition, scale) {
+        if (!playerPosition || !this.canvas) {
+            return;
+        }
+        const centerTileX = Number(playerPosition.centerTileX);
+        const centerTileY = Number(playerPosition.centerTileY);
+        if (!Number.isFinite(centerTileX) || !Number.isFinite(centerTileY)) {
+            return;
+        }
+        const centerX = centerTileX * scale;
+        const centerY = centerTileY * scale;
+        if (!Number.isFinite(centerX) || !Number.isFinite(centerY)) {
+            return;
+        }
+        const canvasWidth = this.canvas.width;
+        const canvasHeight = this.canvas.height;
+        if (centerX < 0 || centerY < 0 || centerX > canvasWidth || centerY > canvasHeight) {
+            return;
+        }
+        const markerSize = Math.max(5, Math.round(scale * 2.8));
+        context.save();
+        context.translate(centerX, centerY);
+        context.beginPath();
+        context.moveTo(0, -markerSize);
+        context.lineTo(markerSize * 0.85, markerSize * 0.9);
+        context.lineTo(0, markerSize * 0.55);
+        context.lineTo(-markerSize * 0.85, markerSize * 0.9);
+        context.closePath();
+        context.fillStyle = PLAYER_MARKER_COLOR;
+        context.strokeStyle = PLAYER_MARKER_OUTLINE;
+        context.lineWidth = Math.max(1, Math.round(scale / 1.5));
+        context.fill();
+        context.stroke();
+        context.restore();
+    }
+
+    getPlayerCenter() {
+        const offset = this.game?.player?.offset;
+        if (!offset || typeof offset !== 'object') {
+            return null;
+        }
+        const rawX = Number(offset.x);
+        const rawY = Number(offset.y);
+        if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
+            return null;
+        }
+        const centerTileX = (rawX + PLAYER_HALF_SIZE) / TILE_SIZE;
+        const centerTileY = (rawY + PLAYER_HALF_SIZE) / TILE_SIZE;
+        if (!Number.isFinite(centerTileX) || !Number.isFinite(centerTileY)) {
+            return null;
+        }
+        const tileX = Math.max(0, Math.floor(centerTileX));
+        const tileY = Math.max(0, Math.floor(centerTileY));
+        return {
+            centerTileX,
+            centerTileY,
+            tileX,
+            tileY
+        };
     }
 
     collectCities() {
