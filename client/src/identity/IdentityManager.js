@@ -11,7 +11,7 @@ const resolveEnvServerUrl = () => {
                 return String(explicit);
             }
         }
-    } catch (error) {
+    } catch (_error) {
         // ignore
     }
     return null;
@@ -44,7 +44,7 @@ const resolveEnvGoogleClientIds = () => {
                 return String(explicit);
             }
         }
-    } catch (error) {
+    } catch (_error) {
         // ignore env access errors
     }
     return null;
@@ -139,7 +139,7 @@ class IdentityManager {
                 this.applyIdentity(identity);
                 return identity;
             }
-        } catch (error) {
+        } catch (_error) {
             if (window?.localStorage) {
                 window.localStorage.removeItem(this.storageKey);
             }
@@ -254,7 +254,7 @@ class IdentityManager {
             this._persistIdentity();
             this.applyIdentity(this.identity);
             return Object.assign({}, this.identity);
-        } catch (error) {
+        } catch (_error) {
             return null;
         }
     }
@@ -352,7 +352,7 @@ class IdentityManager {
         let response;
         try {
             response = await fetch(url, requestOptions);
-        } catch (networkError) {
+        } catch (_networkError) {
             throw new Error(fallbackMessage);
         }
         if (!response.ok) {
@@ -382,7 +382,7 @@ class IdentityManager {
                         message = 'Google response was missing required data.';
                     }
                 }
-            } catch (error) {
+            } catch (_error) {
                 // ignore parse errors
             }
             throw new Error(message);

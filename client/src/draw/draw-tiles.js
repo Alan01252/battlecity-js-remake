@@ -99,7 +99,7 @@ var drawBuilding = (game, tileLayer, i, j, tileX, tileY) => {
             game.textures['imageItems'].baseTexture,
             new PIXI.Rectangle(subType * 32, 0, 32, 32)
         );
-    } catch (ex) {
+    } catch (_ex) {
         buildingOverlayTexture = null;
     }
 

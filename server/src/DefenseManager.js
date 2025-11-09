@@ -63,7 +63,7 @@ class DefenseManager {
         if (typeof payload === "string") {
             try {
                 return JSON.parse(payload);
-            } catch (error) {
+            } catch (_error) {
                 return null;
             }
         }

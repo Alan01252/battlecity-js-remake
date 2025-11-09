@@ -142,7 +142,7 @@ const formatCash = (value) => {
     const amount = Number.isFinite(value) ? value : parseInt(value, 10) || 0;
     try {
         return amount.toLocaleString('en-US');
-    } catch (error) {
+    } catch (_error) {
         return `${amount}`;
     }
 };

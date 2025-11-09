@@ -6,7 +6,6 @@ import { CAN_BUILD } from "../constants";
 var menuContainer = new PIXI.Container();
 let activeGhostBuilding = null;
 let pointerMoveListener = null;
-const tempPointer = new PIXI.Point();
 
 function buildDemolishMenuItem(game) {
     var click = (e) => {
@@ -219,7 +218,7 @@ export const setupBuildingMenu = (game) => {
         buildDemolishMenuItem(game);
 
         y = 1;
-        canBuildList.forEach((id, index) => {
+        canBuildList.forEach((id) => {
             if (canBuild[id] == CAN_BUILD) {
                 var buildingType = LABELS[id].TYPE;
 

@@ -59,25 +59,3 @@ export const checkPlayerCollision = (game) => {
 
     return collision;
 };
-
-/**
- * Allows you to debug where you are in the game via the console
- * @param game
- */
-var printToConsole = (game) => {
-
-    for (var i = parseInt(game.player.offset.x / 48) - 3; i < parseInt(game.player.offset.x / 48) + 3; i++) {
-
-        var out = [];
-        for (var j = parseInt(game.player.offset.y / 48) - 3; j < parseInt(game.player.offset.y / 48) + 3; j++) {
-            if (parseInt(game.player.offset.x / 48) == i && parseInt(game.player.offset.y / 48) == j) {
-
-                out.push("p");
-            } else {
-
-                out.push(game.map[i][j]);
-            }
-        }
-        console.log(out.join(","));
-    }
-};

@@ -119,7 +119,7 @@ export const checkTiles = (game, rect) => {
             if (map[left][bottom] != 0 && map[left][bottom] != 3) return COLLISION_BLOCKING;
             if (map[right][top] != 0 && map[right][top] != 3) return COLLISION_BLOCKING;
             if (map[right][bottom] != 0 && map[right][bottom] != 3) return COLLISION_BLOCKING;
-        }catch (ex) {
+        }catch (_ex) {
             console.error("Invalid map reference")
         }
     }

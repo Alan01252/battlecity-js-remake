@@ -89,11 +89,15 @@ function main() {
     const decodeProtoPlayerStats = bench('Protobuf decode player update', 50000, () => decodePlayerMessage(protoPlayerBuffer));
 
     console.log('\nClient frame budget impact:');
+    reportFrameBudget('stringify snapshot payload', stringifySnapshotStats.perOpMs, updatesPerSecond);
     reportFrameBudget('parse snapshot payload', parseSnapshotStats.perOpMs, updatesPerSecond);
     reportFrameBudget('parse single player', parsePlayerStats.perOpMs, updatesPerSecond);
     reportFrameBudget('stringify single player (emit)', stringifyPlayerStats.perOpMs, updatesPerSecond);
     reportFrameBudget('decode protobuf snapshot', decodeProtoSnapshotStats.perOpMs, updatesPerSecond);
     reportFrameBudget('decode protobuf player', decodeProtoPlayerStats.perOpMs, updatesPerSecond);
+    reportFrameBudget('encode protobuf snapshot', _encodeProtoSnapshotStats.perOpMs, updatesPerSecond);
+    reportFrameBudget('decode protobuf snapshot (fresh buffer)', _decodeProtoSnapshotToJs.perOpMs, updatesPerSecond);
+    reportFrameBudget('encode protobuf player', _encodeProtoPlayerStats.perOpMs, updatesPerSecond);
 
     const bullet = createSampleBulletPayload(1);
     const bulletString = JSON.stringify(bullet);

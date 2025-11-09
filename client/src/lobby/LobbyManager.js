@@ -33,7 +33,7 @@ class LobbyManager {
 
         this.onLobbySnapshot = (snapshot) => this.updateSnapshot(snapshot);
         this.onLobbyUpdate = (snapshot) => this.updateSnapshot(snapshot);
-        this.onLobbyAssignment = (assignment) => this.handleAssignment(assignment);
+        this.onLobbyAssignment = () => this.handleAssignment();
         this.onLobbyDenied = (payload) => this.handleDenial(payload);
         this.onSocketConnected = () => this.handleConnected();
         this.onSocketDisconnected = (reason) => this.handleDisconnected(reason);
@@ -1268,7 +1268,7 @@ class LobbyManager {
         }
     }
 
-    handleAssignment(assignment) {
+    handleAssignment() {
         this.waiting = false;
         this.waitingCity = null;
         this.waitingRole = null;

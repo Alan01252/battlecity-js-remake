@@ -186,7 +186,7 @@ export const drawItems = (game, itemTiles) => {
 
         var foundItems = getItemsWithingRange(game.itemFactory, game.player);
 
-        foundItems.forEach((item, index) => {
+        foundItems.forEach((item) => {
             switch (item.type) {
                 default: {
                     const renderer = rendererMap[item.type];
