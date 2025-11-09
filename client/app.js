@@ -38,6 +38,7 @@ import IdentityManager from "./src/identity/IdentityManager";
 import AudioManager from './src/audio/AudioManager';
 import MusicManager from './src/audio/MusicManager';
 import IntroModal from "./src/ui/IntroModal";
+import HelpModal from "./src/ui/HelpModal";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -1064,25 +1065,16 @@ game.openOptionsPanel = () => {
     game.forceDraw = true;
 };
 
+let activeHelpModal = null;
 game.showHelpMessage = () => {
-    game.setPanelMessage({
-        heading: 'Help',
-        lines: [
-            'Movement: WASD / Arrow keys',
-            'Fire: SHIFT  •  Drop item: Space  •  Arm bomb: B',
-            'Medkit: H  •  Cloak: C  •  DFG freeze: use from inventory',
-            'Right-click structures for city intel and build options.'
-        ]
-    });
-    if (game.notify) {
-        game.notify({
-            title: 'Help',
-            message: 'Core controls and tips are listed in the panel. GameRules.md tracks full mechanics.',
-            variant: 'info',
-            timeout: 6000
-        });
+    if (activeHelpModal) {
+        return;
     }
-    game.forceDraw = true;
+    activeHelpModal = new HelpModal(game, {
+        onClose: () => {
+            activeHelpModal = null;
+        }
+    });
 };
 
 game.toggleBuildMenuFromPanel = () => {
