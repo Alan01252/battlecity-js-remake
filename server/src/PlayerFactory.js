@@ -960,7 +960,7 @@ class PlayerFactory {
             this.releaseSlot(player);
         }
         if (this.game.buildingFactory && this.game.buildingFactory.cityManager) {
-            this.game.buildingFactory.cityManager.releasePlayerInventory(socketId, { returnToCity: true });
+            this.game.buildingFactory.cityManager.releasePlayerInventory(socketId);
         }
         delete this.game.players[socketId];
 
