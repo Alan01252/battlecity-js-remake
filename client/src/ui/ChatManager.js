@@ -203,7 +203,12 @@ class ChatManager {
                 </form>
                 <div class="battlecity-chat__status" role="status"></div>
             `;
-            document.body.appendChild(container);
+            const gameContainer = document.getElementById('game');
+            if (gameContainer) {
+                gameContainer.appendChild(container);
+            } else {
+                document.body.appendChild(container);
+            }
         }
         return container;
     }

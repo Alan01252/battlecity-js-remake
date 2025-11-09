@@ -148,6 +148,8 @@ var stats = new Stats();
 stats.showPanel(0);
 document.getElementById("game").appendChild(stats.dom);
 
+const gameContainer = document.getElementById("game");
+
 var objectContainer = new PIXI.Container();
 var commandCenterLabelLayer = new PIXI.Container();
 var panelContainer = new PIXI.Container();
@@ -261,7 +263,6 @@ orbHintStyle.maxWidth = '320px';
 orbHintStyle.zIndex = '1000';
 orbHintStyle.pointerEvents = 'none';
 orbHintStyle.display = 'none';
-document.body.appendChild(orbHintElement);
 game.orbHintElement = orbHintElement;
 
 const fullscreenButton = document.createElement('button');
@@ -300,8 +301,10 @@ fullscreenButton.addEventListener('click', () => {
         game.toggleFullscreen();
     }
 });
-document.body.appendChild(fullscreenButton);
 game.fullscreenButton = fullscreenButton;
+
+gameContainer.appendChild(orbHintElement);
+gameContainer.appendChild(fullscreenButton);
 
 initialiseCameraShake(game);
 game.lastOrbHintMessage = '';
