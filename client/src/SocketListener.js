@@ -23,7 +23,7 @@ const resolveSocketUrl = () => {
                 explicitUrl = String(explicitUrl).trim();
             }
         }
-    } catch (error) {
+    } catch (_error) {
         // ignore env access errors
     }
 
@@ -270,8 +270,8 @@ class SocketListener extends EventEmitter2 {
                     data.smokeFrame = data.smokeFrame || 0;
                 }
                 this.emit('building:new', data);
-            } catch (error) {
-                console.warn('Failed to parse new_building payload', error);
+            } catch (_error) {
+                console.warn('Failed to parse new_building payload', _error);
             }
         });
 
@@ -288,8 +288,8 @@ class SocketListener extends EventEmitter2 {
                     data.itemsLeft = data.itemsLeft || 0;
                 }
                 this.emit('population:update', data);
-            } catch (error) {
-                console.warn('Failed to parse population update', error);
+            } catch (_error) {
+                console.warn('Failed to parse population update', _error);
             }
         });
 
@@ -299,8 +299,8 @@ class SocketListener extends EventEmitter2 {
                 if (data) {
                     this.emit('city:finance', data);
                 }
-            } catch (error) {
-                console.warn('Failed to parse finance update', error);
+            } catch (_error) {
+                console.warn('Failed to parse finance update', _error);
             }
         });
 
@@ -352,8 +352,8 @@ class SocketListener extends EventEmitter2 {
                 if (data) {
                     this.emit('build:denied', data);
                 }
-            } catch (error) {
-                console.warn('Failed to parse build denied payload', error);
+            } catch (_error) {
+                console.warn('Failed to parse build denied payload', _error);
             }
         });
 
@@ -363,8 +363,8 @@ class SocketListener extends EventEmitter2 {
                 if (data && data.id && this.game.buildingFactory?.removeBuildingById) {
                     this.game.buildingFactory.removeBuildingById(data.id);
                 }
-            } catch (error) {
-                console.warn('Failed to handle demolish payload', error);
+            } catch (_error) {
+                console.warn('Failed to handle demolish payload', _error);
             }
         });
 
@@ -1178,8 +1178,8 @@ class SocketListener extends EventEmitter2 {
         }
         try {
             return JSON.parse(payload);
-        } catch (error) {
-            console.warn("Failed to parse payload from server", error);
+        } catch (_error) {
+            console.warn("Failed to parse payload from server", _error);
             return null;
         }
     }

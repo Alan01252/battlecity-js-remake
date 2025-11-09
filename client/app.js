@@ -7,7 +7,7 @@ import * as mapBuilder from "./src/mapBuilder";
 import * as cityBuilder from "./src/cityBuilder";
 
 import {play} from './src/play';
-import { RESOLUTION_X, RESOLUTION_Y, MAX_HEALTH, COST_BUILDING, LABELS } from "./src/constants";
+import { MAX_HEALTH, COST_BUILDING, LABELS } from "./src/constants";
 
 import {setupKeyboardInputs} from './src/input/input-keyboard';
 import {setupMouseInputs} from './src/input/input-mouse';
@@ -124,13 +124,6 @@ const shortenId = (value) => {
     }
     return `${value.slice(0, 4)}...${value.slice(-2)}`;
 };
-
-
-var type = "WebGL";
-
-if (!PIXI.utils.isWebGLSupported()) {
-    type = "canvas"
-}
 
 
 var app = new PIXI.Application({
@@ -1623,7 +1616,7 @@ function setup() {
         if (typeof payload === 'string') {
             try {
                 details = JSON.parse(payload);
-            } catch (error) {
+            } catch (_error) {
                 details = {};
             }
         }

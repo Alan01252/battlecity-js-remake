@@ -41,7 +41,6 @@ const RECRUIT_PATROL_POINT_THRESHOLD = TILE_SIZE * 0.75;
 const RECRUIT_MAX_TICK_MS = 160;
 const RECRUIT_SIMULATION_STEP_MS = 16;
 const RECRUIT_MAX_SIM_STEPS = 12;
-const RECRUIT_MIN_MOVEMENT_DELTA = 0.25;
 const MAP_SIZE_TILES = 512;
 const MAP_PIXEL_SIZE = MAP_SIZE_TILES * TILE_SIZE;
 const MAP_MAX_COORD = (MAP_PIXEL_SIZE) - TILE_SIZE;
@@ -244,11 +243,6 @@ const rotateVector = (vector, angle) => {
 const pixelToTile = (px, py) => ({
     x: clampTileIndex(px / TILE_SIZE),
     y: clampTileIndex(py / TILE_SIZE)
-});
-
-const tileToPixelCenter = (tileX, tileY) => ({
-    x: (tileX * TILE_SIZE) + (TILE_SIZE / 2),
-    y: (tileY * TILE_SIZE) + (TILE_SIZE / 2)
 });
 
 const tileToOffsetOrigin = (tileX, tileY) => ({
@@ -1176,7 +1170,6 @@ class FakeCityManager {
         }
         const visitedPenalty = options.visitedPenalty instanceof Set ? options.visitedPenalty : null;
         const startKey = `${start.x}_${start.y}`;
-        const goalKey = `${goal.x}_${goal.y}`;
         const open = [];
         const openMap = new Map();
         const cameFrom = new Map();

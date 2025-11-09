@@ -66,7 +66,7 @@ const normaliseOrigin = (value) => {
     try {
         const url = new URL(value);
         return `${url.protocol}//${url.host}`;
-    } catch (error) {
+    } catch (_error) {
         return value.replace(/\/$/, '');
     }
 };
@@ -218,8 +218,8 @@ try {
     } else {
         console.warn('[map] Map data missing or invalid, collision checks may fail');
     }
-} catch (error) {
-    console.warn('[map] Unable to load map data:', error.message);
+} catch (_error) {
+    console.warn('[map] Unable to load map data:', _error.message);
 }
 
 
@@ -254,8 +254,8 @@ const fetchJson = (url, { timeout = GOOGLE_TOKEN_TIMEOUT_MS } = {}) => new Promi
         request.setTimeout(timeout, () => {
             request.destroy(new Error('Request timed out'));
         });
-    } catch (error) {
-        reject(error);
+    } catch (_error) {
+        reject(_error);
     }
 });
 
@@ -335,12 +335,12 @@ app.post('/api/users/register', (req, res) => {
             return;
         }
         res.status(201).json(user);
-    } catch (error) {
-        if (error?.code === 'NAME_TAKEN') {
+    } catch (_error) {
+        if (_error?.code === 'NAME_TAKEN') {
             res.status(409).json({ error: 'name_taken' });
             return;
         }
-        console.warn('[users] register failed:', error?.message || error);
+        console.warn('[users] register failed:', _error?.message || _error);
         res.status(500).json({ error: 'save_failed' });
     }
 });
@@ -366,19 +366,19 @@ app.post('/api/auth/google', async (req, res) => {
             return;
         }
         res.json(profile);
-    } catch (error) {
-        if (error && error.message) {
-            console.warn('[auth] Google verification failed:', error.message);
+    } catch (_error) {
+        if (_error && _error.message) {
+            console.warn('[auth] Google verification failed:', _error.message);
         }
-        if (error.code === 'AUDIENCE_MISMATCH') {
+        if (_error.code === 'AUDIENCE_MISMATCH') {
             res.status(403).json({ error: 'audience_mismatch' });
             return;
         }
-        if (error.code === 'NAME_TAKEN') {
+        if (_error.code === 'NAME_TAKEN') {
             res.status(409).json({ error: 'name_taken' });
             return;
         }
-        if (error.status && error.status >= 500) {
+        if (_error.status && _error.status >= 500) {
             res.status(503).json({ error: 'upstream_unavailable' });
             return;
         }
@@ -426,12 +426,12 @@ app.put('/api/users/:id', (req, res) => {
     try {
         const updated = userStore.update(id, sanitized);
         res.json(updated);
-    } catch (error) {
-        if (error?.code === 'NAME_TAKEN') {
+    } catch (_error) {
+        if (_error?.code === 'NAME_TAKEN') {
             res.status(409).json({ error: 'name_taken' });
             return;
         }
-        console.warn('[users] update failed:', error?.message || error);
+        console.warn('[users] update failed:', _error?.message || _error);
         res.status(500).json({ error: 'save_failed' });
     }
 });
@@ -482,8 +482,8 @@ const shutdown = () => {
                 if (child && !child.killed) {
                     child.kill();
                 }
-            } catch (error) {
-                console.error(`[bot] error killing bot during shutdown: ${error.message}`);
+            } catch (_error) {
+                console.error(`[bot] error killing bot during shutdown: ${_error.message}`);
             }
         }
     }
@@ -549,7 +549,7 @@ const parseCityInspectPayload = (payload) => {
         try {
             const parsed = JSON.parse(payload);
             return parseCityInspectPayload(parsed);
-        } catch (error) {
+        } catch (_error) {
             return normaliseCityId(payload);
         }
     }

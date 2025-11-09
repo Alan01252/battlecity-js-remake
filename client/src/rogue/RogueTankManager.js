@@ -143,7 +143,7 @@ class RogueTankManager {
         }
         try {
             return registry.assign(id);
-        } catch (error) {
+        } catch (_error) {
             return null;
         }
     }
@@ -155,7 +155,7 @@ class RogueTankManager {
         }
         try {
             registry.release(id);
-        } catch (error) {
+        } catch (_error) {
             // no-op
         }
     }
@@ -699,7 +699,7 @@ class RogueTankManager {
         const isBlocked = (x, y) => {
             try {
                 return map[x][y] !== 0 && map[x][y] !== 3;
-            } catch (error) {
+            } catch (_error) {
                 return true;
             }
         };

@@ -62,8 +62,8 @@ export default class MusicManager {
                 this.gainNode.gain.value = 0.45;
                 this.mediaSourceNode.connect(this.gainNode);
                 this.gainNode.connect(context.destination);
-            } catch (error) {
-                console.debug('Failed to connect lobby music to AudioContext', error);
+            } catch (_error) {
+                console.debug('Failed to connect lobby music to AudioContext', _error);
                 this.gainNode = null;
                 this.mediaSourceNode = null;
                 this.mediaElement.volume = 0.45;
@@ -102,8 +102,8 @@ export default class MusicManager {
         if (this.audioManager && typeof this.audioManager.resumeContext === 'function') {
             try {
                 await this.audioManager.resumeContext();
-            } catch (error) {
-                console.debug('Unable to resume AudioContext for lobby music', error);
+            } catch (_error) {
+                console.debug('Unable to resume AudioContext for lobby music', _error);
             }
         }
         if (this.mediaElement.src !== src) {
@@ -111,8 +111,8 @@ export default class MusicManager {
         }
         try {
             await this.mediaElement.play();
-        } catch (error) {
-            console.debug('Lobby music playback blocked', error);
+        } catch (_error) {
+            console.debug('Lobby music playback blocked', _error);
         }
     }
 
@@ -134,7 +134,7 @@ export default class MusicManager {
             this.mediaElement.pause();
             try {
                 this.mediaElement.currentTime = 0;
-            } catch (error) {
+            } catch (_error) {
                 // ignored
             }
         }

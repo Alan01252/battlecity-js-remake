@@ -36,7 +36,7 @@ export const drawIcons = (game, iconTiles) => {
         iconTiles.clear();
 
         var foundItems = getIconsWithinRange(game.iconFactory, game.player);
-        foundItems.forEach((icon, index) => {
+        foundItems.forEach((icon) => {
             console.log(game.player.offset.x - icon.x);
             var tmpText = new PIXI.Texture(
                 game.textures['imageItems'].baseTexture,

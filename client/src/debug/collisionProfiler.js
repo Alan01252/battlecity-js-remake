@@ -71,7 +71,6 @@ const maybeLogStats = () => {
         const contextAvg = entry.time / entry.calls;
         parts.push(`${label}: ${entry.calls} calls @ ${formatNumber(contextAvg)}ms`);
     });
-    // eslint-disable-next-line no-console
     console.debug(`[collision] ${parts.join(' | ')}`);
 };
 

@@ -136,7 +136,7 @@ class ChatManager {
         if (typeof payload === "string") {
             try {
                 parsed = JSON.parse(payload);
-            } catch (error) {
+            } catch (_error) {
                 return null;
             }
         }

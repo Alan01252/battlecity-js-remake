@@ -87,7 +87,7 @@ class HazardManager {
         if (typeof payload === "string") {
             try {
                 return JSON.parse(payload);
-            } catch (error) {
+            } catch (_error) {
                 return null;
             }
         }
@@ -342,7 +342,7 @@ class HazardManager {
         this.io.emit(event, JSON.stringify(payload));
     }
 
-    update(deltaMs) {
+    update(_deltaMs) {
         if (this.hazards.size === 0) {
             return;
         }

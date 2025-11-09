@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import * as PIXI from 'pixi.js';
 
 var pixi_tilemap;
