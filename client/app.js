@@ -133,8 +133,8 @@ if (!PIXI.utils.isWebGLSupported()) {
 
 
 var app = new PIXI.Application({
-    width:RESOLUTION_X, 
-    height:RESOLUTION_Y
+    width: window.innerWidth,
+    height: window.innerHeight
 });
 
 app.renderer.plugins.interaction.cursorStyles = {
@@ -167,15 +167,15 @@ const game = {
     timePassed: 0,
     staticTick: 0,
     textures: [],
-    maxMapX: RESOLUTION_X - 200,
-    maxMapY: RESOLUTION_Y,
+    maxMapX: window.innerWidth - 200,
+    maxMapY: window.innerHeight,
     maxCities: 0,
     otherPlayers: {},
     audio: null,
     showBuildMenu: false,
     buildMenuOffset: {
-        x: ((RESOLUTION_X - 200) / 2),
-        y: (RESOLUTION_Y / 2)
+        x: ((window.innerWidth - 200) / 2),
+        y: (window.innerHeight / 2)
     },
     buildings: {},
     cities: [],
@@ -188,8 +188,8 @@ const game = {
         timeTurn: 0,
         direction: 0,
         defaultOffset: {
-            x: ((RESOLUTION_X - 200) / 2),
-            y: (RESOLUTION_Y / 2)
+            x: ((window.innerWidth - 200) / 2),
+            y: (window.innerHeight / 2)
         },
         offset: {
             x: 0,
@@ -1046,12 +1046,6 @@ game.requestExitToLobby = () => {
 game.clearPanelMessage();
 
 game.isFullscreen = false;
-game.originalDimensions = {
-    width: RESOLUTION_X,
-    height: RESOLUTION_Y,
-    maxMapX: RESOLUTION_X - 200,
-    maxMapY: RESOLUTION_Y
-};
 
 game.resizeToFullscreen = () => {
     const width = window.innerWidth;
@@ -1068,16 +1062,8 @@ game.resizeToFullscreen = () => {
 };
 
 game.resizeToOriginal = () => {
-    const { width, height, maxMapX, maxMapY } = game.originalDimensions;
-
-    app.renderer.resize(width, height);
-    game.maxMapX = maxMapX;
-    game.maxMapY = maxMapY;
-    game.buildMenuOffset.x = (width - 200) / 2;
-    game.buildMenuOffset.y = height / 2;
-    game.player.defaultOffset.x = (width - 200) / 2;
-    game.player.defaultOffset.y = height / 2;
-    game.forceDraw = true;
+    // When exiting fullscreen, resize to current window dimensions
+    game.resizeToWindow();
 };
 
 game.toggleFullscreen = () => {
@@ -1105,15 +1091,41 @@ game.toggleFullscreen = () => {
     }
 };
 
+game.resizeToWindow = () => {
+    if (game.isFullscreen) {
+        return;
+    }
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    app.renderer.resize(width, height);
+    game.maxMapX = width - 200;
+    game.maxMapY = height;
+    game.buildMenuOffset.x = (width - 200) / 2;
+    game.buildMenuOffset.y = height / 2;
+    game.player.defaultOffset.x = (width - 200) / 2;
+    game.player.defaultOffset.y = height / 2;
+    game.forceDraw = true;
+};
+
 document.addEventListener('fullscreenchange', () => {
     if (document.fullscreenElement) {
         game.isFullscreen = true;
         game.resizeToFullscreen();
     } else {
         game.isFullscreen = false;
-        game.resizeToOriginal();
+        game.resizeToWindow();
     }
 });
+
+window.addEventListener('resize', () => {
+    if (!game.isFullscreen) {
+        game.resizeToWindow();
+    }
+});
+
+// Initialize with current window size
+game.resizeToWindow();
 
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
