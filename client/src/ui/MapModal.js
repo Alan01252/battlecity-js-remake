@@ -135,21 +135,21 @@ class MapModal {
                 pointer-events: auto;
             }
             .battlecity-map-panel {
-                width: min(92vw, 1120px);
-                max-height: calc(100vh - 48px);
+                width: min(96vw, 1040px);
+                max-height: min(96vh, 1080px);
                 overflow: hidden;
                 background: rgba(8, 10, 18, 0.96);
                 border: 1px solid rgba(145, 196, 255, 0.35);
                 box-shadow: 0 28px 56px rgba(0, 0, 0, 0.6);
                 border-radius: 20px;
-                padding: 24px 28px 28px;
+                padding: 20px 24px 24px;
                 color: #f1f5ff;
                 font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
                 display: flex;
                 flex-direction: column;
                 gap: 18px;
                 position: relative;
-                align-items: center;
+                align-items: stretch;
             }
             .battlecity-map-close {
                 position: absolute;
@@ -167,39 +167,28 @@ class MapModal {
             .battlecity-map-close:hover {
                 background: rgba(255, 255, 255, 0.18);
             }
-            .battlecity-map-heading {
-                font-size: 24px;
-                font-weight: 600;
-                margin: 0;
-                letter-spacing: 0.4px;
-                text-transform: uppercase;
-                text-align: center;
-            }
-            .battlecity-map-description {
-                margin: 0;
-                font-size: 14px;
-                line-height: 1.55;
-                color: rgba(221, 230, 255, 0.85);
-                text-align: center;
-                max-width: 760px;
-            }
             .battlecity-map-content {
                 width: 100%;
                 display: flex;
+                flex: 1;
                 flex-direction: column;
-                gap: 20px;
                 align-items: center;
+                justify-content: center;
+                gap: 18px;
             }
             .battlecity-map-canvas-wrapper {
                 width: 100%;
+                max-width: min(92vw, 980px);
                 display: flex;
                 flex-direction: column;
                 gap: 14px;
                 align-items: center;
                 position: relative;
+                justify-content: center;
             }
             .battlecity-map-canvas {
-                width: min(100%, 960px);
+                width: min(100%, 980px);
+                max-height: calc(90vh - 160px);
                 height: auto;
                 border-radius: 14px;
                 border: 1px solid rgba(255, 255, 255, 0.16);
@@ -211,19 +200,27 @@ class MapModal {
             .battlecity-map-status {
                 margin: 0;
                 font-size: 12px;
-                color: rgba(214, 224, 255, 0.78);
+                color: rgba(214, 224, 255, 0.82);
                 text-align: center;
+                padding: 2px 10px;
+                border-radius: 999px;
+                background: rgba(8, 11, 20, 0.78);
+                border: 1px solid rgba(145, 196, 255, 0.16);
             }
             .battlecity-map-legend {
+                position: absolute;
+                left: 18px;
+                bottom: 18px;
                 display: flex;
                 flex-wrap: wrap;
-                justify-content: center;
+                justify-content: flex-start;
                 gap: 8px;
-                padding: 10px 14px;
-                background: rgba(12, 16, 26, 0.82);
+                padding: 8px 12px;
+                background: rgba(12, 16, 26, 0.78);
                 border-radius: 14px;
                 border: 1px solid rgba(145, 196, 255, 0.18);
                 box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+                max-width: calc(100% - 36px);
             }
             .battlecity-map-legend-entry {
                 display: flex;
@@ -276,14 +273,6 @@ class MapModal {
         closeButton.textContent = 'Close';
         closeButton.addEventListener('click', () => this.close());
 
-        const heading = document.createElement('h1');
-        heading.className = 'battlecity-map-heading';
-        heading.textContent = 'Strategic Map';
-
-        const description = document.createElement('p');
-        description.className = 'battlecity-map-description';
-        description.textContent = 'Review the full theatre: terrain, active build zones, and every city centre are plotted below. Press Esc or Close to return to command.';
-
         const canvasWrapper = document.createElement('div');
         canvasWrapper.className = 'battlecity-map-canvas-wrapper';
 
@@ -299,15 +288,13 @@ class MapModal {
 
         canvasWrapper.appendChild(canvas);
         canvasWrapper.appendChild(legend);
-        canvasWrapper.appendChild(status);
 
         const content = document.createElement('div');
         content.className = 'battlecity-map-content';
         content.appendChild(canvasWrapper);
+        content.appendChild(status);
 
         panel.appendChild(closeButton);
-        panel.appendChild(heading);
-        panel.appendChild(description);
         panel.appendChild(content);
 
         overlay.appendChild(panel);
