@@ -20,10 +20,12 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apk add --no-cache sqlite
 
 # Copy static assets and shared modules
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/client/dist ./client/dist
+COPY --from=builder /app/client/data ./client/data
 
 # Install server production dependencies without bringing over builder node_modules
 WORKDIR /app/server
