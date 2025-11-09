@@ -9,274 +9,274 @@ let pointerMoveListener = null;
 const tempPointer = new PIXI.Point();
 
 function buildDemolishMenuItem(game) {
-  var click = (e) => {
-    e.stopPropagation();
-    console.log("Setting is demolishing to true");
-    game.isDemolishing = true;
-    game.stage.cursor = "demolish";
-    if (game.interactionLayer) {
-      game.interactionLayer.cursor = "demolish";
-    }
-  };
+    var click = (e) => {
+        e.stopPropagation();
+        console.log("Setting is demolishing to true");
+        game.isDemolishing = true;
+        game.stage.cursor = "demolish";
+        if (game.interactionLayer) {
+            game.interactionLayer.cursor = "demolish";
+        }
+    };
 
-  var tmpText = new PIXI.Texture(
-    game.textures["buildingIcons"].baseTexture,
-    new PIXI.Rectangle(13 * 16, 0, 16, 16),
-  );
+    var tmpText = new PIXI.Texture(
+        game.textures["buildingIcons"].baseTexture,
+        new PIXI.Rectangle(13 * 16, 0, 16, 16),
+    );
 
-  var buildIcon = new PIXI.Sprite(tmpText);
-  buildIcon.x = game.buildMenuOffset.x - 16;
-  buildIcon.y = game.buildMenuOffset.y;
-  buildIcon.interactive = true;
-  buildIcon.iconType = 13;
-  buildIcon.on("mousedown", click);
+    var buildIcon = new PIXI.Sprite(tmpText);
+    buildIcon.x = game.buildMenuOffset.x - 16;
+    buildIcon.y = game.buildMenuOffset.y;
+    buildIcon.interactive = true;
+    buildIcon.iconType = 13;
+    buildIcon.on("mousedown", click);
 
-  var basicText = new PIXI.Text("Demolish building", {
-    fontSize: 12,
-    fill: 0xffffff,
-  });
-  basicText.x = game.buildMenuOffset.x;
-  basicText.y = game.buildMenuOffset.y;
-  basicText.interactive = true;
-  basicText.on("mousedown", click);
+    var basicText = new PIXI.Text("Demolish building", {
+        fontSize: 12,
+        fill: 0xffffff,
+    });
+    basicText.x = game.buildMenuOffset.x;
+    basicText.y = game.buildMenuOffset.y;
+    basicText.interactive = true;
+    basicText.on("mousedown", click);
 
-  menuContainer.addChild(buildIcon);
-  menuContainer.addChild(basicText);
+    menuContainer.addChild(buildIcon);
+    menuContainer.addChild(basicText);
 }
 
 const clearGhostBuilding = (game) => {
-  if (pointerMoveListener && game.interactionLayer) {
-    game.interactionLayer.off("pointermove", pointerMoveListener);
-    pointerMoveListener = null;
-  }
-  if (activeGhostBuilding) {
-    activeGhostBuilding.destroy();
-    activeGhostBuilding = null;
-  }
-  game.isBuilding = false;
-  game.isDragging = false;
-  game.showBuildMenu = false;
-  menuContainer.visible = false;
-  if (game.interactionLayer) {
-    game.interactionLayer.cursor = "cursor";
-  }
+    if (pointerMoveListener && game.interactionLayer) {
+        game.interactionLayer.off("pointermove", pointerMoveListener);
+        pointerMoveListener = null;
+    }
+    if (activeGhostBuilding) {
+        activeGhostBuilding.destroy();
+        activeGhostBuilding = null;
+    }
+    game.isBuilding = false;
+    game.isDragging = false;
+    game.showBuildMenu = false;
+    menuContainer.visible = false;
+    if (game.interactionLayer) {
+        game.interactionLayer.cursor = "cursor";
+    }
 };
 
 const startGhostBuilding = (game, buildingType, pointerData) => {
-  clearGhostBuilding(game);
+    clearGhostBuilding(game);
 
-  game.isBuilding = buildingType;
-  game.isDragging = true;
-  game.showBuildMenu = false;
-  menuContainer.visible = false;
+    game.isBuilding = buildingType;
+    game.isDragging = true;
+    game.showBuildMenu = false;
+    menuContainer.visible = false;
 
-  const tmpText = new PIXI.Texture(
-    game.textures["buildings"].baseTexture,
-    new PIXI.Rectangle(0, parseInt(game.isBuilding / 100) * 144, 144, 144),
-  );
+    const tmpText = new PIXI.Texture(
+        game.textures["buildings"].baseTexture,
+        new PIXI.Rectangle(0, parseInt(game.isBuilding / 100) * 144, 144, 144),
+    );
 
-  const building = new PIXI.Sprite(tmpText);
-  building.alpha = 0.5;
-  building.interactive = false;
-  building.buttonMode = false;
-  // Center the sprite anchor so cursor is in the middle of the building
-  building.anchor.set(0.5, 0.5);
+    const building = new PIXI.Sprite(tmpText);
+    building.alpha = 0.5;
+    building.interactive = false;
+    building.buttonMode = false;
+    // Center the sprite anchor so cursor is in the middle of the building
+    building.anchor.set(0.5, 0.5);
 
-  game.stage.addChild(building);
-  activeGhostBuilding = building;
+    game.stage.addChild(building);
+    activeGhostBuilding = building;
 
-  const updatePosition = (interactionData) => {
-    let global;
-    if (interactionData && interactionData.global) {
-      global = interactionData.global;
-    } else if (
-      game.app &&
+    const updatePosition = (interactionData) => {
+        let global;
+        if (interactionData && interactionData.global) {
+            global = interactionData.global;
+        } else if (
+            game.app &&
       game.app.renderer &&
       game.app.renderer.plugins &&
       game.app.renderer.plugins.interaction
-    ) {
-      const interaction = game.app.renderer.plugins.interaction;
-      const pointer = interaction.pointer || interaction.mouse;
-      if (pointer && pointer.global) {
-        global = pointer.global;
-      }
-    }
+        ) {
+            const interaction = game.app.renderer.plugins.interaction;
+            const pointer = interaction.pointer || interaction.mouse;
+            if (pointer && pointer.global) {
+                global = pointer.global;
+            }
+        }
 
-    if (!global) {
-      return;
-    }
+        if (!global) {
+            return;
+        }
 
-    // Since we want the cursor in the CENTER of the building (not top-left),
-    // offset the cursor position by half the building size before tile calculation
-    // Buildings are 144x144 pixels (3x3 tiles at 48px each)
-    const halfBuildingSize = 144 / 2; // 72 pixels
-    const adjustedGlobalX = global.x - halfBuildingSize;
-    const adjustedGlobalY = global.y - halfBuildingSize;
+        // Since we want the cursor in the CENTER of the building (not top-left),
+        // offset the cursor position by half the building size before tile calculation
+        // Buildings are 144x144 pixels (3x3 tiles at 48px each)
+        const halfBuildingSize = 144 / 2; // 72 pixels
+        const adjustedGlobalX = global.x - halfBuildingSize;
+        const adjustedGlobalY = global.y - halfBuildingSize;
 
-    // Use the same tile-grid calculation as actual placement (input-mouse.js lines 35-38)
-    const offTileX = Math.floor(game.player.offset.x % 48);
-    const offTileY = Math.floor(game.player.offset.y % 48);
-    const tileX = Math.floor(
-      (game.player.offset.x -
+        // Use the same tile-grid calculation as actual placement (input-mouse.js lines 35-38)
+        const offTileX = Math.floor(game.player.offset.x % 48);
+        const offTileY = Math.floor(game.player.offset.y % 48);
+        const tileX = Math.floor(
+            (game.player.offset.x -
         game.player.defaultOffset.x +
         offTileX +
         adjustedGlobalX) /
         48,
-    );
-    const tileY = Math.floor(
-      (game.player.offset.y -
+        );
+        const tileY = Math.floor(
+            (game.player.offset.y -
         game.player.defaultOffset.y +
         offTileY +
         adjustedGlobalY) /
         48,
-    );
+        );
 
-    // Convert tile coordinates back to world pixel coordinates for rendering
-    const worldPixelX = tileX * 48;
-    const worldPixelY = tileY * 48;
+        // Convert tile coordinates back to world pixel coordinates for rendering
+        const worldPixelX = tileX * 48;
+        const worldPixelY = tileY * 48;
 
-    // Since the building anchor is centered (0.5, 0.5), position at the center of the grid
-    const centeredWorldX = worldPixelX + halfBuildingSize;
-    const centeredWorldY = worldPixelY + halfBuildingSize;
+        // Since the building anchor is centered (0.5, 0.5), position at the center of the grid
+        const centeredWorldX = worldPixelX + halfBuildingSize;
+        const centeredWorldY = worldPixelY + halfBuildingSize;
 
-    // Transform world coordinates back to screen coordinates
-    const screenX =
+        // Transform world coordinates back to screen coordinates
+        const screenX =
       centeredWorldX - game.player.offset.x + game.player.defaultOffset.x;
-    const screenY =
+        const screenY =
       centeredWorldY - game.player.offset.y + game.player.defaultOffset.y;
 
-    // Set position directly in screen space
-    building.position.set(screenX, screenY);
-  };
+        // Set position directly in screen space
+        building.position.set(screenX, screenY);
+    };
 
-  if (game.interactionLayer) {
-    pointerMoveListener = (event) => updatePosition(event.data);
-    game.interactionLayer.on("pointermove", pointerMoveListener);
-    game.interactionLayer.cursor = "pointer";
-  }
+    if (game.interactionLayer) {
+        pointerMoveListener = (event) => updatePosition(event.data);
+        game.interactionLayer.on("pointermove", pointerMoveListener);
+        game.interactionLayer.cursor = "pointer";
+    }
 
-  updatePosition(pointerData);
+    updatePosition(pointerData);
 };
 
 export const setupBuildingMenu = (game) => {
-  if (!game || !game.stage) {
-    return;
-  }
-
-  const isMayor = !!(game && game.player && game.player.isMayor);
-  if (!isMayor) {
-    clearGhostBuilding(game);
-    menuContainer.visible = false;
-    if (!menuContainer.parent) {
-      game.stage.addChild(menuContainer);
+    if (!game || !game.stage) {
+        return;
     }
-    return;
-  }
 
-  const playerCity = Number.isFinite(game?.player?.city)
-    ? game.player.city
-    : null;
-  const cityState =
+    const isMayor = !!(game && game.player && game.player.isMayor);
+    if (!isMayor) {
+        clearGhostBuilding(game);
+        menuContainer.visible = false;
+        if (!menuContainer.parent) {
+            game.stage.addChild(menuContainer);
+        }
+        return;
+    }
+
+    const playerCity = Number.isFinite(game?.player?.city)
+        ? game.player.city
+        : null;
+    const cityState =
     playerCity !== null && Array.isArray(game?.cities)
-      ? game.cities[playerCity]
-      : null;
-  const canBuild = cityState?.canBuild;
+        ? game.cities[playerCity]
+        : null;
+    const canBuild = cityState?.canBuild;
 
-  if (!canBuild) {
-    clearGhostBuilding(game);
-    menuContainer.visible = false;
-    if (!menuContainer.parent) {
-      game.stage.addChild(menuContainer);
+    if (!canBuild) {
+        clearGhostBuilding(game);
+        menuContainer.visible = false;
+        if (!menuContainer.parent) {
+            game.stage.addChild(menuContainer);
+        }
+        return;
     }
-    return;
-  }
 
-  if (game.forceDraw) {
-    menuContainer.removeChildren();
+    if (game.forceDraw) {
+        menuContainer.removeChildren();
 
-    var canBuildList = Object.keys(canBuild);
+        var canBuildList = Object.keys(canBuild);
 
-    var y = 1;
+        var y = 1;
 
-    canBuildList.forEach((id) => {
-      if (canBuild[id] == CAN_BUILD) {
-        y++;
-      }
-    });
-
-    var graphics = new PIXI.Graphics();
-    graphics.lineStyle(2, 0x00000, 0);
-    graphics.beginFill(0x000000, 1);
-    graphics.drawRect(
-      game.buildMenuOffset.x,
-      game.buildMenuOffset.y,
-      180,
-      y * 16,
-    );
-    graphics.endFill();
-    menuContainer.addChild(graphics);
-
-    buildDemolishMenuItem(game);
-
-    y = 1;
-    canBuildList.forEach((id, index) => {
-      if (canBuild[id] == CAN_BUILD) {
-        var buildingType = LABELS[id].TYPE;
-
-        var click = (e) => {
-          e.stopPropagation();
-          startGhostBuilding(game, buildingType, e.data);
-        };
-
-        var tmpText = new PIXI.Texture(
-          game.textures["buildingIcons"].baseTexture,
-          new PIXI.Rectangle(LABELS[id].ICON * 16, 0, 16, 16),
-        );
-
-        var buildIcon = new PIXI.Sprite(tmpText);
-        buildIcon.x = game.buildMenuOffset.x - 16;
-        buildIcon.y = game.buildMenuOffset.y + y * 16;
-        buildIcon.interactive = true;
-        buildIcon.iconType = LABELS[id].IMAGE;
-        buildIcon.on("mousedown", click);
-
-        var basicText = new PIXI.Text(LABELS[id].LABEL, {
-          fontSize: 12,
-          fill: 0xffffff,
+        canBuildList.forEach((id) => {
+            if (canBuild[id] == CAN_BUILD) {
+                y++;
+            }
         });
-        basicText.x = game.buildMenuOffset.x;
-        basicText.y = game.buildMenuOffset.y + y * 16;
-        basicText.interactive = true;
-        basicText.on("mousedown", click);
 
-        menuContainer.addChild(buildIcon);
-        menuContainer.addChild(basicText);
+        var graphics = new PIXI.Graphics();
+        graphics.lineStyle(2, 0x00000, 0);
+        graphics.beginFill(0x000000, 1);
+        graphics.drawRect(
+            game.buildMenuOffset.x,
+            game.buildMenuOffset.y,
+            180,
+            y * 16,
+        );
+        graphics.endFill();
+        menuContainer.addChild(graphics);
 
-        y++;
-      }
-    });
+        buildDemolishMenuItem(game);
 
-    menuContainer.visible = false;
-  }
+        y = 1;
+        canBuildList.forEach((id, index) => {
+            if (canBuild[id] == CAN_BUILD) {
+                var buildingType = LABELS[id].TYPE;
 
-  if (!menuContainer.parent) {
-    game.stage.addChild(menuContainer);
-  }
-  game.clearGhostBuilding = () => clearGhostBuilding(game);
-  game.startGhostBuilding = (type, data) =>
-    startGhostBuilding(game, type, data);
+                var click = (e) => {
+                    e.stopPropagation();
+                    startGhostBuilding(game, buildingType, e.data);
+                };
+
+                var tmpText = new PIXI.Texture(
+                    game.textures["buildingIcons"].baseTexture,
+                    new PIXI.Rectangle(LABELS[id].ICON * 16, 0, 16, 16),
+                );
+
+                var buildIcon = new PIXI.Sprite(tmpText);
+                buildIcon.x = game.buildMenuOffset.x - 16;
+                buildIcon.y = game.buildMenuOffset.y + y * 16;
+                buildIcon.interactive = true;
+                buildIcon.iconType = LABELS[id].IMAGE;
+                buildIcon.on("mousedown", click);
+
+                var basicText = new PIXI.Text(LABELS[id].LABEL, {
+                    fontSize: 12,
+                    fill: 0xffffff,
+                });
+                basicText.x = game.buildMenuOffset.x;
+                basicText.y = game.buildMenuOffset.y + y * 16;
+                basicText.interactive = true;
+                basicText.on("mousedown", click);
+
+                menuContainer.addChild(buildIcon);
+                menuContainer.addChild(basicText);
+
+                y++;
+            }
+        });
+
+        menuContainer.visible = false;
+    }
+
+    if (!menuContainer.parent) {
+        game.stage.addChild(menuContainer);
+    }
+    game.clearGhostBuilding = () => clearGhostBuilding(game);
+    game.startGhostBuilding = (type, data) =>
+        startGhostBuilding(game, type, data);
 };
 
 function addBuilding(game) {
-  if (game.isBuilding && !activeGhostBuilding) {
-    startGhostBuilding(game, game.isBuilding, null);
-  }
+    if (game.isBuilding && !activeGhostBuilding) {
+        startGhostBuilding(game, game.isBuilding, null);
+    }
 }
 
 export const drawBuilding = (game) => {
-  if (!game.isDragging && !game.isDemolishing) {
-    menuContainer.visible = game.showBuildMenu;
-  }
+    if (!game.isDragging && !game.isDemolishing) {
+        menuContainer.visible = game.showBuildMenu;
+    }
 
-  addBuilding(game);
+    addBuilding(game);
 };

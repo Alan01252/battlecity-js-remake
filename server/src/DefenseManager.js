@@ -365,7 +365,7 @@ class DefenseManager {
             return;
         }
         this.removeDefenseById(id);
-}
+    }
 
     recordInventoryConsumption(socketId, record) {
         if (!record || !this.game || !this.game.buildingFactory || !this.game.buildingFactory.cityManager) {

@@ -395,17 +395,12 @@ class IdentityManager {
     }
 
     async _loadRemoteConfig() {
-        let response;
-        try {
-            response = await this._request(
-                'GET',
-                '/api/identity/config',
-                undefined,
-                { fallbackMessage: 'Unable to load identity configuration.' }
-            );
-        } catch (error) {
-            throw error;
-        }
+        const response = await this._request(
+            'GET',
+            '/api/identity/config',
+            undefined,
+            { fallbackMessage: 'Unable to load identity configuration.' }
+        );
         if (!response || typeof response !== 'object') {
             return null;
         }

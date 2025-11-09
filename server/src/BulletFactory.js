@@ -195,8 +195,8 @@ class BulletFactory {
         const shooterId = (payload && typeof payload.shooterId === 'string' && payload.shooterId.length)
             ? payload.shooterId
             : ((payload && typeof payload.shooter === 'string' && payload.shooter.length)
-                ? payload.shooter
-                : (bulletData.sourceId || 'system'));
+                    ? payload.shooter
+                    : (bulletData.sourceId || 'system'));
 
         const sourceId = bulletData.sourceId || shooterId;
         if (sourceId && !this.canRegisterSourceShot(sourceId, bulletData.sourceType, now)) {
