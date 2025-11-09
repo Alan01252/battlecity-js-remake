@@ -39,6 +39,7 @@ import AudioManager from './src/audio/AudioManager';
 import MusicManager from './src/audio/MusicManager';
 import IntroModal from "./src/ui/IntroModal";
 import HelpModal from "./src/ui/HelpModal";
+import MapModal from "./src/ui/MapModal";
 
 const assetUrl = (relativePath) => `${import.meta.env.BASE_URL}${relativePath}`;
 const LoaderResource = PIXI.LoaderResource || (PIXI.loaders && PIXI.loaders.Resource);
@@ -484,6 +485,7 @@ game.describeKillSource = (details = {}) => {
 };
 game.cityFinanceFlags = new Map();
 game.mapOverlayActive = false;
+let activeMapModal = null;
 
 const describeDirection = (dx, dy, threshold = TILE_SIZE_PX) => {
     let horizontal = '';
@@ -879,6 +881,10 @@ game.setPanelMessage = (message) => {
 };
 
 game.clearPanelMessage = () => {
+    if (activeMapModal) {
+        activeMapModal.close();
+        return;
+    }
     game.mapOverlayActive = false;
     applyPanelMessage(DEFAULT_PANEL_MESSAGE);
 };
@@ -955,26 +961,37 @@ game.showStaffSummary = () => {
 };
 
 game.toggleMapOverlay = () => {
-    game.mapOverlayActive = !game.mapOverlayActive;
-    if (game.mapOverlayActive) {
-        game.setPanelMessage({
-            heading: 'Tactical Map',
-            lines: [
-                'Full-screen map is still under construction.',
-                'Use the radar and right-click inspections for intel.',
-                'Notifications highlight city threats in real time.'
-            ]
-        });
-        if (game.notify) {
-            game.notify({
-                title: 'Tactical Map',
-                message: 'Radar and notifications provide situational awareness until the full map returns.',
-                variant: 'info',
-                timeout: 5200
-            });
+    if (activeMapModal) {
+        activeMapModal.close();
+        game.forceDraw = true;
+        return;
+    }
+    const modal = new MapModal(game, {
+        onClose: () => {
+            if (activeMapModal === modal) {
+                activeMapModal = null;
+            }
+            game.mapOverlayActive = false;
+            game.setPanelMessage(DEFAULT_PANEL_MESSAGE);
+            game.forceDraw = true;
         }
-    } else {
-        game.clearPanelMessage();
+    });
+    activeMapModal = modal;
+    game.mapOverlayActive = true;
+    game.setPanelMessage({
+        heading: 'Strategic Map',
+        lines: [
+            'Strategic overlay open.',
+            'Press Esc or Close to return to command.'
+        ]
+    });
+    if (game.notify) {
+        game.notify({
+            title: 'Strategic Map',
+            message: 'Displaying the full theatre. Press Esc or Close when finished.',
+            variant: 'info',
+            timeout: 4800
+        });
     }
     game.forceDraw = true;
 };
