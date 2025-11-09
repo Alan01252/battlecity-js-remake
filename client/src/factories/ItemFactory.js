@@ -20,6 +20,7 @@ import {ITEM_INITIAL_LIFE} from "../constants";
 import {ITEM_BURN_THRESHOLDS} from "../constants";
 import { SOUND_IDS } from '../audio/AudioManager';
 import spawnMuzzleFlash from "../effects/muzzleFlash";
+import { applyHazardMetadata } from './hazardMetadata.js';
 
 const STRUCTURE_ITEM_TYPES = new Set([
     ITEM_TYPE_WALL,
@@ -928,6 +929,7 @@ class ItemFactory {
     applyHazardState(item, hazard) {
         item.x = this.toFiniteNumber(hazard.x, item.x);
         item.y = this.toFiniteNumber(hazard.y, item.y);
+        applyHazardMetadata(item, hazard, (value, fallback) => this.toFiniteNumber(value, fallback));
         if (hazard.active !== undefined) {
             item.active = !!hazard.active;
         }
