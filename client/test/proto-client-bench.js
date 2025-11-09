@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-'use strict';
 
-const { performance } = require('perf_hooks');
+import { performance } from 'node:perf_hooks';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+
 const {
     createPlayerSnapshot,
     createSampleBulletPayload
