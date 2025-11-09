@@ -54,6 +54,14 @@ class IntroModal {
                 line-height: 1.6;
                 color: rgba(218, 227, 255, 0.85);
             }
+            .intro-modal-hint {
+                margin: 0;
+                font-size: 13px;
+                line-height: 1.5;
+                color: rgba(255, 218, 93, 0.9);
+                font-weight: 500;
+                letter-spacing: 0.3px;
+            }
             .intro-modal-button {
                 align-self: center;
                 border: none;
@@ -96,6 +104,10 @@ class IntroModal {
         blurb.className = 'intro-modal-copy';
         blurb.textContent = this.blurb;
 
+        const hint = document.createElement('p');
+        hint.className = 'intro-modal-hint';
+        hint.textContent = 'Press F to play in fullscreen!';
+
         const button = document.createElement('button');
         button.className = 'intro-modal-button';
         button.type = 'button';
@@ -104,6 +116,7 @@ class IntroModal {
 
         panel.appendChild(heading);
         panel.appendChild(blurb);
+        panel.appendChild(hint);
         panel.appendChild(button);
         overlay.appendChild(panel);
         document.body.appendChild(overlay);

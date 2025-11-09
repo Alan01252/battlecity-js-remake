@@ -63,6 +63,7 @@ class ChatManager {
 
         this.registerDomEvents();
         this.setConnectionState(false);
+        this.hideControls(); // Start with controls hidden
     }
 
     injectStyles() {
@@ -78,7 +79,7 @@ class ChatManager {
             #${CHAT_CONTAINER_ID} {
                 position: fixed;
                 left: 18px;
-                bottom: 24px;
+                bottom: 84px;
                 width: min(360px, 32vw);
                 display: flex;
                 flex-direction: column;
@@ -203,7 +204,12 @@ class ChatManager {
                 </form>
                 <div class="battlecity-chat__status" role="status"></div>
             `;
-            document.body.appendChild(container);
+            const gameContainer = document.getElementById('game');
+            if (gameContainer) {
+                gameContainer.appendChild(container);
+            } else {
+                document.body.appendChild(container);
+            }
         }
         return container;
     }
@@ -401,8 +407,10 @@ class ChatManager {
             return;
         }
         const node = this.renderMessage(message);
+        node.dataset.timestamp = Date.now(); // Add timestamp for auto-hide
         this.logElement.appendChild(node);
         this.scrollToBottom();
+        this.startMessageCleanup();
     }
 
     renderMessage(message) {
@@ -495,6 +503,84 @@ class ChatManager {
             }
         } else {
             this.statusElement.dataset.visible = 'false';
+        }
+    }
+
+    showControls() {
+        if (this.formElement) {
+            this.formElement.style.display = 'flex';
+        }
+        if (this.statusElement) {
+            this.statusElement.style.display = 'block';
+        }
+        if (this.logElement) {
+            this.logElement.style.display = 'flex'; // Always show log when menu is open
+        }
+        this.showAllMessages(); // Show all messages when menu opens
+    }
+
+    hideControls() {
+        if (this.formElement) {
+            this.formElement.style.display = 'none';
+        }
+        if (this.statusElement) {
+            this.statusElement.style.display = 'none';
+        }
+        this.hideOldMessages();
+    }
+
+    showAllMessages() {
+        if (!this.logElement) {
+            return;
+        }
+        const messages = this.logElement.querySelectorAll('.battlecity-chat__message');
+        messages.forEach(msg => {
+            msg.style.display = 'flex';
+        });
+    }
+
+    hideOldMessages() {
+        if (!this.logElement) {
+            return;
+        }
+        const now = Date.now();
+        const messages = this.logElement.querySelectorAll('.battlecity-chat__message');
+        let hasVisibleMessages = false;
+
+        messages.forEach(msg => {
+            const timestamp = parseInt(msg.dataset.timestamp, 10);
+            if (timestamp && (now - timestamp > 10000)) { // 10 seconds
+                msg.style.display = 'none';
+            } else {
+                msg.style.display = 'flex';
+                hasVisibleMessages = true;
+            }
+        });
+
+        // Hide the log container itself if there are no visible messages
+        if (!hasVisibleMessages) {
+            this.logElement.style.display = 'none';
+        } else {
+            this.logElement.style.display = 'flex';
+        }
+    }
+
+    startMessageCleanup() {
+        if (this.cleanupInterval) {
+            return; // Already running
+        }
+        this.cleanupInterval = setInterval(() => {
+            // Only hide old messages if menu is closed (controls are hidden)
+            if (this.formElement && this.formElement.style.display === 'none') {
+                this.hideOldMessages();
+            }
+        }, 1000); // Check every second
+    }
+
+    stopMessageCleanup() {
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = null;
         }
     }
 }

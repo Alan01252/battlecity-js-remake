@@ -136,7 +136,8 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
         s = keyboard(83),
         b = keyboard(66),
         h = keyboard(72),
-        c = keyboard(67);
+        c = keyboard(67),
+        f = keyboard(70);
 
 
     left.press = function () {
@@ -247,6 +248,12 @@ export const setupKeyboardInputs = (game) => {    //Capture the keyboard arrow k
             return;
         }
         game.itemFactory.activateCloak();
+    };
+
+    f.press = function () {
+        if (typeof game?.toggleFullscreen === 'function') {
+            game.toggleFullscreen();
+        }
     };
 
     ctrl.press = function () {

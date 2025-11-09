@@ -80,7 +80,12 @@ class NotificationManager {
         if (!container) {
             container = document.createElement('div');
             container.id = 'battlecity-toast-container';
-            document.body.appendChild(container);
+            const gameContainer = document.getElementById('game');
+            if (gameContainer) {
+                gameContainer.appendChild(container);
+            } else {
+                document.body.appendChild(container);
+            }
         }
         return container;
     }

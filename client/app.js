@@ -133,8 +133,8 @@ if (!PIXI.utils.isWebGLSupported()) {
 
 
 var app = new PIXI.Application({
-    width:RESOLUTION_X, 
-    height:RESOLUTION_Y
+    width: window.innerWidth,
+    height: window.innerHeight
 });
 
 app.renderer.plugins.interaction.cursorStyles = {
@@ -147,6 +147,8 @@ document.getElementById("game").appendChild(app.view);
 var stats = new Stats();
 stats.showPanel(0);
 document.getElementById("game").appendChild(stats.dom);
+
+const gameContainer = document.getElementById("game");
 
 var objectContainer = new PIXI.Container();
 var commandCenterLabelLayer = new PIXI.Container();
@@ -165,15 +167,15 @@ const game = {
     timePassed: 0,
     staticTick: 0,
     textures: [],
-    maxMapX: RESOLUTION_X - 200,
-    maxMapY: RESOLUTION_Y,
+    maxMapX: window.innerWidth - 200,
+    maxMapY: window.innerHeight,
     maxCities: 0,
     otherPlayers: {},
     audio: null,
     showBuildMenu: false,
     buildMenuOffset: {
-        x: ((RESOLUTION_X - 200) / 2),
-        y: (RESOLUTION_Y / 2)
+        x: ((window.innerWidth - 200) / 2),
+        y: (window.innerHeight / 2)
     },
     buildings: {},
     cities: [],
@@ -186,8 +188,8 @@ const game = {
         timeTurn: 0,
         direction: 0,
         defaultOffset: {
-            x: ((RESOLUTION_X - 200) / 2),
-            y: (RESOLUTION_Y / 2)
+            x: ((window.innerWidth - 200) / 2),
+            y: (window.innerHeight / 2)
         },
         offset: {
             x: 0,
@@ -261,8 +263,135 @@ orbHintStyle.maxWidth = '320px';
 orbHintStyle.zIndex = '1000';
 orbHintStyle.pointerEvents = 'none';
 orbHintStyle.display = 'none';
-document.body.appendChild(orbHintElement);
 game.orbHintElement = orbHintElement;
+
+const menuToggleButton = document.createElement('button');
+menuToggleButton.id = 'menu-toggle-button';
+menuToggleButton.innerHTML = '&#9776;'; // Hamburger menu icon
+menuToggleButton.title = 'Toggle Menu';
+const menuToggleStyle = menuToggleButton.style;
+menuToggleStyle.position = 'fixed';
+menuToggleStyle.bottom = '24px';
+menuToggleStyle.left = '24px';
+menuToggleStyle.width = '48px';
+menuToggleStyle.height = '48px';
+menuToggleStyle.borderRadius = '12px';
+menuToggleStyle.background = 'rgba(10, 18, 52, 0.82)';
+menuToggleStyle.border = '1px solid rgba(123, 152, 255, 0.35)';
+menuToggleStyle.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.45)';
+menuToggleStyle.fontSize = '24px';
+menuToggleStyle.color = '#f0f6ff';
+menuToggleStyle.cursor = 'pointer';
+menuToggleStyle.zIndex = '1200';
+menuToggleStyle.transition = 'all 0.2s ease';
+menuToggleStyle.display = 'flex';
+menuToggleStyle.alignItems = 'center';
+menuToggleStyle.justifyContent = 'center';
+menuToggleStyle.fontFamily = 'Arial, sans-serif';
+
+const fullscreenButton = document.createElement('button');
+fullscreenButton.id = 'fullscreen-button';
+fullscreenButton.textContent = '\u26F6';
+fullscreenButton.title = 'Toggle Fullscreen (F)';
+const fullscreenStyle = fullscreenButton.style;
+fullscreenStyle.width = '48px';
+fullscreenStyle.height = '48px';
+fullscreenStyle.borderRadius = '12px';
+fullscreenStyle.background = 'rgba(10, 18, 52, 0.82)';
+fullscreenStyle.border = '1px solid rgba(123, 152, 255, 0.35)';
+fullscreenStyle.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.45)';
+fullscreenStyle.fontSize = '24px';
+fullscreenStyle.color = '#f0f6ff';
+fullscreenStyle.cursor = 'pointer';
+fullscreenStyle.transition = 'all 0.2s ease';
+fullscreenStyle.display = 'flex';
+fullscreenStyle.alignItems = 'center';
+fullscreenStyle.justifyContent = 'center';
+fullscreenStyle.fontFamily = 'Arial, sans-serif';
+fullscreenButton.addEventListener('mouseenter', () => {
+    fullscreenStyle.background = 'rgba(15, 28, 72, 0.92)';
+    fullscreenStyle.transform = 'scale(1.05)';
+});
+fullscreenButton.addEventListener('mouseleave', () => {
+    fullscreenStyle.background = 'rgba(10, 18, 52, 0.82)';
+    fullscreenStyle.transform = 'scale(1)';
+});
+fullscreenButton.addEventListener('click', () => {
+    if (typeof game.toggleFullscreen === 'function') {
+        game.toggleFullscreen();
+    }
+});
+
+const menuContainer = document.createElement('div');
+menuContainer.id = 'game-menu-container';
+const menuContainerStyle = menuContainer.style;
+menuContainerStyle.position = 'fixed';
+menuContainerStyle.left = '18px';
+menuContainerStyle.bottom = '84px';
+menuContainerStyle.display = 'none';
+menuContainerStyle.flexDirection = 'column';
+menuContainerStyle.gap = '12px';
+menuContainerStyle.zIndex = '1150';
+menuContainerStyle.pointerEvents = 'auto';
+
+menuContainer.appendChild(fullscreenButton);
+
+game.menuOpen = false;
+game.menuToggleButton = menuToggleButton;
+game.fullscreenButton = fullscreenButton;
+game.menuContainer = menuContainer;
+
+game.toggleMenu = () => {
+    game.menuOpen = !game.menuOpen;
+
+    if (game.menuOpen) {
+        menuToggleButton.innerHTML = '&#10005;'; // X icon
+        menuToggleButton.title = 'Close Menu';
+
+        // Show chat input controls first
+        if (game.chatManager && typeof game.chatManager.showControls === 'function') {
+            game.chatManager.showControls();
+        }
+
+        // Calculate position based on chat container height after showing controls
+        setTimeout(() => {
+            const chatContainer = document.getElementById('battlecity-chat-container');
+            if (chatContainer) {
+                const containerHeight = chatContainer.offsetHeight;
+                // Position menu below chat container
+                menuContainerStyle.bottom = `${84 + containerHeight + 12}px`;
+            }
+            menuContainerStyle.display = 'flex';
+        }, 10);
+    } else {
+        // Hide menu
+        menuContainerStyle.display = 'none';
+        menuToggleButton.innerHTML = '&#9776;'; // Hamburger icon
+        menuToggleButton.title = 'Toggle Menu';
+
+        // Hide chat input controls
+        if (game.chatManager && typeof game.chatManager.hideControls === 'function') {
+            game.chatManager.hideControls();
+        }
+    }
+};
+
+menuToggleButton.addEventListener('mouseenter', () => {
+    menuToggleStyle.background = 'rgba(15, 28, 72, 0.92)';
+    menuToggleStyle.transform = 'scale(1.05)';
+});
+menuToggleButton.addEventListener('mouseleave', () => {
+    menuToggleStyle.background = 'rgba(10, 18, 52, 0.82)';
+    menuToggleStyle.transform = 'scale(1)';
+});
+menuToggleButton.addEventListener('click', () => {
+    game.toggleMenu();
+});
+
+gameContainer.appendChild(orbHintElement);
+gameContainer.appendChild(menuContainer);
+gameContainer.appendChild(menuToggleButton);
+
 initialiseCameraShake(game);
 game.lastOrbHintMessage = '';
 
@@ -1001,6 +1130,89 @@ game.requestExitToLobby = () => {
 };
 
 game.clearPanelMessage();
+
+game.isFullscreen = false;
+
+game.resizeToFullscreen = () => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    app.renderer.resize(width, height);
+    game.maxMapX = width - 200;
+    game.maxMapY = height;
+    game.buildMenuOffset.x = (width - 200) / 2;
+    game.buildMenuOffset.y = height / 2;
+    game.player.defaultOffset.x = (width - 200) / 2;
+    game.player.defaultOffset.y = height / 2;
+    game.forceDraw = true;
+};
+
+game.resizeToOriginal = () => {
+    // When exiting fullscreen, resize to current window dimensions
+    game.resizeToWindow();
+};
+
+game.toggleFullscreen = () => {
+    const gameElement = document.getElementById('game');
+    if (!gameElement) {
+        return;
+    }
+
+    if (!document.fullscreenElement) {
+        gameElement.requestFullscreen().catch((error) => {
+            console.warn('Failed to enter fullscreen:', error?.message || error);
+            if (game.notify) {
+                game.notify({
+                    title: 'Fullscreen Error',
+                    message: 'Unable to enter fullscreen mode.',
+                    variant: 'warn',
+                    timeout: 3000
+                });
+            }
+        });
+    } else {
+        document.exitFullscreen().catch((error) => {
+            console.warn('Failed to exit fullscreen:', error?.message || error);
+        });
+    }
+};
+
+game.resizeToWindow = () => {
+    if (game.isFullscreen) {
+        return;
+    }
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    app.renderer.resize(width, height);
+    game.maxMapX = width - 200;
+    game.maxMapY = height;
+    game.buildMenuOffset.x = (width - 200) / 2;
+    game.buildMenuOffset.y = height / 2;
+    game.player.defaultOffset.x = (width - 200) / 2;
+    game.player.defaultOffset.y = height / 2;
+    game.forceDraw = true;
+};
+
+document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) {
+        game.isFullscreen = true;
+        game.resizeToFullscreen();
+    } else {
+        game.isFullscreen = false;
+        game.resizeToWindow();
+    }
+});
+
+window.addEventListener('resize', () => {
+    if (!game.isFullscreen) {
+        game.resizeToWindow();
+    }
+});
+
+// Initialize with current window size
+game.resizeToWindow();
+
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);

@@ -575,7 +575,12 @@ class LobbyManager {
         panel.appendChild(this.statusNode);
 
         this.overlay.appendChild(panel);
-        document.body.appendChild(this.overlay);
+        const gameContainer = document.getElementById('game');
+        if (gameContainer) {
+            gameContainer.appendChild(this.overlay);
+        } else {
+            document.body.appendChild(this.overlay);
+        }
         this.setActiveTab(this.activeTab || 'cities');
         this.renderHighScores();
     }
