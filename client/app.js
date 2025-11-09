@@ -263,6 +263,46 @@ orbHintStyle.pointerEvents = 'none';
 orbHintStyle.display = 'none';
 document.body.appendChild(orbHintElement);
 game.orbHintElement = orbHintElement;
+
+const fullscreenButton = document.createElement('button');
+fullscreenButton.id = 'fullscreen-button';
+fullscreenButton.textContent = '\u26F6';
+fullscreenButton.title = 'Toggle Fullscreen (F)';
+const fullscreenStyle = fullscreenButton.style;
+fullscreenStyle.position = 'fixed';
+fullscreenStyle.bottom = '24px';
+fullscreenStyle.left = '24px';
+fullscreenStyle.width = '48px';
+fullscreenStyle.height = '48px';
+fullscreenStyle.borderRadius = '12px';
+fullscreenStyle.background = 'rgba(10, 18, 52, 0.82)';
+fullscreenStyle.border = '1px solid rgba(123, 152, 255, 0.35)';
+fullscreenStyle.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.45)';
+fullscreenStyle.fontSize = '24px';
+fullscreenStyle.color = '#f0f6ff';
+fullscreenStyle.cursor = 'pointer';
+fullscreenStyle.zIndex = '1000';
+fullscreenStyle.transition = 'all 0.2s ease';
+fullscreenStyle.display = 'flex';
+fullscreenStyle.alignItems = 'center';
+fullscreenStyle.justifyContent = 'center';
+fullscreenStyle.fontFamily = 'Arial, sans-serif';
+fullscreenButton.addEventListener('mouseenter', () => {
+    fullscreenStyle.background = 'rgba(15, 28, 72, 0.92)';
+    fullscreenStyle.transform = 'scale(1.05)';
+});
+fullscreenButton.addEventListener('mouseleave', () => {
+    fullscreenStyle.background = 'rgba(10, 18, 52, 0.82)';
+    fullscreenStyle.transform = 'scale(1)';
+});
+fullscreenButton.addEventListener('click', () => {
+    if (typeof game.toggleFullscreen === 'function') {
+        game.toggleFullscreen();
+    }
+});
+document.body.appendChild(fullscreenButton);
+game.fullscreenButton = fullscreenButton;
+
 initialiseCameraShake(game);
 game.lastOrbHintMessage = '';
 
@@ -1001,6 +1041,77 @@ game.requestExitToLobby = () => {
 };
 
 game.clearPanelMessage();
+
+game.isFullscreen = false;
+game.originalDimensions = {
+    width: RESOLUTION_X,
+    height: RESOLUTION_Y,
+    maxMapX: RESOLUTION_X - 200,
+    maxMapY: RESOLUTION_Y
+};
+
+game.resizeToFullscreen = () => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    app.renderer.resize(width, height);
+    game.maxMapX = width - 200;
+    game.maxMapY = height;
+    game.buildMenuOffset.x = (width - 200) / 2;
+    game.buildMenuOffset.y = height / 2;
+    game.player.defaultOffset.x = (width - 200) / 2;
+    game.player.defaultOffset.y = height / 2;
+    game.forceDraw = true;
+};
+
+game.resizeToOriginal = () => {
+    const { width, height, maxMapX, maxMapY } = game.originalDimensions;
+
+    app.renderer.resize(width, height);
+    game.maxMapX = maxMapX;
+    game.maxMapY = maxMapY;
+    game.buildMenuOffset.x = (width - 200) / 2;
+    game.buildMenuOffset.y = height / 2;
+    game.player.defaultOffset.x = (width - 200) / 2;
+    game.player.defaultOffset.y = height / 2;
+    game.forceDraw = true;
+};
+
+game.toggleFullscreen = () => {
+    const gameElement = document.getElementById('game');
+    if (!gameElement) {
+        return;
+    }
+
+    if (!document.fullscreenElement) {
+        gameElement.requestFullscreen().catch((error) => {
+            console.warn('Failed to enter fullscreen:', error?.message || error);
+            if (game.notify) {
+                game.notify({
+                    title: 'Fullscreen Error',
+                    message: 'Unable to enter fullscreen mode.',
+                    variant: 'warn',
+                    timeout: 3000
+                });
+            }
+        });
+    } else {
+        document.exitFullscreen().catch((error) => {
+            console.warn('Failed to exit fullscreen:', error?.message || error);
+        });
+    }
+};
+
+document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) {
+        game.isFullscreen = true;
+        game.resizeToFullscreen();
+    } else {
+        game.isFullscreen = false;
+        game.resizeToOriginal();
+    }
+});
+
 game.bulletFactory = new BulletFactory(game);
 game.buildingFactory = new BuildingFactory(game);
 game.socketListener = new SocketListener(game);
