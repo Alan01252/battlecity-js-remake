@@ -11,8 +11,8 @@ const DEFAULT_SCALE = 2;
 const MAX_SCALE = 4;
 const CITY_MARKER_COLOR = '#4da3ff';
 const CITY_MARKER_OUTLINE = 'rgba(4, 12, 24, 0.85)';
-const PLAYER_MARKER_COLOR = '#f5f7ff';
-const PLAYER_MARKER_OUTLINE = 'rgba(4, 12, 24, 0.92)';
+const PLAYER_MARKER_COLOR = '#fdfefe';
+const PLAYER_MARKER_OUTLINE = 'rgba(255, 255, 255, 0.9)';
 const TILE_SIZE = 48;
 const PLAYER_HALF_SIZE = TILE_SIZE / 2;
 
@@ -100,7 +100,6 @@ class MapModal {
         this.panel = null;
         this.canvas = null;
         this.legendContainer = null;
-        this.statusLabel = null;
         this.handleKeyDown = this.handleKeyDown.bind(this);
         this.palette = {
             ground: TERRAIN_PALETTE.ground,
@@ -163,6 +162,8 @@ class MapModal {
                 border-radius: 999px;
                 cursor: pointer;
                 transition: background 0.2s ease;
+                z-index: 20;
+                box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
             }
             .battlecity-map-close:hover {
                 background: rgba(255, 255, 255, 0.18);
@@ -197,30 +198,19 @@ class MapModal {
                 box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
                 display: block;
             }
-            .battlecity-map-status {
-                margin: 0;
-                font-size: 12px;
-                color: rgba(214, 224, 255, 0.82);
-                text-align: center;
-                padding: 2px 10px;
-                border-radius: 999px;
-                background: rgba(8, 11, 20, 0.78);
-                border: 1px solid rgba(145, 196, 255, 0.16);
-            }
             .battlecity-map-legend {
-                position: absolute;
-                left: 18px;
-                bottom: 18px;
                 display: flex;
                 flex-wrap: wrap;
-                justify-content: flex-start;
-                gap: 8px;
-                padding: 8px 12px;
-                background: rgba(12, 16, 26, 0.78);
+                justify-content: center;
+                gap: 10px;
+                padding: 10px 14px;
+                background: rgba(8, 11, 20, 0.92);
                 border-radius: 14px;
                 border: 1px solid rgba(145, 196, 255, 0.18);
-                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-                max-width: calc(100% - 36px);
+                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+                width: min(92vw, 980px);
+                margin: 0 auto;
+                align-self: center;
             }
             .battlecity-map-legend-entry {
                 display: flex;
@@ -238,10 +228,21 @@ class MapModal {
                 border-radius: 4px;
                 border: 1px solid rgba(255, 255, 255, 0.35);
                 box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
+                transition: box-shadow 0.2s ease, transform 0.2s ease;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
             }
             .battlecity-map-legend-entry[data-marker='player'] .battlecity-map-legend-swatch {
-                border-radius: 50%;
-                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+                width: 18px;
+                height: 18px;
+                border-radius: 0;
+                border: none;
+                clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+                box-shadow:
+                    0 0 0 1px rgba(255, 255, 255, 0.55),
+                    0 0 14px rgba(245, 247, 255, 0.65);
+                transform: translateY(1px);
             }
             .battlecity-map-legend-label {
                 font-size: 12px;
@@ -282,17 +283,12 @@ class MapModal {
         const legend = document.createElement('div');
         legend.className = 'battlecity-map-legend';
 
-        const status = document.createElement('p');
-        status.className = 'battlecity-map-status';
-        status.textContent = 'Loading terrain data…';
-
         canvasWrapper.appendChild(canvas);
-        canvasWrapper.appendChild(legend);
 
         const content = document.createElement('div');
         content.className = 'battlecity-map-content';
         content.appendChild(canvasWrapper);
-        content.appendChild(status);
+        content.appendChild(legend);
 
         panel.appendChild(closeButton);
         panel.appendChild(content);
@@ -302,7 +298,6 @@ class MapModal {
         this.panel = panel;
         this.canvas = canvas;
         this.legendContainer = legend;
-        this.statusLabel = status;
     }
 
     open() {
@@ -335,7 +330,6 @@ class MapModal {
         this.panel = null;
         this.canvas = null;
         this.legendContainer = null;
-        this.statusLabel = null;
         this.isOpen = false;
         if (typeof this.onClose === 'function') {
             this.onClose();
@@ -544,9 +538,6 @@ class MapModal {
         }
         if (!width || !height) {
             context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            if (this.statusLabel) {
-                this.statusLabel.textContent = 'Map data is still loading. The overlay will update when terrain is ready.';
-            }
             return;
         }
         const scale = this.scale;
@@ -585,19 +576,6 @@ class MapModal {
         this.drawStructureMarkers(context, structures, scale);
         this.drawCityMarkers(context, cities, scale);
         this.drawPlayerMarker(context, playerPosition, scale);
-        if (this.statusLabel) {
-            const cityCount = Array.isArray(cities) ? cities.length : 0;
-            const structureCount = Array.isArray(structures) ? structures.length : 0;
-            const cityText = `${cityCount} cit${cityCount === 1 ? 'y' : 'ies'}`;
-            const structureText = structureCount
-                ? `${structureCount} structure${structureCount === 1 ? '' : 's'} tracked`
-                : 'No structures recorded yet';
-            const statusParts = [cityText, structureText];
-            if (playerPosition && Number.isFinite(playerPosition.tileX) && Number.isFinite(playerPosition.tileY)) {
-                statusParts.push(`You are at tile (${playerPosition.tileX}, ${playerPosition.tileY})`);
-            }
-            this.statusLabel.textContent = `${statusParts.join(' · ')}. Terrain refreshed just now.`;
-        }
     }
 
     drawStructureMarkers(context, structures, scale) {
@@ -606,9 +584,8 @@ class MapModal {
         }
         const markerSize = Math.max(3, Math.round(scale * 1.6));
         structures.forEach((structure) => {
-            const style = STRUCTURE_CATEGORY_LOOKUP[structure.category] || null;
-            const fill = style?.color || '#9aa7bf';
-            const outline = style?.outline || DEFAULT_STRUCTURE_OUTLINE;
+            const fill = '#f6d743';
+            const outline = DEFAULT_STRUCTURE_OUTLINE;
             const centerTileX = Number.isFinite(structure.centerTileX)
                 ? structure.centerTileX
                 : (structure.tileX ?? 0) + 0.5;
@@ -687,17 +664,42 @@ class MapModal {
             return;
         }
         const markerSize = Math.max(5, Math.round(scale * 2.8));
+        const glowSize = Math.max(markerSize * 1.8, markerSize + 6);
+        const drawTrianglePath = (ctx, size) => {
+            ctx.beginPath();
+            ctx.moveTo(0, -size);
+            ctx.lineTo(size * 0.85, size * 0.9);
+            ctx.lineTo(0, size * 0.55);
+            ctx.lineTo(-size * 0.85, size * 0.9);
+            ctx.closePath();
+        };
+
         context.save();
         context.translate(centerX, centerY);
+        const gradient = context.createRadialGradient(0, 0, markerSize * 0.6, 0, 0, glowSize * 1.4);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.75)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        context.fillStyle = gradient;
         context.beginPath();
-        context.moveTo(0, -markerSize);
-        context.lineTo(markerSize * 0.85, markerSize * 0.9);
-        context.lineTo(0, markerSize * 0.55);
-        context.lineTo(-markerSize * 0.85, markerSize * 0.9);
-        context.closePath();
+        context.arc(0, 0, glowSize * 1.3, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+
+        context.save();
+        context.translate(centerX, centerY);
+        context.shadowColor = 'rgba(255, 255, 255, 0.6)';
+        context.shadowBlur = glowSize;
+        drawTrianglePath(context, glowSize);
+        context.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        context.fill();
+        context.restore();
+
+        context.save();
+        context.translate(centerX, centerY);
+        drawTrianglePath(context, markerSize);
         context.fillStyle = PLAYER_MARKER_COLOR;
         context.strokeStyle = PLAYER_MARKER_OUTLINE;
-        context.lineWidth = Math.max(1, Math.round(scale / 1.5));
+        context.lineWidth = Math.max(2, Math.round(scale / 1.2));
         context.fill();
         context.stroke();
         context.restore();
