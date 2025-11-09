@@ -158,6 +158,39 @@ var FakeCityManager = require('./src/FakeCityManager');
 var DefenseManager = require('./src/DefenseManager');
 var { loadMapData } = require('./src/utils/mapLoader');
 var ChatManager = require('./src/chat/ChatManager');
+var { LoopMonitor } = require('./src/utils/LoopMonitor');
+
+const parseBooleanEnv = (value) => {
+    if (value === undefined || value === null) {
+        return false;
+    }
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+    const normalized = String(value).trim().toLowerCase();
+    if (!normalized) {
+        return false;
+    }
+    return normalized === '1' ||
+        normalized === 'true' ||
+        normalized === 'yes' ||
+        normalized === 'y' ||
+        normalized === 'on';
+};
+
+const shouldProfileLoop = parseBooleanEnv(process.env.SERVER_LOOP_PROFILER || process.env.SERVER_PROFILE_LOOP);
+const explicitFakeCityFlag = process.env.SERVER_DISABLE_FAKE_CITIES ?? process.env.DISABLE_FAKE_CITIES;
+const disableFakeCities = explicitFakeCityFlag !== undefined
+    ? parseBooleanEnv(explicitFakeCityFlag)
+    : shouldProfileLoop;
+const loopMonitor = shouldProfileLoop ? new LoopMonitor({
+    reportIntervalMs: Number(process.env.SERVER_LOOP_REPORT_MS) || 5000,
+    maxSamples: Number(process.env.SERVER_LOOP_SAMPLE_SIZE) || 600,
+    label: 'server-loop'
+}) : null;
 
 app.get('/health', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -279,6 +312,7 @@ const fakeCityManager = new FakeCityManager({
     hazardManager,
     defenseManager,
     bulletFactory,
+    enabled: !disableFakeCities,
 });
 fakeCityManager.setIo(io);
 
@@ -640,6 +674,7 @@ let buildingAccumulator = 0;
 
 var loop = () => {
 
+    const loopStart = process.hrtime.bigint();
     var now = Date.now();
     if (!game.tick) {
         game.tick = now;
@@ -662,6 +697,15 @@ var loop = () => {
     if (buildingAccumulator >= BUILDING_UPDATE_INTERVAL) {
         buildingFactory.cycle();
         buildingAccumulator = buildingAccumulator % BUILDING_UPDATE_INTERVAL;
+    }
+
+    if (loopMonitor) {
+        const loopEnd = process.hrtime.bigint();
+        const durationNs = loopEnd - loopStart;
+        loopMonitor.record({
+            deltaMs: delta,
+            durationNs: Number(durationNs)
+        });
     }
 
     setTimeout(function () {

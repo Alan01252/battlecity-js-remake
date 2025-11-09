@@ -15,6 +15,7 @@ import {rectangleCollision} from "./collision/collision-helpers";
 import {isHospitalBuilding} from "./utils/buildings";
 import {getHospitalDriveableRect} from "./utils/buildings";
 import { SOUND_IDS } from "./audio/AudioManager";
+import { profileCollision } from "./debug/collisionProfiler";
 
 const TILE_SIZE = 48;
 const NEAREST_SAFE_MAX_RADIUS_TILES = 12;
@@ -42,6 +43,48 @@ const UNSTICK_DIRECTIONS = [
 
 const UNSTICK_STEP = 6;
 const UNSTICK_MAX_DISTANCE = 96;
+const MAX_VELOCITY = 20;
+const DIRECTION_STEPS = 32;
+
+const DIRECTION_VECTORS = Array.from({ length: DIRECTION_STEPS }, (_unused, direction) => {
+    const angle = (-direction / 16) * Math.PI;
+    return {
+        sin: Math.sin(angle),
+        cos: Math.cos(angle),
+    };
+});
+
+const normaliseDirection = (direction) => {
+    if (!Number.isFinite(direction)) {
+        return 0;
+    }
+    let normalised = Math.round(direction) % DIRECTION_STEPS;
+    if (normalised < 0) {
+        normalised += DIRECTION_STEPS;
+    }
+    return normalised;
+};
+
+const getDirectionVector = (direction) => DIRECTION_VECTORS[normaliseDirection(direction)];
+
+const clampVelocity = (value) => {
+    if (value > MAX_VELOCITY) {
+        return MAX_VELOCITY;
+    }
+    if (value < -MAX_VELOCITY) {
+        return -MAX_VELOCITY;
+    }
+    return value;
+};
+
+const runCollisionCheck = (game, context, { cacheResult = false } = {}) => {
+    const collision = profileCollision(context, () => checkPlayerCollision(game));
+    if (cacheResult && game?.player) {
+        game.player.lastCollisionCode = collision;
+        game.player.lastCollisionFrame = game._frameId || 0;
+    }
+    return collision;
+};
 
 const updateLastSafeOffset = (game) => {
     if (!game || !game.player) {
@@ -139,73 +182,38 @@ var movePlayer = (game) => {
     const previousX = game.player.offset.x;
     const previousY = game.player.offset.y;
 
-    var fDir = -game.player.direction;
-    var velocity = (Math.sin((fDir / 16) * 3.14) * game.player.isMoving) * (game.timePassed * MOVEMENT_SPEED_PLAYER);
-    if (velocity > 20) {
-        velocity = 20;
-    }
-    if (velocity < -20) {
-        velocity = -20;
-    }
+    const directionVector = getDirectionVector(game.player.direction);
+    const movementScale = game.player.isMoving * (game.timePassed * MOVEMENT_SPEED_PLAYER);
 
+    const applyAxisMovement = (axis, velocityComponent, positiveEdge, negativeEdge) => {
+        const preUpdate = game.player.offset[axis];
+        game.player.offset[axis] += velocityComponent;
+        switch (runCollisionCheck(game, `move:${axis}`)) {
+            case positiveEdge:
+                game.player.offset[axis] = 0;
+                break;
+            case negativeEdge:
+                game.player.offset[axis] = (511) * 48;
+                break;
+            case COLLISION_BLOCKING:
+                game.player.offset[axis] = preUpdate;
+                break;
+            case COLLISION_MINE:
+                handleMineCollision(game, game.player.collidedItem);
+                break;
+            case COLLISION_DFG:
+                handleDFGCollision(game, game.player.collidedItem);
+                break;
+            default:
+                break;
+        }
+    };
 
-    var preUpdate = game.player.offset.x;
-    game.player.offset.x += velocity;
+    const velocityX = clampVelocity(directionVector.sin * movementScale);
+    applyAxisMovement('x', velocityX, COLLISION_MAP_EDGE_LEFT, COLLISION_MAP_EDGE_RIGHT);
 
-    //console.log("position" + checkPlayerCollision(game));
-
-    switch (checkPlayerCollision(game)) {
-        case COLLISION_MAP_EDGE_LEFT:
-            game.player.offset.x = 0;
-            break;
-        case COLLISION_MAP_EDGE_RIGHT:
-            game.player.offset.x = (511) * 48;
-            break;
-        case COLLISION_BLOCKING:
-            game.player.offset.x = preUpdate;
-            break;
-        case COLLISION_MINE:
-            handleMineCollision(game, game.player.collidedItem);
-            break;
-        case COLLISION_DFG:
-            handleDFGCollision(game, game.player.collidedItem);
-            break;
-        case 0:
-            break;
-    }
-
-    velocity = (Math.cos((fDir / 16) * 3.14) * game.player.isMoving) * (game.timePassed * MOVEMENT_SPEED_PLAYER);
-    if (velocity > 20) {
-        velocity = 20;
-    }
-    if (velocity < -20) {
-        velocity = -20;
-    }
-
-
-    var preUpdate = game.player.offset.y;
-    game.player.offset.y += velocity;
-
-
-    switch (checkPlayerCollision(game)) {
-        case COLLISION_MAP_EDGE_TOP:
-            game.player.offset.y = 0;
-            break;
-        case COLLISION_MAP_EDGE_BOTTOM:
-            game.player.offset.y = (511) * 48;
-            break;
-        case COLLISION_BLOCKING:
-            game.player.offset.y = preUpdate;
-            break;
-        case COLLISION_MINE:
-            handleMineCollision(game, game.player.collidedItem);
-            break;
-        case COLLISION_DFG:
-            handleDFGCollision(game, game.player.collidedItem);
-            break;
-        case 0:
-            break;
-    }
+    const velocityY = clampVelocity(directionVector.cos * movementScale);
+    applyAxisMovement('y', velocityY, COLLISION_MAP_EDGE_TOP, COLLISION_MAP_EDGE_BOTTOM);
 
     const debugMovement = !!(game && game.debug && game.debug.logMovement);
     if (
@@ -224,7 +232,7 @@ const attemptUnstick = (game, originalPosition) => {
             const candidateY = originalPosition.y + (direction.dy * distance);
             game.player.offset.x = candidateX;
             game.player.offset.y = candidateY;
-            const collision = checkPlayerCollision(game);
+            const collision = runCollisionCheck(game, 'unstick:probe');
             if (collision === COLLISION_MINE) {
                 handleMineCollision(game, game.player.collidedItem);
                 updateLastSafeOffset(game);
@@ -254,13 +262,14 @@ const findNearestSafeOffset = (game, originOffset, maxRadiusTiles = NEAREST_SAFE
     const startTileY = Math.floor((originOffset.y + (TILE_SIZE / 2)) / TILE_SIZE);
 
     const queue = [{ x: startTileX, y: startTileY, distance: 0 }];
+    let head = 0;
     const visited = new Set();
 
     const originalOffset = { x: game.player.offset.x, y: game.player.offset.y };
     const originalCollidedItem = game.player.collidedItem;
 
-    while (queue.length) {
-        const node = queue.shift();
+    while (head < queue.length) {
+        const node = queue[head++];
         const key = `${node.x},${node.y}`;
         if (visited.has(key)) {
             continue;
@@ -282,7 +291,7 @@ const findNearestSafeOffset = (game, originOffset, maxRadiusTiles = NEAREST_SAFE
 
         game.player.offset.x = candidateOffset.x;
         game.player.offset.y = candidateOffset.y;
-        const collision = checkPlayerCollision(game);
+        const collision = runCollisionCheck(game, 'unstick:bfs');
         const collidedItem = game.player.collidedItem;
         game.player.offset.x = originalOffset.x;
         game.player.offset.y = originalOffset.y;
@@ -331,7 +340,7 @@ const ensurePlayerUnstuck = (game) => {
         return;
     }
 
-    const collision = checkPlayerCollision(game);
+    const collision = runCollisionCheck(game, 'ensure:initial');
     if (collision === COLLISION_MINE) {
         handleMineCollision(game, game.player.collidedItem);
         return;
@@ -360,7 +369,7 @@ const ensurePlayerUnstuck = (game) => {
     if (nearestSafe) {
         game.player.offset.x = nearestSafe.offset.x;
         game.player.offset.y = nearestSafe.offset.y;
-        const collisionAfterNearest = checkPlayerCollision(game);
+        const collisionAfterNearest = runCollisionCheck(game, 'unstick:nearest_result');
         if (collisionAfterNearest === COLLISION_MINE) {
             handleMineCollision(game, game.player.collidedItem);
             return;
@@ -378,7 +387,7 @@ const ensurePlayerUnstuck = (game) => {
     if (fallback && (fallback.x !== original.x || fallback.y !== original.y)) {
         game.player.offset.x = fallback.x;
         game.player.offset.y = fallback.y;
-        const postFallbackCollision = checkPlayerCollision(game);
+        const postFallbackCollision = runCollisionCheck(game, 'unstick:fallback');
         if (postFallbackCollision === COLLISION_MINE) {
             handleMineCollision(game, game.player.collidedItem);
             updateLastSafeOffset(game);
@@ -400,7 +409,7 @@ const ensurePlayerUnstuck = (game) => {
 
     movePlayerToCitySpawn(game);
 
-    const collisionAtSpawn = checkPlayerCollision(game);
+    const collisionAtSpawn = runCollisionCheck(game, 'respawn:initial');
     if (collisionAtSpawn === COLLISION_MINE) {
         handleMineCollision(game, game.player.collidedItem);
         return;
@@ -418,7 +427,7 @@ const ensurePlayerUnstuck = (game) => {
     if (safeNearSpawn) {
         game.player.offset.x = safeNearSpawn.offset.x;
         game.player.offset.y = safeNearSpawn.offset.y;
-        const postSpawnCollision = checkPlayerCollision(game);
+        const postSpawnCollision = runCollisionCheck(game, 'respawn:post');
         if (postSpawnCollision === COLLISION_MINE) {
             handleMineCollision(game, game.player.collidedItem);
             return;

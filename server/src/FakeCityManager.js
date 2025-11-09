@@ -578,7 +578,7 @@ const getBuildingFootprint = (building) => {
 const BUILDING_HITBOX_PADDING = TILE_SIZE * 0.2;
 
 class FakeCityManager {
-    constructor({ game, buildingFactory, playerFactory, hazardManager, defenseManager, bulletFactory }) {
+    constructor({ game, buildingFactory, playerFactory, hazardManager, defenseManager, bulletFactory, enabled = true }) {
         this.game = game;
         this.buildingFactory = buildingFactory;
         this.playerFactory = playerFactory;
@@ -595,7 +595,10 @@ class FakeCityManager {
         this.recruitsByCity = new Map();
         this.navGrid = null;
         this.debug = require('debug')('BattleCity:FakeCityManager');
-
+        this.disabled = !enabled;
+        if (this.disabled) {
+            this.debug('[fake-city] manager disabled via configuration');
+        }
     }
 
     getBotProcesses() {
@@ -607,6 +610,9 @@ class FakeCityManager {
     }
 
     update(now = Date.now()) {
+        if (this.disabled) {
+            return;
+        }
         const interval = toFiniteNumber(this.config.evaluationIntervalMs, 10000);
         if (now < this.nextEvaluation) {
             return;
@@ -2404,6 +2410,9 @@ class FakeCityManager {
     }
 
     sendSnapshot(target) {
+        if (this.disabled) {
+            return;
+        }
         if (!target) {
             return;
         }
