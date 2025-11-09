@@ -30,8 +30,8 @@ WORKDIR /app/server
 COPY --from=builder /app/server/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy server source excluding prebuilt node_modules so Alpine dependencies remain intact
-COPY --from=builder /app/server ./ --exclude=node_modules
+# Copy server source after installing prod dependencies
+COPY --from=builder /app/server ./
 
 EXPOSE 8021
 CMD ["node", "app.js"]
