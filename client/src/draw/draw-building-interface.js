@@ -106,6 +106,13 @@ const startGhostBuilding = (game, buildingType, pointerData) => {
       return;
     }
 
+    // Since we want the cursor in the CENTER of the building (not top-left),
+    // offset the cursor position by half the building size before tile calculation
+    // Buildings are 144x144 pixels (3x3 tiles at 48px each)
+    const halfBuildingSize = 144 / 2; // 72 pixels
+    const adjustedGlobalX = global.x - halfBuildingSize;
+    const adjustedGlobalY = global.y - halfBuildingSize;
+
     // Use the same tile-grid calculation as actual placement (input-mouse.js lines 35-38)
     const offTileX = Math.floor(game.player.offset.x % 48);
     const offTileY = Math.floor(game.player.offset.y % 48);
@@ -113,26 +120,22 @@ const startGhostBuilding = (game, buildingType, pointerData) => {
       (game.player.offset.x -
         game.player.defaultOffset.x +
         offTileX +
-        global.x) /
+        adjustedGlobalX) /
         48,
     );
     const tileY = Math.floor(
       (game.player.offset.y -
         game.player.defaultOffset.y +
         offTileY +
-        global.y) /
+        adjustedGlobalY) /
         48,
     );
 
     // Convert tile coordinates back to world pixel coordinates for rendering
-    // Buildings are 144x144 pixels (3x3 tiles at 48px each)
-    // We need to convert back to screen space for the ghost preview
     const worldPixelX = tileX * 48;
     const worldPixelY = tileY * 48;
 
-    // Since the building anchor is centered (0.5, 0.5), offset by half the building size
-    // to align the center of the building with the center of the 3x3 tile grid
-    const halfBuildingSize = 144 / 2; // 72 pixels
+    // Since the building anchor is centered (0.5, 0.5), position at the center of the grid
     const centeredWorldX = worldPixelX + halfBuildingSize;
     const centeredWorldY = worldPixelY + halfBuildingSize;
 
