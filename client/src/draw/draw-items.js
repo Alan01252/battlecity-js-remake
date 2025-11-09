@@ -9,6 +9,24 @@ import {ITEM_TYPE_BOMB} from "../constants";
 import {ITEM_TYPE_DFG} from "../constants";
 
 var drawTick = 0;
+const textureCache = new Map();
+
+const getItemTexture = (baseTexture, cacheKey, x, y, width, height) => {
+    if (!baseTexture) {
+        return null;
+    }
+    const baseId = baseTexture.uid || baseTexture.cacheId || 'base';
+    const key = `${baseId}:${cacheKey}:${x}:${y}:${width}:${height}`;
+    let cached = textureCache.get(key);
+    if (!cached) {
+        cached = new PIXI.Texture(
+            baseTexture,
+            new PIXI.Rectangle(x, y, width, height)
+        );
+        textureCache.set(key, cached);
+    }
+    return cached;
+};
 
 var getItemsWithingRange = function (itemFactory, player) {
 
@@ -53,10 +71,17 @@ var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
     }
     damageColumn = Math.max(0, Math.min(2, damageColumn));
 
-    const baseFrame = new PIXI.Texture(
+    const baseFrame = getItemTexture(
         baseTexture,
-        new PIXI.Rectangle(damageColumn * 48, typeIndex * 48, 48, 48)
+        `turret-base:${typeIndex}:${damageColumn}`,
+        damageColumn * 48,
+        typeIndex * 48,
+        48,
+        48
     );
+    if (!baseFrame) {
+        return;
+    }
     itemTiles.addFrame(baseFrame, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
 
     let orientation = 0;
@@ -66,11 +91,17 @@ var drawTurret = (game, itemTiles, item, offTileX, offTileY) => {
     if (orientation >= 16 || orientation < 0) {
         orientation = 0;
     }
-    var tmpText = new PIXI.Texture(
-        game.textures['imageTurretHead'].baseTexture,
-        new PIXI.Rectangle(orientation * 48, (item.type - 9) * 48, 48, 48)
+    const headTexture = getItemTexture(
+        game.textures['imageTurretHead']?.baseTexture,
+        `turret-head:${item.type}:${orientation}`,
+        orientation * 48,
+        (item.type - 9) * 48,
+        48,
+        48
     );
-    itemTiles.addFrame(tmpText, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
+    if (headTexture) {
+        itemTiles.addFrame(headTexture, item.x - game.player.offset.x + offTileX, item.y - game.player.offset.y + offTileY);
+    }
 };
 
 var drawMine = (game, itemTiles, item, offTileX, offTileY) => {
@@ -79,13 +110,20 @@ var drawMine = (game, itemTiles, item, offTileX, offTileY) => {
     if (item.active && mineTeam !== null && mineTeam !== playerTeam) {
         return;
     }
-    var tmpText = new PIXI.Texture(
-        game.textures['imageItems'].baseTexture,
-        new PIXI.Rectangle(ITEM_TYPE_MINE * 32, 0, 32, 32)
+    const texture = getItemTexture(
+        game.textures['imageItems']?.baseTexture,
+        `mine:${ITEM_TYPE_MINE}`,
+        ITEM_TYPE_MINE * 32,
+        0,
+        32,
+        32
     );
+    if (!texture) {
+        return;
+    }
     var drawX = item.x - game.player.offset.x + offTileX + 8;
     var drawY = item.y - game.player.offset.y + offTileY + 8;
-    itemTiles.addFrame(tmpText, drawX, drawY);
+    itemTiles.addFrame(texture, drawX, drawY);
 };
 
 var drawDFG = (game, itemTiles, item, offTileX, offTileY) => {
@@ -98,10 +136,17 @@ var drawDFG = (game, itemTiles, item, offTileX, offTileY) => {
     if (!baseTexture) {
         return;
     }
-    const texture = new PIXI.Texture(
+    const texture = getItemTexture(
         baseTexture,
-        new PIXI.Rectangle(ITEM_TYPE_DFG * 48, 42, 48, 48)
+        `dfg:${ITEM_TYPE_DFG}`,
+        ITEM_TYPE_DFG * 48,
+        42,
+        48,
+        48
     );
+    if (!texture) {
+        return;
+    }
     const drawX = item.x - game.player.offset.x + offTileX;
     const drawY = item.y - game.player.offset.y + offTileY;
     itemTiles.addFrame(texture, drawX, drawY);
@@ -118,7 +163,17 @@ var drawBomb = (game, itemTiles, item, offTileX, offTileY) => {
         ? new PIXI.Rectangle(144, 91, 48, 48)
         : new PIXI.Rectangle(ITEM_TYPE_BOMB * 48, 42, 48, 48);
 
-    const texture = new PIXI.Texture(baseTexture, frame);
+    const texture = getItemTexture(
+        baseTexture,
+        `bomb:${armed ? 'armed' : 'idle'}`,
+        frame.x,
+        frame.y,
+        frame.width,
+        frame.height
+    );
+    if (!texture) {
+        return;
+    }
     const drawX = item.x - game.player.offset.x + offTileX;
     const drawY = item.y - game.player.offset.y + offTileY;
     itemTiles.addFrame(texture, drawX, drawY);
@@ -129,10 +184,17 @@ const drawWall = (game, itemTiles, item, offTileX, offTileY) => {
     if (!baseTexture) {
         return;
     }
-    const texture = new PIXI.Texture(
+    const texture = getItemTexture(
         baseTexture,
-        new PIXI.Rectangle(ITEM_TYPE_WALL * 48, 42, 48, 48)
+        `wall:${ITEM_TYPE_WALL}`,
+        ITEM_TYPE_WALL * 48,
+        42,
+        48,
+        48
     );
+    if (!texture) {
+        return;
+    }
     const drawX = item.x - game.player.offset.x + offTileX;
     const drawY = item.y - game.player.offset.y + offTileY;
     itemTiles.addFrame(texture, drawX, drawY);
@@ -154,10 +216,17 @@ const drawGenericItem = (game, itemTiles, item, offTileX, offTileY) => {
         return;
     }
     const frameX = item.type * 48;
-    const texture = new PIXI.Texture(
+    const texture = getItemTexture(
         baseTexture,
-        new PIXI.Rectangle(frameX, 42, 48, 48)
+        `item:${item.type}`,
+        frameX,
+        42,
+        48,
+        48
     );
+    if (!texture) {
+        return;
+    }
     const drawX = item.x - game.player.offset.x + offTileX;
     const drawY = item.y - game.player.offset.y + offTileY;
     itemTiles.addFrame(texture, drawX, drawY);

@@ -27,6 +27,27 @@ import {
 const TILE_SIZE = 48;
 const HALF_TILE = TILE_SIZE / 2;
 const CITY_CENTER_OFFSET = TILE_SIZE * 1.5;
+const PANEL_MESSAGE_STATE_KEY = '__panelMessageState';
+const PANEL_HEALTH_STATE_KEY = '__panelHealthState';
+const HEALTH_BAR_WIDTH = 38;
+const HEALTH_BAR_HEIGHT = 87;
+
+const PANEL_HEADING_STYLE = Object.freeze({
+    fontFamily: 'Arial',
+    fontSize: 14,
+    fontWeight: 'bold',
+    fill: 0xF4D03F,
+    stroke: 0x000000,
+    strokeThickness: 2,
+});
+
+const PANEL_BODY_STYLE = Object.freeze({
+    fontFamily: 'Arial',
+    fontSize: 12,
+    fill: 0xFDFEFE,
+    stroke: 0x000000,
+    strokeThickness: 2,
+});
 
 const INVENTORY_SLOTS = {
     [ITEM_TYPE_LASER]: {x: 7, y: 267},
@@ -207,6 +228,39 @@ const buildRadarTextures = (game) => {
         textures.dead = new PIXI.Texture(mini.baseTexture, new PIXI.Rectangle(15 * RADAR_TEXTURE_SIZE, 0, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE));
     }
     return textures;
+};
+
+const ensurePanelMessageState = (game) => {
+    if (!game) {
+        return null;
+    }
+    if (!game[PANEL_MESSAGE_STATE_KEY]) {
+        game[PANEL_MESSAGE_STATE_KEY] = {
+            heading: null,
+            lines: []
+        };
+    }
+    return game[PANEL_MESSAGE_STATE_KEY];
+};
+
+const ensureHealthSpriteState = (game) => {
+    if (!game) {
+        return null;
+    }
+    if (!game[PANEL_HEALTH_STATE_KEY]) {
+        const baseTexture = game.textures?.health?.baseTexture;
+        if (!baseTexture) {
+            return null;
+        }
+        const texture = new PIXI.Texture(baseTexture);
+        const sprite = new PIXI.Sprite(texture);
+        sprite.anchor.set(1, 1);
+        game[PANEL_HEALTH_STATE_KEY] = {
+            sprite,
+            texture
+        };
+    }
+    return game[PANEL_HEALTH_STATE_KEY];
 };
 
 const buildHomeArrowTextures = (game) => {
@@ -685,58 +739,90 @@ const drawPanelMessages = (game, stage) => {
     const baseX = game.maxMapX + 12;
     let currentY = 465;
 
-    if (heading) {
-        const headingText = new PIXI.Text(heading, {
-            fontFamily: 'Arial',
-            fontSize: 14,
-            fontWeight: 'bold',
-            fill: 0xF4D03F,
-            stroke: 0x000000,
-            strokeThickness: 2,
-        });
-        headingText.x = baseX;
-        headingText.y = currentY;
-        stage.addChild(headingText);
-        currentY += 15;
+    const state = ensurePanelMessageState(game);
+    const headingSprite = (() => {
+        if (!state) {
+            return null;
+        }
+        if (!state.heading) {
+            state.heading = new PIXI.Text('', PANEL_HEADING_STYLE);
+        }
+        return state.heading;
+    })();
+
+    if (headingSprite) {
+        if (heading) {
+            headingSprite.visible = true;
+            headingSprite.text = heading;
+            headingSprite.x = baseX;
+            headingSprite.y = currentY;
+            stage.addChild(headingSprite);
+            currentY += 15;
+        } else {
+            headingSprite.visible = false;
+        }
     }
 
-    const bodyStyle = {
-        fontFamily: 'Arial',
-        fontSize: 12,
-        fill: 0xFDFEFE,
-        stroke: 0x000000,
-        strokeThickness: 2,
-    };
-
+    const lineSprites = state ? state.lines : [];
+    let lineIndex = 0;
     lines.forEach((line) => {
-        if (line === null || line === undefined) {
+        if (line === null || line === undefined || line === '') {
             currentY += 15;
+            if (lineSprites[lineIndex]) {
+                lineSprites[lineIndex].visible = false;
+            }
+            lineIndex += 1;
             return;
         }
-        const text = new PIXI.Text(`${line}`, bodyStyle);
-        text.x = baseX;
-        text.y = currentY;
-        stage.addChild(text);
+        let textSprite = lineSprites[lineIndex];
+        if (!textSprite) {
+            textSprite = new PIXI.Text('', PANEL_BODY_STYLE);
+            lineSprites[lineIndex] = textSprite;
+        }
+        textSprite.visible = true;
+        textSprite.text = `${line}`;
+        textSprite.x = baseX;
+        textSprite.y = currentY;
+        stage.addChild(textSprite);
         currentY += 15;
+        lineIndex += 1;
     });
+
+    if (lineSprites) {
+        for (let i = lineIndex; i < lineSprites.length; i += 1) {
+            if (lineSprites[i]) {
+                lineSprites[i].visible = false;
+            }
+        }
+    }
 };
 
 var drawHealth = (game, stage) => {
 
-    var percent = game.player.health / MAX_HEALTH;
-
-    var tmpText = new PIXI.Texture(
-        game.textures['health'].baseTexture,
-        new PIXI.Rectangle(0, 0, 38, percent * 87)
-    );
-
-    var health = new PIXI.Sprite(tmpText);
-    health.anchor = {x: 1, y: 1};
-    health.x = game.maxMapX + (137 + 38);
-    health.y = 160 + 87;
-
-
-    stage.addChild(health);
+    const percent = Math.max(0, Math.min(1, game.player.health / MAX_HEALTH));
+    const height = Math.floor(percent * HEALTH_BAR_HEIGHT);
+    const state = ensureHealthSpriteState(game);
+    if (!state) {
+        return;
+    }
+    const { sprite, texture } = state;
+    if (!sprite || !texture) {
+        return;
+    }
+    const needsUpdate = texture.frame.height !== height;
+    if (needsUpdate) {
+        texture.frame = new PIXI.Rectangle(0, 0, HEALTH_BAR_WIDTH, height);
+        texture.updateUvs();
+    }
+    sprite.visible = height > 0;
+    sprite.x = game.maxMapX + (137 + HEALTH_BAR_WIDTH);
+    sprite.y = 160 + HEALTH_BAR_HEIGHT;
+    if (!sprite.parent) {
+        stage.addChild(sprite);
+    } else if (sprite.parent !== stage) {
+        sprite.parent.removeChild(sprite);
+        stage.addChild(sprite);
+    }
 };
 
 
