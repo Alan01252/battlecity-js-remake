@@ -207,13 +207,34 @@ const getTankRow = (player, me) => {
     return isMayor ? 3 : 2;
 };
 
+const tankTextureCache = new Map();
+
+const getTankTexture = (game, row, column) => {
+    const baseTexture = game.textures['tankTexture']?.baseTexture;
+    if (!baseTexture) {
+        return null;
+    }
+    const baseId = baseTexture.uid || baseTexture.cacheId || 'tank';
+    const key = `${baseId}:${row}:${column}`;
+    let texture = tankTextureCache.get(key);
+    if (!texture) {
+        texture = new PIXI.Texture(
+            baseTexture,
+            new PIXI.Rectangle(column * 48, row * 48, 48, 48)
+        );
+        tankTextureCache.set(key, texture);
+    }
+    return texture;
+};
+
 const createTankSprite = (game, player, me) => {
     const direction = player?.direction || 0;
     const row = getTankRow(player, me);
-    const texture = new PIXI.Texture(
-        game.textures['tankTexture'].baseTexture,
-        new PIXI.Rectangle(Math.floor(direction / 2) * 48, row * 48, 48, 48)
-    );
+    const column = Math.floor(direction / 2);
+    const texture = getTankTexture(game, row, column);
+    if (!texture) {
+        return new PIXI.Sprite();
+    }
     return new PIXI.Sprite(texture);
 };
 

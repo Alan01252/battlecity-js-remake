@@ -34,6 +34,40 @@ const COMMAND_CENTER_LABEL_STYLE = Object.freeze({
 });
 const COMMAND_CENTER_LABEL_RESOLUTION = 2;
 const COMMAND_CENTER_LABEL_OFFSET_Y = -32;
+const textureCache = new Map();
+
+const getSubTexture = (baseTexture, cacheKey, x, y, width, height) => {
+    if (!baseTexture) {
+        return null;
+    }
+    const baseId = baseTexture.uid || baseTexture.cacheId || 'base';
+    const key = `${baseId}:${cacheKey}:${x}:${y}:${width}:${height}`;
+    let cached = textureCache.get(key);
+    if (!cached) {
+        cached = new PIXI.Texture(
+            baseTexture,
+            new PIXI.Rectangle(x, y, width, height)
+        );
+        textureCache.set(key, cached);
+    }
+    return cached;
+};
+
+const getCameraPosition = (game) => {
+    const offsetX = Number.isFinite(game.player?.offset?.x) ? game.player.offset.x : 0;
+    const offsetY = Number.isFinite(game.player?.offset?.y) ? game.player.offset.y : 0;
+    return {
+        rawX: offsetX,
+        rawY: offsetY,
+        pixelX: Math.floor(offsetX),
+        pixelY: Math.floor(offsetY)
+    };
+};
+
+const modulo = (value, divisor) => {
+    const remainder = value % divisor;
+    return remainder < 0 ? remainder + divisor : remainder;
+};
 
 const ensureLayers = (backgroundTiles) => {
     if (!backgroundTiles.tileLayer) {
@@ -57,21 +91,34 @@ const ensureLayers = (backgroundTiles) => {
 };
 
 var drawLava = (game, tileLayer, i, j, tileX, tileY) => {
-    var tmpText = new PIXI.Texture(
-        game.textures['lavaTexture'].baseTexture,
-        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, TILE_SIZE, TILE_SIZE)
+    const texture = getSubTexture(
+        game.textures['lavaTexture']?.baseTexture,
+        `lava:${game.tiles[tileX][tileY]}`,
+        game.tiles[tileX][tileY],
+        0,
+        TILE_SIZE,
+        TILE_SIZE
     );
-
-    tileLayer.addFrame(tmpText, i * TILE_SIZE, j * TILE_SIZE);
+    if (!texture) {
+        return;
+    }
+    tileLayer.addFrame(texture, i * TILE_SIZE, j * TILE_SIZE);
 };
 
 
 var drawRocks = (game, tileLayer, i, j, tileX, tileY) => {
-    var tmpText = new PIXI.Texture(
-        game.textures['rockTexture'].baseTexture,
-        new PIXI.Rectangle(game.tiles[tileX][tileY], 0, TILE_SIZE, TILE_SIZE)
+    const texture = getSubTexture(
+        game.textures['rockTexture']?.baseTexture,
+        `rock:${game.tiles[tileX][tileY]}`,
+        game.tiles[tileX][tileY],
+        0,
+        TILE_SIZE,
+        TILE_SIZE
     );
-    tileLayer.addFrame(tmpText, i * TILE_SIZE, j * TILE_SIZE);
+    if (!texture) {
+        return;
+    }
+    tileLayer.addFrame(texture, i * TILE_SIZE, j * TILE_SIZE);
 };
 
 
@@ -86,18 +133,29 @@ var drawBuilding = (game, tileLayer, i, j, tileX, tileY) => {
 
 
 
-    var tmpText = new PIXI.Texture(
-        game.textures['buildings'].baseTexture,
-        new PIXI.Rectangle(0, baseType * 144, 144, 144, 144)
+    const baseTexture = getSubTexture(
+        game.textures['buildings']?.baseTexture,
+        `building:${baseType}`,
+        0,
+        baseType * 144,
+        144,
+        144
     );
+    if (!baseTexture) {
+        return;
+    }
 
-    tileLayer.addFrame(tmpText, i * TILE_SIZE, j * TILE_SIZE, 1, 0);
+    tileLayer.addFrame(baseTexture, i * TILE_SIZE, j * TILE_SIZE, 1, 0);
 
     let buildingOverlayTexture = null;
     try {
-        buildingOverlayTexture = new PIXI.Texture(
-            game.textures['imageItems'].baseTexture,
-            new PIXI.Rectangle(subType * 32, 0, 32, 32)
+        buildingOverlayTexture = getSubTexture(
+            game.textures['imageItems']?.baseTexture,
+            `buildingOverlay:${subType}`,
+            subType * 32,
+            0,
+            32,
+            32
         );
     } catch (_ex) {
         buildingOverlayTexture = null;
@@ -129,10 +187,17 @@ var drawBuilding = (game, tileLayer, i, j, tileX, tileY) => {
             const frameColumn = frameIndex; // single row progression (0-6)
             const frameRow = isCommandCenter ? 1 : 0;
 
-            const populationTexture = new PIXI.Texture(
-                game.textures['population'].baseTexture,
-                new PIXI.Rectangle(frameColumn * frameWidth, frameRow * frameHeight, frameWidth, frameHeight)
+            const populationTexture = getSubTexture(
+                game.textures['population']?.baseTexture,
+                `population:${frameRow}:${frameColumn}`,
+                frameColumn * frameWidth,
+                frameRow * frameHeight,
+                frameWidth,
+                frameHeight
             );
+            if (!populationTexture) {
+                return;
+            }
 
             const populationOffsets = {
                 [BUILDING_COMMAND_CENTER]: { x: 96, y: 49 },
@@ -156,13 +221,19 @@ var drawBuilding = (game, tileLayer, i, j, tileX, tileY) => {
 
     if (baseType === BUILDING_FACTORY && building && building.smokeActive && game.textures['smoke']) {
         const smokeFrame = Math.max(0, (building.smokeFrame || 1) - 1);
-        const smokeTexture = new PIXI.Texture(
-            game.textures['smoke'].baseTexture,
-            new PIXI.Rectangle(0, smokeFrame * 60, 180, 60)
+        const smokeTexture = getSubTexture(
+            game.textures['smoke']?.baseTexture,
+            `smoke:${smokeFrame}`,
+            0,
+            smokeFrame * 60,
+            180,
+            60
         );
-        const smokeX = (i * TILE_SIZE) + 6;
-        const smokeY = (j * TILE_SIZE) - 15;
-        tileLayer.addFrame(smokeTexture, smokeX, smokeY);
+        if (smokeTexture) {
+            const smokeX = (i * TILE_SIZE) + 6;
+            const smokeY = (j * TILE_SIZE) - 15;
+            tileLayer.addFrame(smokeTexture, smokeX, smokeY);
+        }
     }
 
     if (baseType === BUILDING_FACTORY && building && typeof building.itemsLeft === 'number' && game.textures['blackNumbers']) {
@@ -171,11 +242,17 @@ var drawBuilding = (game, tileLayer, i, j, tileX, tileY) => {
         const ones = cappedValue % 10;
 
         const addDigit = (digit, offsetX) => {
-            const digitTexture = new PIXI.Texture(
-                game.textures['blackNumbers'].baseTexture,
-                new PIXI.Rectangle(digit * 16, 0, 16, 16)
+            const digitTexture = getSubTexture(
+                game.textures['blackNumbers']?.baseTexture,
+                `digit:${digit}`,
+                digit * 16,
+                0,
+                16,
+                16
             );
-            tileLayer.addFrame(digitTexture, (i * TILE_SIZE) + offsetX, (j * TILE_SIZE) + 84);
+            if (digitTexture) {
+                tileLayer.addFrame(digitTexture, (i * TILE_SIZE) + offsetX, (j * TILE_SIZE) + 84);
+            }
         };
 
         addDigit(tens, 56);
@@ -205,13 +282,6 @@ const syncCommandCenterLabels = (game) => {
     const cache = game.commandCenterLabelCache;
     const activeKeys = new Set();
 
-    const playerOffsetX = Number.isFinite(game.player?.offset?.x) ? game.player.offset.x : 0;
-    const playerOffsetY = Number.isFinite(game.player?.offset?.y) ? game.player.offset.y : 0;
-    const defaultOffsetX = Number.isFinite(game.player?.defaultOffset?.x) ? game.player.defaultOffset.x : 0;
-    const defaultOffsetY = Number.isFinite(game.player?.defaultOffset?.y) ? game.player.defaultOffset.y : 0;
-    const offsetX = defaultOffsetX - playerOffsetX;
-    const offsetY = defaultOffsetY - playerOffsetY;
-
     let node = typeof game.buildingFactory.getHead === 'function'
         ? game.buildingFactory.getHead()
         : null;
@@ -228,13 +298,7 @@ const syncCommandCenterLabels = (game) => {
             const baseTileY = toFinite(node.y, 0);
             const centerX = (baseTileX + 1.5) * TILE_SIZE;
             const centerY = (baseTileY + 1.5) * TILE_SIZE;
-            const screenX = centerX + offsetX;
-            const screenY = centerY + offsetY;
             const cityName = getCityDisplayName(node.city ?? 0);
-
-            const isWithinView =
-                Math.abs(centerX - playerOffsetX) <= VIEW_RADIUS_TILES * TILE_SIZE &&
-                Math.abs(centerY - playerOffsetY) <= VIEW_RADIUS_TILES * TILE_SIZE;
 
             let record = cache.get(key);
             if (!record) {
@@ -242,16 +306,15 @@ const syncCommandCenterLabels = (game) => {
                 label.anchor.set(0.5);
                 label.resolution = COMMAND_CENTER_LABEL_RESOLUTION;
                 labelLayer.addChild(label);
-                record = { label, text: cityName };
+                record = { label, text: cityName, worldX: centerX, worldY: centerY };
                 cache.set(key, record);
             } else if (record.text !== cityName) {
                 record.label.text = cityName;
                 record.text = cityName;
             }
 
-            record.label.visible = isWithinView;
-            record.label.x = screenX;
-            record.label.y = screenY + COMMAND_CENTER_LABEL_OFFSET_Y;
+            record.worldX = centerX;
+            record.worldY = centerY;
         }
         node = node.next;
     }
@@ -265,6 +328,31 @@ const syncCommandCenterLabels = (game) => {
                 record.label.destroy();
             }
             cache.delete(key);
+        }
+    });
+};
+
+const updateCommandCenterLabelVisibility = (game, camera) => {
+    if (!game?.commandCenterLabelCache) {
+        return;
+    }
+    const cache = game.commandCenterLabelCache;
+    const threshold = VIEW_RADIUS_TILES * TILE_SIZE;
+    const defaultOffsetX = Number.isFinite(game.player?.defaultOffset?.x) ? game.player.defaultOffset.x : 0;
+    const defaultOffsetY = Number.isFinite(game.player?.defaultOffset?.y) ? game.player.defaultOffset.y : 0;
+    cache.forEach((record) => {
+        if (!record || !record.label) {
+            return;
+        }
+        const visible =
+            Math.abs(record.worldX - camera.rawX) <= threshold &&
+            Math.abs(record.worldY - camera.rawY) <= threshold;
+        record.label.visible = visible;
+        if (visible) {
+            const screenX = record.worldX + (defaultOffsetX - camera.rawX);
+            const screenY = record.worldY + (defaultOffsetY - camera.rawY) + COMMAND_CENTER_LABEL_OFFSET_Y;
+            record.label.x = screenX;
+            record.label.y = screenY;
         }
     });
 };
@@ -337,8 +425,9 @@ export const drawTiles = (game, backgroundTiles) => {
         return;
     }
 
-    var offTileX = Math.floor(game.player.offset.x % TILE_SIZE);
-    var offTileY = Math.floor(game.player.offset.y % TILE_SIZE);
+    const camera = getCameraPosition(game);
+    var offTileX = Math.floor(modulo(camera.pixelX, TILE_SIZE));
+    var offTileY = Math.floor(modulo(camera.pixelY, TILE_SIZE));
 
 
     if (needToRedraw(game)) {
@@ -349,8 +438,8 @@ export const drawTiles = (game, backgroundTiles) => {
         edgeOverlay.clear();
         edgeOverlay.beginFill(0x000000, 1);
 
-        var exactX = Math.floor(game.player.offset.x / TILE_SIZE);
-        var exactY = Math.floor(game.player.offset.y / TILE_SIZE);
+        var exactX = Math.floor(camera.rawX / TILE_SIZE);
+        var exactY = Math.floor(camera.rawY / TILE_SIZE);
         var mapWidth = game.map.length;
         var mapHeight = Array.isArray(game.map[0]) ? game.map[0].length : 0;
 
@@ -382,11 +471,12 @@ export const drawTiles = (game, backgroundTiles) => {
         edgeOverlay.endFill();
 
         backgroundTiles.position.set(
-            game.player.defaultOffset.x + game.player.offset.x - offTileX,
-            game.player.defaultOffset.y + game.player.offset.y - offTileY
+            game.player.defaultOffset.x + camera.pixelX - offTileX,
+            game.player.defaultOffset.y + camera.pixelY - offTileY
         );
     }
 
-    backgroundTiles.pivot.set(game.player.offset.x, game.player.offset.y);
+    backgroundTiles.pivot.set(camera.pixelX, camera.pixelY);
+    updateCommandCenterLabelVisibility(game, camera);
     pruneCommandCenterLabels(game);
 };
