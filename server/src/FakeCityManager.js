@@ -746,8 +746,8 @@ class FakeCityManager {
         const resolvedLayout = Array.isArray(layout) && layout.length
             ? layout
             : (Array.isArray(entry?.layout) && entry.layout.length
-                ? entry.layout
-                : (Array.isArray(this.config.layout) ? this.config.layout : []));
+                    ? entry.layout
+                    : (Array.isArray(this.config.layout) ? this.config.layout : []));
 
         const bounds = calculateLayoutBounds(resolvedLayout, baseTileX, baseTileY);
         const margin = Math.max(0, toFiniteNumber(entry?.patrolMarginTiles, RECRUIT_PATROL_MARGIN_TILES));
@@ -1325,9 +1325,9 @@ class FakeCityManager {
 
         const targetCenter = target
             ? {
-                x: (target.offset?.x ?? target.x ?? 0) + (TILE_SIZE / 2),
-                y: (target.offset?.y ?? target.y ?? 0) + (TILE_SIZE / 2)
-            }
+                    x: (target.offset?.x ?? target.x ?? 0) + (TILE_SIZE / 2),
+                    y: (target.offset?.y ?? target.y ?? 0) + (TILE_SIZE / 2)
+                }
             : null;
 
         if (mode === 'patrol') {
@@ -1763,9 +1763,9 @@ class FakeCityManager {
 
         const lastSeen = lastSeenAge <= LAST_SEEN_TIMEOUT_MS
             ? {
-                x: record.lastSeenX ?? shooterCenter.x,
-                y: record.lastSeenY ?? shooterCenter.y
-            }
+                    x: record.lastSeenX ?? shooterCenter.x,
+                    y: record.lastSeenY ?? shooterCenter.y
+                }
             : null;
 
         const rangePx = targetCenter
@@ -1873,9 +1873,9 @@ class FakeCityManager {
         const currentTile = pixelToTile(px, py);
         let desiredPoint = goal
             ? {
-                x: goal.goalPixelX ?? px,
-                y: goal.goalPixelY ?? py
-            }
+                    x: goal.goalPixelX ?? px,
+                    y: goal.goalPixelY ?? py
+                }
             : null;
 
         if (goal && goal.requiresPath && desiredPoint) {
@@ -1935,9 +1935,9 @@ class FakeCityManager {
             if (desiredPoint) {
                 const point = (mode === 'patrol' && Number.isFinite(record.motionSeed))
                     ? {
-                        x: clamp(desiredPoint.x + ((record.motionSeed - 0.5) * PATH_JITTER_PX), 0, MAP_MAX_COORD),
-                        y: clamp(desiredPoint.y - ((record.motionSeed - 0.5) * PATH_JITTER_PX), 0, MAP_MAX_COORD)
-                    }
+                            x: clamp(desiredPoint.x + ((record.motionSeed - 0.5) * PATH_JITTER_PX), 0, MAP_MAX_COORD),
+                            y: clamp(desiredPoint.y - ((record.motionSeed - 0.5) * PATH_JITTER_PX), 0, MAP_MAX_COORD)
+                        }
                     : desiredPoint;
                 return {
                     point,

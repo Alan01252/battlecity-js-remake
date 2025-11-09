@@ -195,7 +195,7 @@ const game = {
             x: 0,
             y: 0,
             vx: 0,
-        vy: 0
+            vy: 0
         },
         bombsArmed: false,
         lastSafeOffset: {
@@ -1768,35 +1768,35 @@ function setup() {
     }
 
 
-     app.stage.addChild(groundTiles);
-     app.stage.addChild(backgroundTiles);
-     app.stage.addChild(itemTiles);
-     app.stage.addChild(iconTiles);
-     app.stage.addChild(commandCenterLabelLayer);
-     app.stage.addChild(objectContainer);
-     app.stage.addChild(panelContainer);
+    app.stage.addChild(groundTiles);
+    app.stage.addChild(backgroundTiles);
+    app.stage.addChild(itemTiles);
+    app.stage.addChild(iconTiles);
+    app.stage.addChild(commandCenterLabelLayer);
+    app.stage.addChild(objectContainer);
+    app.stage.addChild(panelContainer);
 
-     game.gBotDebug = new PIXI.Graphics();
-     app.stage.addChild(game.gBotDebug);
-
-
-     setupBuildingMenu(game);
-
-     game.forceDraw = true;
+    game.gBotDebug = new PIXI.Graphics();
+    app.stage.addChild(game.gBotDebug);
 
 
-     drawGround(game, groundTiles);
-     drawTiles(game, backgroundTiles);
-     drawIcons(game, iconTiles);
-     drawItems(game, itemTiles);
+    setupBuildingMenu(game);
 
-     drawPanelInterface(game, panelContainer);
+    game.forceDraw = true;
 
 
-     game.forceDraw = false;
+    drawGround(game, groundTiles);
+    drawTiles(game, backgroundTiles);
+    drawIcons(game, iconTiles);
+    drawItems(game, itemTiles);
+
+    drawPanelInterface(game, panelContainer);
 
 
-     gameLoop();
+    game.forceDraw = false;
+
+
+    gameLoop();
 }
 
 

@@ -46,6 +46,10 @@
 - Map/city generation is placeholder (`cityBuilder.createFakeCity` commented); expect additional logic or data integration work.
 - Bullet physics run client-side; server currently trusts client data, so authoritative validation is absent.
 
+## Linting & Automation
+- Run `npm run lint` from the repository root before committing. The ESLint flat config (`eslint.config.js`) enforces 4-space indentation across the repo—expect large diffs if you introduce inconsistent indenting and use `npm run lint -- --fix` to realign files when needed.
+- GitLab CI now runs the same command in the `lint` stage using Node 20 (`.gitlab-ci.yml`). Ensure the command passes locally to keep pipelines green.
+
 ## Useful Entry Points for Future Work
 - Player movement logic: `client/src/play.js`.
 - Spawning buildings & permissions: `client/src/factories/BuildingFactory.js` and `client/src/draw/draw-building-interface.js`.

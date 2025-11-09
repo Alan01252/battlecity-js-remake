@@ -302,10 +302,10 @@ class ScoreService {
         const newRankIndex = this.rankOrder[updated.rankTitle] ?? previousRankIndex;
         const promotion = (newRankIndex > previousRankIndex && updated.points > before.points)
             ? {
-                userId: updated.userId,
-                rankTitle: updated.rankTitle,
-                displayName: updated.displayName
-            }
+                    userId: updated.userId,
+                    rankTitle: updated.rankTitle,
+                    displayName: updated.displayName
+                }
             : null;
 
         return { profile: updated, promotion, changed: true };
