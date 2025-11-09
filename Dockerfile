@@ -23,13 +23,13 @@ ENV NODE_ENV=production
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/client/dist ./client/dist
 
-# Install server production dependencies
+# Install server production dependencies without bringing over builder node_modules
 WORKDIR /app/server
 COPY --from=builder /app/server/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy server source after installing dependencies
-COPY --from=builder /app/server ./
+# Copy server source excluding prebuilt node_modules so Alpine dependencies remain intact
+COPY --from=builder /app/server ./ --exclude=node_modules
 
 EXPOSE 8021
 CMD ["node", "app.js"]
