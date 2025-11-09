@@ -29,6 +29,19 @@ const toTrimmedString = (value) => {
     return value.trim();
 };
 
+const escapeDiscordMentions = (value) => {
+    if (typeof value !== 'string') {
+        if (value === null || typeof value === 'undefined') {
+            return '';
+        }
+        return escapeDiscordMentions(String(value));
+    }
+    if (value.length === 0) {
+        return '';
+    }
+    return value.replace(/@/g, '@\u200B');
+};
+
 const shortenId = (value) => {
     if (!value || typeof value !== 'string') {
         return null;
@@ -173,32 +186,32 @@ class DiscordNotifier {
 
     formatCityName(payload, fallback) {
         if (!payload) {
-            return fallback;
+            return escapeDiscordMentions(fallback);
         }
         if (typeof payload.cityName === 'string' && payload.cityName.trim().length) {
-            return payload.cityName.trim();
+            return escapeDiscordMentions(payload.cityName.trim());
         }
         if (Number.isFinite(payload.cityId)) {
-            return `City ${Math.floor(payload.cityId) + 1}`;
+            return escapeDiscordMentions(`City ${Math.floor(payload.cityId) + 1}`);
         }
-        return fallback;
+        return escapeDiscordMentions(fallback);
     }
 
     formatPlayerName(payload, fallback = 'Unknown Player') {
         if (!payload) {
-            return fallback;
+            return escapeDiscordMentions(fallback);
         }
         if (typeof payload.displayName === 'string' && payload.displayName.trim().length) {
-            return payload.displayName.trim();
+            return escapeDiscordMentions(payload.displayName.trim());
         }
         if (typeof payload.callsign === 'string' && payload.callsign.trim().length) {
-            return payload.callsign.trim();
+            return escapeDiscordMentions(payload.callsign.trim());
         }
         const shortId = shortenId(typeof payload.playerId === 'string' ? payload.playerId : String(payload.playerId || ''));
         if (shortId) {
-            return shortId;
+            return escapeDiscordMentions(shortId);
         }
-        return fallback;
+        return escapeDiscordMentions(fallback);
     }
 
     notifyPlayerJoined(payload = {}) {
